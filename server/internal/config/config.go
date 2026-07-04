@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	Port      string // HTTP 端口
+	Root      string // 项目根(算版本 + 持仓文件)
 	DataDir   string // 每日快照 JSON 目录(engine 产出)
 	EngineDir string // Python 引擎目录
 	PythonBin string // python 解释器(默认复用 safna_jr 的 uv venv)
@@ -19,6 +20,7 @@ func Load() Config {
 	root := findRoot()
 	return Config{
 		Port:      envOr("SENTINEL_PORT", "8787"),
+		Root:      root,
 		DataDir:   envOr("SENTINEL_DATA", filepath.Join(root, "data")),
 		EngineDir: envOr("SENTINEL_ENGINE", filepath.Join(root, "engine")),
 		PythonBin: envOr("SENTINEL_PYTHON", "/Users/lugia/lugia_fc/TradingAgents/.venv/bin/python"),

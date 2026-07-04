@@ -35,3 +35,15 @@ export interface Snapshot {
   holdings: Holding[]
   portfolio: { n_holdings: number; gross_exposure: number; cash_pct: number }
 }
+
+export interface Position { ticker: string; shares: number; cost: number }
+export interface PnLRow extends Position {
+  price: number; priced: boolean
+  market_value: number; cost_value: number; pnl: number; pnl_pct: number
+}
+export interface PnLResult {
+  asof: string
+  positions: PnLRow[]
+  summary: { market_value: number; cost_value: number; pnl: number; pnl_pct: number }
+}
+export interface Version { version: string; branch: string; commit: string }

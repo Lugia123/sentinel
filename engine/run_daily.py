@@ -54,11 +54,14 @@ def trend_grade(r):
     return int(np.clip(round(s * 3 / 7), -3, 3))
 
 
-def build_z_quantiles(uni, asof_i, h):
+def build_z_quantiles(uni, POS, h):
     """全池历史标准化前瞻收益 z=fwd_h/(vol*sqrt(h)) 的经验分位(<=asof,无前视)。"""
     zs = []
     for tk, df in uni.items():
-        c = df["close"].values[:asof_i + 1]
+        p = POS.get(tk)
+        if p is None:
+            continue
+        c = df["close"].values[:p + 1]
         if len(c) < 300:
             continue
         r1 = pd.Series(c).pct_change()
@@ -107,28 +110,41 @@ def main():
     asof = all_dates[asof_i]
     print(f"as-of(收盘日): {asof.date()}", flush=True)
 
-    # 每票 as-of 行 + 63日波动
-    def row(tk, i):
-        df = uni[tk]
-        if i >= len(df):
+    # ★ 无前视关键:按【日期】per-ticker 定位,不用共享位置索引(各票上市日/行数不同,
+    #   位置索引会错位取到未来价)。POS[tk] = 该票 <=asof 的最后一行位置。
+    asof64 = np.datetime64(asof)
+
+    def _pos(df):
+        d = pd.to_datetime(df["date"]).values
+        p = int(np.searchsorted(d, asof64, side="right")) - 1
+        return p if p >= 0 else None
+    POS = {tk: _pos(df) for tk, df in uni.items()}
+
+    def row(tk):
+        i = POS.get(tk)
+        if i is None:
             return None
+        df = uni[tk]
         return {c: df[c].iloc[i] for c in
                 ("close", "sma20", "sma50", "sma200", "sma200_slope", "mom21", "mom126", "pct_from_high")}
 
-    def vol63(tk, i):
-        c = uni[tk]["close"].values[:i + 1]
-        if len(c) < 64:
+    def vol63(tk):
+        i = POS.get(tk)
+        if i is None or i < 63:
             return np.nan
+        c = uni[tk]["close"].values[:i + 1]
         return float(pd.Series(c).pct_change().tail(63).std())
 
     # ── 选股 ──
     spy_c = spy["close"].values
-    spy_mom = (spy_c[asof_i] / spy_c[asof_i - 126] - 1) if asof_i >= 126 else 0.0
+    spy_dt = pd.to_datetime(spy["date"]).values
+    sp = int(np.searchsorted(spy_dt, asof64, side="right")) - 1
+    spy_mom = (spy_c[sp] / spy_c[sp - 126] - 1) if sp >= 126 else 0.0
     elig = []
     for tk in NARROW:
         if tk not in uni:
             continue
-        r = row(tk, asof_i)
+        r = row(tk)
         if r is None or pd.isna(r["close"]) or pd.isna(r["sma200"]) or pd.isna(r["mom126"]):
             continue
         if r["close"] > r["sma200"] and r["sma200_slope"] > 0 and r["close"] > r["sma50"] \
@@ -142,13 +158,13 @@ def main():
         try:
             from backtest_r24 import FundamentalsPITExtended
             fp = FundamentalsPITExtended(verbose=False)
-            avail = [tk for tk in uni if (r := row(tk, asof_i)) and not pd.isna(r["close"]) and r["close"] >= 5]
+            avail = [tk for tk in uni if (r := row(tk)) and not pd.isna(r["close"]) and r["close"] >= 5]
             scored = {}
             for tk in avail:
                 if tk not in fp.available_tickers():
                     continue
                 sh = fp.get_latest(tk, "CommonStockSharesOutstanding", asof, lag_days=45)
-                px = row(tk, asof_i)["close"]
+                px = row(tk)["close"]
                 if not sh or sh <= 0:
                     continue
                 mcap = sh * px
@@ -164,7 +180,7 @@ def main():
 
     # ── 风险平价定仓(逆波动,各腿50%)──
     def ivw(picks, frac):
-        iv = {tk: 1.0 / v for tk in picks if (v := vol63(tk, asof_i)) and v > 0}
+        iv = {tk: 1.0 / v for tk in picks if (v := vol63(tk)) and v > 0}
         s = sum(iv.values())
         return {tk: frac * iv.get(tk, 0) / s for tk in picks} if s > 0 else {}
     base = {}
@@ -174,21 +190,21 @@ def main():
         base[tk] = base.get(tk, 0) + w
 
     # ── 风险灯(波动目标)──
-    spy_ret = pd.Series(spy_c[:asof_i + 1]).pct_change()
+    spy_ret = pd.Series(spy_c[:sp + 1]).pct_change()
     spyvol = float(spy_ret.tail(21).std() * np.sqrt(252))
     exposure = float(min(1.0, VOL_TARGET / spyvol)) if spyvol > 0 else 1.0
     light = "green" if exposure >= 0.95 else ("amber" if exposure >= 0.7 else "red")
 
     # ── 概率分位(全池,每 horizon 一次)──
-    zqs = {h: build_z_quantiles(uni, asof_i, h) for h in HORIZONS}
+    zqs = {h: build_z_quantiles(uni, POS, h) for h in HORIZONS}
 
     # ── 组装 holdings ──
     holdings = []
     for tk in sorted(base, key=lambda t: -base[t]):
-        r = row(tk, asof_i)
+        r = row(tk)
         px = float(r["close"]); g = trend_grade(r)
         mult, label = ACTION[g]
-        v63 = vol63(tk, asof_i)
+        v63 = vol63(tk)
         prob = {}
         for h in HORIZONS:
             zq, zsort = zqs[h]
@@ -223,7 +239,21 @@ def main():
     latest = os.path.join(OUT_DIR, "snapshot_latest.json")
     with open(latest, "w") as f:
         json.dump(snap, f, ensure_ascii=False, indent=2)
+    # 价格表(全池 asof 收盘价)——供后端算用户持仓盈亏,as-of 一致
+    prices = {}
+    for tk, df in uni.items():
+        p = POS.get(tk)
+        if p is not None:
+            c = df["close"].iloc[p]
+            if not pd.isna(c):
+                prices[tk] = round(float(c), 4)
+    pd_out = dict(asof=str(asof.date()), prices=prices)
+    for name in (f"prices_{asof.date()}.json", "prices_latest.json"):
+        with open(os.path.join(OUT_DIR, name), "w") as f:
+            json.dump(pd_out, f, ensure_ascii=False)
+
     print(f"快照写入 {out}", flush=True)
+    print(f"价格表 {len(prices)} 只", flush=True)
     print(f"持仓 {len(holdings)} 只 | 风险灯 {light}(SPYvol {spyvol:.1%},建议仓位 {exposure:.0%})", flush=True)
     print(f"动量腿 {len(mom_picks)} / SY腿 {len(sy_picks)}", flush=True)
 

@@ -1,33 +1,56 @@
 :root {
-  --bg: #f5f7fb; --surface: #ffffff; --surface-2: #eef2f8; --border: #e3e8f1;
-  --ink: #15203a; --ink-soft: #3f4d68; --ink-mute: #5c6a83;
-  --brand: #1f51e0; --up: #0ca678; --down: #e23d34; --neutral: #2f80ed; --warn: #e08a1e;
-  --shadow: 0 1px 3px rgba(16,24,40,.07), 0 1px 2px rgba(16,24,40,.04);
+  --bg: #0a0e17;          /* 深色页面背景 */
+  --surface: #141b28;     /* 卡片 */
+  --surface-2: #1b2433;   /* 表头/次级 */
+  --border: #26303f;      /* 边框 */
+  --ink: #e6edf6;         /* 主文字 */
+  --ink-soft: #aeb9c9;    /* 次要 */
+  --ink-mute: #6b7787;    /* 弱化 */
+  --brand: #4d7cfe;       /* 主强调 */
+  --brand-2: #7c5cff;
+  --up: #2ecc9b;          /* 涨/多/盈 */
+  --down: #ff5c6c;        /* 跌/空/亏 */
+  --neutral: #4d9dff;     /* 中性 */
+  --warn: #f5a623;        /* 高亮/减仓 */
+  --shadow: 0 2px 8px rgba(0,0,0,.35);
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
-.wrap { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 20px; }
 .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
-.title { font-size: 22px; font-weight: 700; color: var(--brand); }
+.title { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: .3px; }
+.title .ver { font-size: 12px; color: var(--brand); margin-left: 8px; font-weight: 600; }
 .sub { color: var(--ink-mute); font-size: 13px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 16px; margin-bottom: 16px; }
+.card h3 { margin: 0 0 12px; font-size: 14px; color: var(--ink-soft); font-weight: 600; }
 .row { display: flex; gap: 16px; flex-wrap: wrap; }
 .row > .card { flex: 1; min-width: 200px; }
-.big { font-size: 26px; font-weight: 700; }
+.big { font-size: 26px; font-weight: 700; margin: 4px 0; }
 .muted { color: var(--ink-mute); font-size: 12px; }
-button { background: var(--brand); color: #fff; border: 0; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+button { background: var(--brand); color: #fff; border: 0; border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; font-weight: 600; }
+button:hover { filter: brightness(1.1); }
 button:disabled { opacity: .5; cursor: default; }
+button.ghost { background: transparent; border: 1px solid var(--border); color: var(--ink-soft); }
+input { background: var(--surface-2); border: 1px solid var(--border); color: var(--ink); border-radius: 6px; padding: 6px 8px; font-size: 13px; width: 90px; }
+input:focus { outline: none; border-color: var(--brand); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--border); }
 th:first-child, td:first-child { text-align: left; }
 th { color: var(--ink-mute); font-weight: 600; background: var(--surface-2); position: sticky; top: 0; }
 .tbl-scroll { overflow-x: auto; }
 .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-.g-3, .g-2 { background: rgba(12,166,120,.14); color: var(--up); }
-.g-1, .g0 { background: rgba(47,128,237,.14); color: var(--neutral); }
-.g-neg1 { background: rgba(224,138,30,.16); color: var(--warn); }
-.g-neg2, .g-neg3 { background: rgba(226,61,52,.14); color: var(--down); }
-.light { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-.light.green { background: var(--up); } .light.amber { background: var(--warn); } .light.red { background: var(--down); }
-.disc { color: var(--ink-mute); font-size: 12px; margin-top: 8px; }
+.g-3, .g-2 { background: rgba(46,204,155,.18); color: var(--up); }
+.g-1, .g0 { background: rgba(77,157,255,.18); color: var(--neutral); }
+.g-neg1 { background: rgba(245,166,35,.2); color: var(--warn); }
+.g-neg2, .g-neg3 { background: rgba(255,92,108,.18); color: var(--down); }
+.light { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 0 8px currentColor; }
+.light.green { background: var(--up); color: var(--up); }
+.light.amber { background: var(--warn); color: var(--warn); }
+.light.red { background: var(--down); color: var(--down); }
+.up { color: var(--up); } .down { color: var(--down); }
+.disc { color: var(--ink-mute); font-size: 12px; margin-top: 8px; line-height: 1.6; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tabs button.active { background: var(--brand); }
+.tabs button { background: var(--surface-2); color: var(--ink-soft); }
+.pos-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
