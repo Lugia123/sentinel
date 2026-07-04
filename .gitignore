@@ -1,0 +1,30 @@
+# deps / build
+node_modules/
+dist/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+.env
+.env.local
+.idea/
+.vscode/
+
+# go build 产物
+server/sentinel
+server/server
+server/cmd/server/dist/
+
+# python venv
+engine/.venv/
+
+# 运行期数据(每日快照/缓存,不入库)
+data/*.json
+data/cache/
+
+# 大数据集(软链或外部路径,不入库)
+engine/data/
+
+# 构建产物 / 机器相关软链
+client/tsconfig.tsbuildinfo
+engine/data
