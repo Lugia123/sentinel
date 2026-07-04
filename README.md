@@ -16,15 +16,26 @@
 
 ## 架构
 ```
-client/   React + Vite + TS + Tailwind + ECharts   仪表盘
-server/   Go (gin)                                  API + 编排 + 调度
-engine/   Python(复用 safna_jr 已验证逻辑)         每日算快照(选股/定仓/档位/概率/风险)
-data/     每日快照 JSON(运行期,不入库)
+client/       React + Vite + TS + ECharts        仪表盘(暗色金融风)
+server/       Go (net/http) + gorm               API + 编排 + ingest
+  migrations/ 编号 SQL 迁移(对齐 Tinia)
+engine/       Python(复用 safna_jr 已验证逻辑)   每日算快照 JSON(选股/定仓/档位/概率/风险)
+data/         引擎产出的 JSON(ingest 源,不入库)
+PostgreSQL    快照/持仓/价格/运行日志持久化
 ```
-Go 后端每日触发 Python 引擎算快照,缓存后经 API 供 React 展示。参考 Tinia 的 Go+Python 模式。
+Go 后端触发 Python 引擎算快照(产 JSON)→ ingest 入 PostgreSQL → 经 API 供 React。参考 Tinia 的 Go+Python+PG 模式。
+
+## 数据库(PostgreSQL)
+- 连接 Docker 容器 `bestfunc-postgres`(postgres:16,宿主端口 **5433**)里的独立库 **sentinel**。
+- 建库:`docker exec bestfunc-postgres createdb -U bestfunc sentinel`
+- 配置:复制 `server/.env.example` → `server/.env`,填 DSN(密码不入库);后端启动时**自动跑迁移**。
+- 5 张表:`snapshots`(每日快照,asof 唯一)`holdings`(快照内持仓)`prices`(日度收盘)`positions`(用户实际持仓)`runs`(运行日志)。详见 `server/migrations/0001_init.up.sql`。
 
 ## 快速开始
-见 `scripts/run-dev.sh`(引擎 → 后端 → 前端)。
+```bash
+cp server/.env.example server/.env   # 填 DB 密码
+./scripts/run-dev.sh                  # 引擎 → 后端(自动迁移)→ 前端:5173
+```
 
 ## 红线
 只做多、手动执行、真摩擦分档税、无前视、必带免责声明、不写密钥(只在 `.env`)。

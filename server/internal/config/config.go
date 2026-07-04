@@ -1,29 +1,53 @@
-// Package config — Sentinel 后端配置(路径 / 端口 / 引擎命令)。
+// Package config — Sentinel 后端配置(路径 / 端口 / 引擎 / 数据库)。
 package config
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Config struct {
 	Port      string // HTTP 端口
-	Root      string // 项目根(算版本 + 持仓文件)
-	DataDir   string // 每日快照 JSON 目录(engine 产出)
+	Root      string // 项目根(算版本)
+	DataDir   string // 引擎产出的快照/价格 JSON 目录(ingest 源)
 	EngineDir string // Python 引擎目录
 	PythonBin string // python 解释器(默认复用 safna_jr 的 uv venv)
+	DBDSN     string // PostgreSQL DSN(密码在 server/.env,不入库)
 }
 
-// Load 从环境变量读配置,给出合理默认值(本地开发即用)。
+// Load 从环境变量 / server/.env 读配置,给出合理默认值(本地开发即用)。
 func Load() Config {
-	// 项目根 = 可执行文件上溯;开发期用 CWD 上溯到含 engine/ 的目录
 	root := findRoot()
+	loadDotenv(filepath.Join(root, "server", ".env")) // 开发期自动加载 .env(含 DB 密码)
 	return Config{
 		Port:      envOr("SENTINEL_PORT", "8787"),
 		Root:      root,
 		DataDir:   envOr("SENTINEL_DATA", filepath.Join(root, "data")),
 		EngineDir: envOr("SENTINEL_ENGINE", filepath.Join(root, "engine")),
 		PythonBin: envOr("SENTINEL_PYTHON", "/Users/lugia/lugia_fc/TradingAgents/.venv/bin/python"),
+		DBDSN:     envOr("SENTINEL_DB_DSN", "host=localhost port=5433 user=bestfunc dbname=sentinel sslmode=disable"),
+	}
+}
+
+// loadDotenv 极简 .env 解析(KEY=VALUE),只设未存在的环境变量;文件缺失静默。
+func loadDotenv(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if ok && os.Getenv(strings.TrimSpace(k)) == "" {
+			os.Setenv(strings.TrimSpace(k), strings.TrimSpace(v))
+		}
 	}
 }
 

@@ -5,9 +5,10 @@
 
 ## 架构与目录
 - `engine/` **Python 策略引擎(核心,复用 safna_jr 已验证逻辑)**:`run_daily.py` 产出每日快照 JSON(选股/定仓/7档/到价概率/风险灯)。数据源 `engine/data/`(软链到 safna_jr/round20/data_broad,live 用 yfinance 刷)。
-- `server/` **Go(gin)后端**:module `sentinel`,`cmd/server/main.go` 入口,`internal/{api,engine,store,config}`。职责=触发引擎、缓存快照、供 API、调度(每日收盘后跑)。
-- `client/` **React+Vite+TS+Tailwind+ECharts** 仪表盘:`src/{api,components,types,pages}`。
-- `data/` 运行期快照(gitignore)。
+- `server/` **Go 后端**(net/http + gorm):module `sentinel`,`cmd/server/main.go` 入口,`internal/{api,engine,store,portfolio,db,config,version}` + `migrations/`(编号 SQL)。职责=连 PG+迁移、触发引擎、ingest 入库、供 API。
+- `client/` **React+Vite+TS+ECharts** 暗色仪表盘:`src/{api,components,types}` + App.tsx(tabs:策略信号/我的持仓)。
+- `engine/` 产 JSON;`data/` 是 ingest 源(gitignore);**真源是 PostgreSQL**(容器 bestfunc-postgres:5433 库 sentinel)。DB 密码只在 `server/.env`。
+- **gorm 坑**:标量单值查询用 `.Raw(...).Row().Scan(&x)`,别用 `.Scan(&x)`(后者只对 struct/slice 生效,标量静默不填充)。
 
 ## 数据契约(引擎→后端→前端唯一接口)
 每日快照 JSON = `engine/schema.md` 定义。字段:asof、holdings[]、risk_light、portfolio。改字段必须三端同步 + 更新 schema.md。

@@ -1,90 +1,92 @@
-// Package portfolio — 用户实际持仓录入 + 按 as-of 收盘价算浮盈亏。
-// 持仓存 data/positions.json;价格取 engine 产出的 prices_<date>.json(as-of 一致)。
+// Package portfolio — 用户实际持仓(PostgreSQL)+ 按 as-of 收盘价算浮盈亏。
 package portfolio
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
+
+	"gorm.io/gorm"
+
+	"sentinel/internal/db"
 )
 
-// Position 用户录入的一笔持仓。
-type Position struct {
-	Ticker string  `json:"ticker"`
-	Shares float64 `json:"shares"`
-	Cost   float64 `json:"cost"` // 每股成本
+// Input 前端录入的一笔持仓。
+type Input struct {
+	Ticker   string  `json:"ticker"`
+	Shares   float64 `json:"shares"`
+	Cost     float64 `json:"cost"`
+	OpenedAt *string `json:"opened_at,omitempty"`
+	Note     string  `json:"note,omitempty"`
 }
 
-// PnL 计算后的持仓盈亏。
+// PnL 计算后的持仓盈亏行。
 type PnL struct {
-	Position
-	Price       float64 `json:"price"`        // as-of 收盘价(无则 0 + priced=false)
-	Priced      bool    `json:"priced"`       // 是否取到价格
+	Ticker      string  `json:"ticker"`
+	Shares      float64 `json:"shares"`
+	Cost        float64 `json:"cost"`
+	Price       float64 `json:"price"`
+	Priced      bool    `json:"priced"`
 	MarketValue float64 `json:"market_value"`
 	CostValue   float64 `json:"cost_value"`
-	PnL         float64 `json:"pnl"`
+	PnLVal      float64 `json:"pnl"`
 	PnLPct      float64 `json:"pnl_pct"`
 }
 
-type Store struct{ dataDir string }
+type Store struct{ gdb *gorm.DB }
 
-func New(dataDir string) *Store { return &Store{dataDir: dataDir} }
+func New(gdb *gorm.DB) *Store { return &Store{gdb: gdb} }
 
-func (s *Store) file() string { return filepath.Join(s.dataDir, "positions.json") }
-
-// Get 读持仓(无文件返回空)。
-func (s *Store) Get() ([]Position, error) {
-	b, err := os.ReadFile(s.file())
-	if os.IsNotExist(err) {
-		return []Position{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	var ps []Position
-	if err := json.Unmarshal(b, &ps); err != nil {
-		return nil, err
-	}
-	return ps, nil
+// Get 读全部持仓。
+func (s *Store) Get() ([]db.Position, error) {
+	var ps []db.Position
+	err := s.gdb.Order("ticker").Find(&ps).Error
+	return ps, err
 }
 
-// Save 整体替换持仓。
-func (s *Store) Save(ps []Position) error {
-	b, _ := json.MarshalIndent(ps, "", "  ")
-	return os.WriteFile(s.file(), b, 0644)
+// Save 整体替换持仓(事务:清空 + 批量插)。
+func (s *Store) Save(in []Input) error {
+	return s.gdb.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(`DELETE FROM positions`).Error; err != nil {
+			return err
+		}
+		for _, p := range in {
+			if err := tx.Exec(`INSERT INTO positions(ticker,shares,cost,opened_at,note,created_at,updated_at)
+				VALUES (?,?,?,?,?,now(),now())`, p.Ticker, p.Shares, p.Cost, p.OpenedAt, p.Note).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
-// priceMap 读 as-of 价格表(date 空=latest)。
-func (s *Store) priceMap(date string) (string, map[string]float64, error) {
-	name := "prices_latest.json"
-	if date != "" && date != "latest" {
-		name = fmt.Sprintf("prices_%s.json", date)
-	}
-	b, err := os.ReadFile(filepath.Join(s.dataDir, name))
-	if err != nil {
-		return "", nil, err
-	}
-	var pd struct {
-		Asof   string             `json:"asof"`
-		Prices map[string]float64 `json:"prices"`
-	}
-	if err := json.Unmarshal(b, &pd); err != nil {
-		return "", nil, err
-	}
-	return pd.Asof, pd.Prices, nil
-}
-
-// Compute 按 as-of 价格算每笔盈亏 + 组合汇总。
+// Compute 按 as-of 价格(date 空=最新快照日)算每笔盈亏 + 组合汇总。
 func (s *Store) Compute(date string) (map[string]any, error) {
+	asof := date
+	if asof == "" || asof == "latest" {
+		if err := s.gdb.Raw(`SELECT asof::text FROM snapshots ORDER BY asof DESC LIMIT 1`).Row().Scan(&asof); err != nil || asof == "" {
+			// 无快照则退到最新价格日
+			s.gdb.Raw(`SELECT max(date)::text FROM prices`).Row().Scan(&asof)
+		}
+	}
+	if asof == "" {
+		return nil, fmt.Errorf("无价格数据(先 POST /api/run 生成)")
+	}
 	ps, err := s.Get()
 	if err != nil {
 		return nil, err
 	}
-	asof, prices, err := s.priceMap(date)
-	if err != nil {
-		return nil, fmt.Errorf("无价格表(先 POST /api/run 生成 as-of=%s): %w", date, err)
+	// 该 as-of 的价格
+	prices := map[string]float64{}
+	var prows []db.Price
+	s.gdb.Raw(`SELECT ticker, close FROM prices WHERE date = ?`, asof).Scan(&prows)
+	for _, r := range prows {
+		prices[r.Ticker] = r.Close
 	}
+	rows, summary := ComputePnL(ps, prices)
+	return map[string]any{"asof": asof, "positions": rows, "summary": summary}, nil
+}
+
+// ComputePnL 纯函数:给持仓 + 价格表,算每笔盈亏 + 组合汇总(无价不计入汇总)。可测。
+func ComputePnL(ps []db.Position, prices map[string]float64) ([]PnL, map[string]float64) {
 	var rows []PnL
 	var totMV, totCost float64
 	for _, p := range ps {
@@ -96,8 +98,8 @@ func (s *Store) Compute(date string) (map[string]any, error) {
 		if cv > 0 {
 			pct = pnl / cv
 		}
-		rows = append(rows, PnL{Position: p, Price: px, Priced: ok,
-			MarketValue: round2(mv), CostValue: round2(cv), PnL: round2(pnl), PnLPct: round4(pct)})
+		rows = append(rows, PnL{Ticker: p.Ticker, Shares: p.Shares, Cost: p.Cost, Price: px, Priced: ok,
+			MarketValue: round2(mv), CostValue: round2(cv), PnLVal: round2(pnl), PnLPct: round4(pct)})
 		if ok {
 			totMV += mv
 			totCost += cv
@@ -108,14 +110,10 @@ func (s *Store) Compute(date string) (map[string]any, error) {
 	if totCost > 0 {
 		totPct = totPnL / totCost
 	}
-	return map[string]any{
-		"asof":      asof,
-		"positions": rows,
-		"summary": map[string]any{
-			"market_value": round2(totMV), "cost_value": round2(totCost),
-			"pnl": round2(totPnL), "pnl_pct": round4(totPct),
-		},
-	}, nil
+	return rows, map[string]float64{
+		"market_value": round2(totMV), "cost_value": round2(totCost),
+		"pnl": round2(totPnL), "pnl_pct": round4(totPct),
+	}
 }
 
 func round2(x float64) float64 { return float64(int(x*100+sign(x)*0.5)) / 100 }
