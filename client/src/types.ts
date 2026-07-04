@@ -7,6 +7,12 @@ export interface ProbBand {
   p_hit_target: number
   p_hit_stop: number
 }
+export interface Signal { name: string; detail: string; verdict: '多' | '空' | '中' }
+export interface Indicators {
+  mom126: number | null; mom21: number | null; vol_annual: number | null
+  sma20: number; sma50: number; sma200: number
+  pct_from_high: number; sy_yield: number | null
+}
 export interface Holding {
   ticker: string
   sleeve: 'momentum' | 'SY' | 'both'
@@ -19,6 +25,9 @@ export interface Holding {
   action: string
   action_weight: number
   prob: Record<string, ProbBand>
+  reason?: string
+  signals?: Signal[]
+  indicators?: Indicators
 }
 export interface RiskLight {
   level: 'green' | 'amber' | 'red'
@@ -47,3 +56,5 @@ export interface PnLResult {
   summary: { market_value: number; cost_value: number; pnl: number; pnl_pct: number }
 }
 export interface Version { version: string; branch: string; commit: string }
+export interface HistPoint { date: string; close: number | null; sma20: number | null; sma50: number | null; sma200: number | null }
+export interface Explanation { ticker: string; asof: string; content: string; cached: boolean }

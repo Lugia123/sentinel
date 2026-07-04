@@ -54,3 +54,58 @@ th { color: var(--ink-mute); font-weight: 600; background: var(--surface-2); pos
 .tabs button.active { background: var(--brand); }
 .tabs button { background: var(--surface-2); color: var(--ink-soft); }
 .pos-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+
+/* 引导条 */
+.hint { background: linear-gradient(135deg, rgba(77,124,254,.12), rgba(124,92,255,.08)); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; line-height: 1.7; color: var(--ink-soft); }
+.hint b { color: var(--ink); }
+.warn-box { background: rgba(245,166,35,.1); border: 1px solid rgba(245,166,35,.3); border-radius: 10px; padding: 10px 14px; font-size: 13px; }
+
+/* 悬浮说明 */
+.infodot { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--ink-mute); font-size: 10px; cursor: help; position: relative; margin-left: 3px; vertical-align: middle; }
+.infodot .tip { position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%); width: 240px; background: #0f1521;
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; color: var(--ink-soft); line-height: 1.6;
+  z-index: 20; box-shadow: 0 4px 16px rgba(0,0,0,.5); text-align: left; font-weight: 400; }
+
+/* 徽章 */
+.b-mom { background: rgba(46,204,155,.16); color: var(--up); }
+.b-sy { background: rgba(77,124,254,.16); color: var(--brand); }
+.b-both { background: rgba(124,92,255,.16); color: var(--brand-2); }
+
+/* 可点击行 */
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: var(--surface-2); }
+.go { color: var(--ink-mute); font-weight: 700; }
+
+/* 错误卡 */
+.err-card { border-color: rgba(255,92,108,.4); }
+.err-card b { color: var(--down); }
+
+/* 详情页 */
+.detail-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.dh-tk { font-size: 24px; font-weight: 800; }
+.dh-px { font-size: 18px; color: var(--ink-soft); margin-left: 12px; }
+.ai-card { border-color: rgba(124,92,255,.35); background: linear-gradient(135deg, rgba(124,92,255,.06), var(--surface)); }
+.ai-text { font-size: 14px; line-height: 1.75; color: var(--ink); }
+button.mini { padding: 3px 10px; font-size: 12px; }
+.sig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.sig { display: flex; gap: 10px; align-items: flex-start; background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
+.sig-dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
+.sig-dot.up { background: rgba(46,204,155,.18); color: var(--up); }
+.sig-dot.down { background: rgba(255,92,108,.18); color: var(--down); }
+.sig-dot.muted { background: var(--surface); color: var(--ink-mute); }
+.sig-name { font-size: 13px; font-weight: 600; }
+.kv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.kv { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+.kv span { color: var(--ink-mute); font-size: 12px; }
+.kv b { font-size: 16px; }
+
+/* 帮助页 */
+.help h2 { font-size: 17px; color: var(--ink); margin: 0 0 10px; }
+.help p, .help li { font-size: 13px; line-height: 1.75; color: var(--ink-soft); }
+.help b { color: var(--ink); }
+.help ul, .help ol { margin: 6px 0; padding-left: 20px; }
+.steps li { margin: 8px 0; }
+.glossary dt { font-weight: 700; color: var(--ink); font-size: 13px; margin-top: 10px; }
+.glossary dd { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.6; }

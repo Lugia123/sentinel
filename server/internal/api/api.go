@@ -21,13 +21,14 @@ type API struct {
 	runner  *engine.Runner
 	port    *portfolio.Store
 	explain *explain.Service
-	gdb     *gorm.DB
-	dataDir string
-	ver     version.Info
+	gdb       *gorm.DB
+	dataDir   string
+	engineDir string
+	ver       version.Info
 }
 
-func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, gdb *gorm.DB, dataDir string, ver version.Info) *API {
-	return &API{store: st, runner: rn, port: pf, explain: ex, gdb: gdb, dataDir: dataDir, ver: ver}
+func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, gdb *gorm.DB, dataDir, engineDir string, ver version.Info) *API {
+	return &API{store: st, runner: rn, port: pf, explain: ex, gdb: gdb, dataDir: dataDir, engineDir: engineDir, ver: ver}
 }
 
 func (a *API) Routes() http.Handler {
@@ -40,6 +41,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/run", a.run)
 	mux.HandleFunc("/api/positions", a.positions)
 	mux.HandleFunc("/api/explain", a.explainHandler)
+	mux.HandleFunc("/api/history", a.history)
 	return cors(mux)
 }
 

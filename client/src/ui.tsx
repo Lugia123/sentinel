@@ -1,0 +1,36 @@
+import { useState } from 'react'
+
+export const pct = (x: number) => `${(x * 100).toFixed(1)}%`
+export const pct2 = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`
+export const usd = (x: number) => `$${x.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+
+// 选股依据(腿)中文 + 说明
+export const SLEEVE: Record<string, { label: string; hint: string; cls: string }> = {
+  momentum: { label: '动量', hint: '因“趋势强、涨得比大盘好”被选中(动量腿)', cls: 'b-mom' },
+  SY: { label: '股东回报', hint: '因“回购+分红多、回报股东”被选中(股东收益率腿)', cls: 'b-sy' },
+  both: { label: '双腿', hint: '两条腿都选中它(趋势强 且 股东回报高)', cls: 'b-both' },
+}
+
+export const gradeCls = (g: number) => (g >= 2 ? 'g-3' : g >= 0 ? 'g-1' : g === -1 ? 'g-neg1' : 'g-neg2')
+export const actionColor = (a: string) => (a.includes('清仓') ? 'var(--down)' : a.includes('减') ? 'var(--warn)' : 'var(--up)')
+export const verdictCls = (v: string) => (v === '多' ? 'up' : v === '空' ? 'down' : 'muted')
+
+// 悬浮说明小圆点
+export function InfoDot({ text }: { text: string }) {
+  const [show, setShow] = useState(false)
+  return (
+    <span className="infodot" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      ?
+      {show && <span className="tip">{text}</span>}
+    </span>
+  )
+}
+
+export function GradeBadge({ g, label }: { g: number; label?: string }) {
+  return <span className={`pill ${gradeCls(g)}`}>{g >= 0 ? `+${g}` : g}{label ? ` ${label}` : ''}</span>
+}
+
+export function SleeveBadge({ sleeve }: { sleeve: string }) {
+  const s = SLEEVE[sleeve] || { label: sleeve, hint: '', cls: '' }
+  return <span className={`pill ${s.cls}`} title={s.hint}>{s.label}</span>
+}

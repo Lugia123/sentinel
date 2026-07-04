@@ -36,7 +36,7 @@ func main() {
 	pf := portfolio.New(gdb)
 	aic := ai.New(cfg.DeepSeek.Key, cfg.DeepSeek.Base, cfg.DeepSeek.Model)
 	ex := explain.New(st, aic, gdb)
-	a := api.New(st, rn, pf, ex, gdb, cfg.DataDir, ver)
+	a := api.New(st, rn, pf, ex, gdb, cfg.DataDir, cfg.EngineDir, ver)
 
 	aiState := "已启用"
 	if !aic.Enabled() {
