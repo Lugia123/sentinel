@@ -54,6 +54,31 @@ def trend_grade(r):
     return int(np.clip(round(s * 3 / 7), -3, 3))
 
 
+def grade_signals(r):
+    """把档位的 7 个子信号透明化:每个判据的名称、当前值明细、多/空/中。
+    档位 = 这些子信号求和后映射到 -3..+3(见 trend_grade)。"""
+    c = r["close"]
+    def v(x):  # 多/空/中 三态
+        return "多" if x > 0 else ("空" if x < 0 else "中")
+    sig = []
+    sig.append(dict(name="站上20日线", detail=f"现价 {c:.2f} vs 20日线 {r['sma20']:.2f}", verdict=v(c - r["sma20"])))
+    sig.append(dict(name="站上50日线", detail=f"现价 {c:.2f} vs 50日线 {r['sma50']:.2f}", verdict=v(c - r["sma50"])))
+    sig.append(dict(name="站上200日线", detail=f"现价 {c:.2f} vs 200日线 {r['sma200']:.2f}", verdict=v(c - r["sma200"])))
+    sig.append(dict(name="200日线上行", detail=f"斜率 {r['sma200_slope']:+.3f}", verdict=v(r["sma200_slope"])))
+    sig.append(dict(name="21日动量为正", detail=f"近21日 {r['mom21']:+.1%}", verdict=v(r["mom21"])))
+    if r["sma20"] > r["sma50"] > r["sma200"]:
+        al = "多"; ad = "多头排列 20>50>200"
+    elif r["sma20"] < r["sma50"] < r["sma200"]:
+        al = "空"; ad = "空头排列 20<50<200"
+    else:
+        al = "中"; ad = "均线交织(无排列)"
+    sig.append(dict(name="均线排列", detail=ad, verdict=al))
+    pf = r["pct_from_high"]
+    pv = "多" if pf > -0.10 else ("空" if pf < -0.25 else "中")
+    sig.append(dict(name="接近52周高", detail=f"距高点 {pf:+.1%}", verdict=pv))
+    return sig
+
+
 def build_z_quantiles(uni, POS, h):
     """全池历史标准化前瞻收益 z=fwd_h/(vol*sqrt(h)) 的经验分位(<=asof,无前视)。"""
     zs = []
@@ -152,8 +177,12 @@ def main():
             elig.append((tk, r["mom126"] - spy_mom))
     elig.sort(key=lambda kv: -kv[1])
     mom_picks = [tk for tk, _ in elig[:N]]
+    mom_rs = {tk: rs for tk, rs in elig}                       # 相对SPY强度
+    mom_rank = {tk: i + 1 for i, (tk, _) in enumerate(elig)}    # 池内排名
 
     sy_picks = []
+    sy_scores = {}       # ticker -> 股东收益率
+    sy_rank = {}         # ticker -> SY 排名
     if not args.no_sy:
         try:
             from backtest_r24 import FundamentalsPITExtended
@@ -174,7 +203,10 @@ def main():
                 ti = sum(v for _, v in iss if v is not None)
                 dv = fp.get_dividend_ttm(tk, asof, lag_days=45) or 0.0
                 scored[tk] = (tb - ti) / mcap + dv / mcap
-            sy_picks = [tk for tk, _ in sorted(scored.items(), key=lambda kv: -kv[1])[:N]]
+            sy_sorted = sorted(scored.items(), key=lambda kv: -kv[1])
+            sy_picks = [tk for tk, _ in sy_sorted[:N]]
+            sy_scores = dict(scored)
+            sy_rank = {tk: i + 1 for i, (tk, _) in enumerate(sy_sorted)}
         except Exception as e:
             print(f"SY 腿跳过({e})", flush=True)
 
@@ -213,12 +245,29 @@ def main():
         sleeve = ("both" if tk in mom_picks and tk in sy_picks
                   else ("momentum" if tk in mom_picks else "SY"))
         tv = base[tk] * args.capital * exposure
+        # 选股理由(透明化:为什么入选)
+        reasons = []
+        if tk in mom_picks:
+            reasons.append(f"动量腿 · 相对SPY强度 {mom_rs.get(tk, 0):+.1%}(池内第{mom_rank.get(tk, '?')}强)")
+        if tk in sy_picks:
+            reasons.append(f"股东回报腿 · 股东收益率 {sy_scores.get(tk, 0):.1%}(池内第{sy_rank.get(tk, '?')})")
         holdings.append(dict(
             ticker=tk, sleeve=sleeve, price=round(px, 2),
             base_weight=round(base[tk], 4),
             target_shares=round(tv / px, 3), target_value=round(tv, 2),
             grade=g, grade_label=label.split("·")[0], action=label.split("·")[1],
-            action_weight=mult, prob=prob))
+            action_weight=mult, prob=prob,
+            reason="；".join(reasons),
+            signals=grade_signals(r),                          # 档位7子信号明细
+            indicators=dict(                                   # 关键指标原值(不藏)
+                mom126=round(float(r["mom126"]), 4) if not pd.isna(r["mom126"]) else None,
+                mom21=round(float(r["mom21"]), 4) if not pd.isna(r["mom21"]) else None,
+                vol_annual=round(float(v63 * np.sqrt(252)), 4) if v63 else None,
+                sma20=round(float(r["sma20"]), 2), sma50=round(float(r["sma50"]), 2),
+                sma200=round(float(r["sma200"]), 2),
+                pct_from_high=round(float(r["pct_from_high"]), 4),
+                sy_yield=round(float(sy_scores[tk]), 4) if tk in sy_scores else None,
+            )))
 
     snap = dict(
         asof=str(asof.date()), generated_at=str(pd.Timestamp("today").date()),

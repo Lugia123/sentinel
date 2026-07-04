@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"sentinel/internal/engine"
+	"sentinel/internal/explain"
 	"sentinel/internal/portfolio"
 	"sentinel/internal/store"
 	"sentinel/internal/version"
@@ -19,13 +20,14 @@ type API struct {
 	store   *store.Store
 	runner  *engine.Runner
 	port    *portfolio.Store
+	explain *explain.Service
 	gdb     *gorm.DB
 	dataDir string
 	ver     version.Info
 }
 
-func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, gdb *gorm.DB, dataDir string, ver version.Info) *API {
-	return &API{store: st, runner: rn, port: pf, gdb: gdb, dataDir: dataDir, ver: ver}
+func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, gdb *gorm.DB, dataDir string, ver version.Info) *API {
+	return &API{store: st, runner: rn, port: pf, explain: ex, gdb: gdb, dataDir: dataDir, ver: ver}
 }
 
 func (a *API) Routes() http.Handler {
@@ -37,7 +39,23 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/snapshot/dates", a.dates)
 	mux.HandleFunc("/api/run", a.run)
 	mux.HandleFunc("/api/positions", a.positions)
+	mux.HandleFunc("/api/explain", a.explainHandler)
 	return cors(mux)
+}
+
+// explainHandler AI 白话讲解某股:?ticker=X&date=&force=1
+func (a *API) explainHandler(w http.ResponseWriter, r *http.Request) {
+	ticker := r.URL.Query().Get("ticker")
+	if ticker == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
+		return
+	}
+	res, err := a.explain.Explain(r.Context(), ticker, r.URL.Query().Get("date"), r.URL.Query().Get("force") == "1")
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 func (a *API) health(w http.ResponseWriter, r *http.Request) {

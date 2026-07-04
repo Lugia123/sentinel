@@ -15,6 +15,13 @@ type Config struct {
 	EngineDir string // Python 引擎目录
 	PythonBin string // python 解释器(默认复用 safna_jr 的 uv venv)
 	DBDSN     string // PostgreSQL DSN(密码在 server/.env,不入库)
+	DeepSeek  DeepSeekConfig
+}
+
+type DeepSeekConfig struct {
+	Key   string // API key(只在 server/.env)
+	Base  string // https://api.deepseek.com
+	Model string // deepseek-chat / deepseek-reasoner
 }
 
 // Load 从环境变量 / server/.env 读配置,给出合理默认值(本地开发即用)。
@@ -28,6 +35,11 @@ func Load() Config {
 		EngineDir: envOr("SENTINEL_ENGINE", filepath.Join(root, "engine")),
 		PythonBin: envOr("SENTINEL_PYTHON", "/Users/lugia/lugia_fc/TradingAgents/.venv/bin/python"),
 		DBDSN:     envOr("SENTINEL_DB_DSN", "host=localhost port=5433 user=bestfunc dbname=sentinel sslmode=disable"),
+		DeepSeek: DeepSeekConfig{
+			Key:   os.Getenv("SENTINEL_DEEPSEEK_KEY"),
+			Base:  envOr("SENTINEL_DEEPSEEK_BASE", "https://api.deepseek.com"),
+			Model: envOr("SENTINEL_DEEPSEEK_MODEL", "deepseek-chat"),
+		},
 	}
 }
 

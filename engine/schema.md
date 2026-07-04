@@ -31,8 +31,18 @@
         "stop": 200.0, "target": 225.0,
         "p_hit_target": 0.31, "p_hit_stop": 0.18
       }
+    },
+    "reason": "动量腿 · 相对SPY强度 +12.3%(池内第3强)",  // 为什么入选(透明)
+    "signals": [                    // 档位7子信号明细(透明化怎么算出档位)
+      {"name": "站上20日线", "detail": "现价 210.5 vs 20日线 205.3", "verdict": "多"}
+    ],
+    "indicators": {                 // 关键指标原值(不藏)
+      "mom126": 0.15, "mom21": 0.042, "vol_annual": 0.24,
+      "sma20": 205.3, "sma50": 198.1, "sma200": 180.5,
+      "pct_from_high": -0.08, "sy_yield": null
     }
   }],
+  // AI 讲解不在快照里,走 GET /api/explain?ticker=X(DeepSeek,缓存于 explanations 表)
   "portfolio": {
     "n_holdings": 20, "gross_exposure": 0.95, "cash_pct": 0.05,
     "next_rebalance": "2026-12-xx"

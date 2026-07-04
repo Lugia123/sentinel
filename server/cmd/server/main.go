@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"sentinel/internal/ai"
 	"sentinel/internal/api"
 	"sentinel/internal/config"
 	"sentinel/internal/db"
 	"sentinel/internal/engine"
+	"sentinel/internal/explain"
 	"sentinel/internal/portfolio"
 	"sentinel/internal/store"
 	"sentinel/internal/version"
@@ -32,11 +34,17 @@ func main() {
 	st := store.New(gdb)
 	rn := engine.New(cfg.PythonBin, cfg.EngineDir)
 	pf := portfolio.New(gdb)
-	a := api.New(st, rn, pf, gdb, cfg.DataDir, ver)
+	aic := ai.New(cfg.DeepSeek.Key, cfg.DeepSeek.Base, cfg.DeepSeek.Model)
+	ex := explain.New(st, aic, gdb)
+	a := api.New(st, rn, pf, ex, gdb, cfg.DataDir, ver)
 
+	aiState := "已启用"
+	if !aic.Enabled() {
+		aiState = "未配置(讲解功能降级,其余不受影响)"
+	}
 	log.Printf("Sentinel %s 后端启动 :%s (%s)", ver.Version, cfg.Port, ver.Branch)
-	log.Printf("  PostgreSQL 已连接 + 迁移完成")
-	log.Printf("  API: /api/snapshot · /api/run · /api/positions · /api/datastatus · /api/version")
+	log.Printf("  PostgreSQL 已连接 + 迁移完成 | DeepSeek AI: %s", aiState)
+	log.Printf("  API: /api/snapshot · /api/run · /api/positions · /api/explain · /api/datastatus")
 	if err := http.ListenAndServe(":"+cfg.Port, a.Routes()); err != nil {
 		log.Fatal(err)
 	}
