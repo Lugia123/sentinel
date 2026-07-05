@@ -1,14 +1,17 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import type { Snapshot, Holding } from '../types'
 import type { TickerMeta } from '../api'
 import { pct, pct2, usd, InfoDot, GradeBadge, SleeveBadge, actionColor } from '../ui'
 
-export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect }: {
+export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onCustom }: {
   snap: Snapshot; meta: TickerMeta; watch: Set<string>
-  onToggleWatch: (t: string, on: boolean) => void; onSelect: (t: string) => void
+  onToggleWatch: (t: string, on: boolean) => void; onSelect: (t: string) => void; onCustom: (t: string) => void
 }) {
   const chartRef = useRef<HTMLDivElement>(null)
+  const [ct, setCt] = useState('')
+  const [loading, setLoading] = useState(false)
+  const doCustom = async () => { if (!ct) return; setLoading(true); await onCustom(ct.trim()); setLoading(false); setCt('') }
   // 关注的置顶(保持各自组内原顺序)
   const rows = [...snap.holdings].sort((a, b) => (watch.has(b.ticker) ? 1 : 0) - (watch.has(a.ticker) ? 1 : 0))
   useEffect(() => {
@@ -72,7 +75,15 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect }
       </div>
 
       <div className="card">
-        <h3>建议持仓 <span className="muted" style={{ fontWeight: 400 }}>· 点行看详情</span></h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
+          <h3 style={{ margin: 0 }}>建议持仓 <span className="muted" style={{ fontWeight: 400 }}>· 点行看详情 · ★关注置顶</span></h3>
+          <div className="pos-add" style={{ margin: 0 }}>
+            <input placeholder="看任意股 如 NVDA" value={ct} onChange={(e) => setCt(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && doCustom()} />
+            <button className="ghost" onClick={doCustom} disabled={loading}>{loading ? '分析中…' : '自选股分析'}</button>
+            <InfoDot text="输入任意股票代码,用同一套档位/概率规则分析它(即便不是AI选中的),资金池假设全押这一只,看它自己的趋势。" />
+          </div>
+        </div>
         <div className="tbl-scroll">
           <table>
             <thead>

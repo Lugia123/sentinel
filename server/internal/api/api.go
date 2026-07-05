@@ -47,7 +47,24 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/meta", a.meta)
 	mux.HandleFunc("/api/strategies", a.strategies)
 	mux.HandleFunc("/api/watchlist", a.watchlist)
+	mux.HandleFunc("/api/focus", a.focus)
 	return cors(mux)
+}
+
+// focus 单股观察:任意 ticker 用同规则分析(资金池=这一只)。?ticker=X
+func (a *API) focus(w http.ResponseWriter, r *http.Request) {
+	tk := r.URL.Query().Get("ticker")
+	if tk == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
+		return
+	}
+	out, err := a.runner.RunFocus(tk, q(r, "asof", "latest"), q(r, "capital", "4000"))
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_, _ = w.Write([]byte(out))
 }
 
 // strategies 返回当天启用的策略组合(从最新快照的 strategy_config 提取)。

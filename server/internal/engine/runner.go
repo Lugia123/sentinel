@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -38,4 +39,27 @@ func (r *Runner) RunDaily(asof string, capital string, withSY bool) (string, err
 		return out.String(), fmt.Errorf("引擎运行失败: %v | stderr: %s", err, errb.String())
 	}
 	return out.String(), nil
+}
+
+// RunFocus 单股观察:跑 focus.py TICKER,返回 stdout 最后一行 JSON。
+func (r *Runner) RunFocus(ticker, asof, capital string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, "focus.py"),
+		ticker, "--asof", asof, "--capital", capital)
+	cmd.Dir = r.engineDir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("focus 运行失败: %v | %s", err, errb.String())
+	}
+	// 取最后一行 JSON(前面可能有装载日志)
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.HasPrefix(strings.TrimSpace(lines[i]), "{") {
+			return strings.TrimSpace(lines[i]), nil
+		}
+	}
+	return "", fmt.Errorf("focus 无有效输出")
 }

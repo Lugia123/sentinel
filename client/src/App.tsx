@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { fetchSnapshot, runEngine, fetchVersion, fetchMeta, fetchWatchlist, addWatch, removeWatch, type TickerMeta } from './api'
-import type { Snapshot } from './types'
+import { fetchSnapshot, runEngine, fetchVersion, fetchMeta, fetchWatchlist, addWatch, removeWatch, fetchFocus, type TickerMeta } from './api'
+import type { Snapshot, Holding } from './types'
 import Dashboard from './pages/Dashboard'
 import Positions from './pages/Positions'
 import Help from './pages/Help'
@@ -22,6 +22,8 @@ export default function App() {
   const [sel, setSel] = useState<string | null>(null)
   const [meta, setMeta] = useState<TickerMeta>({})
   const [watch, setWatch] = useState<Set<string>>(new Set())
+  const [focusH, setFocusH] = useState<Holding | null>(null)
+  const [focusErr, setFocusErr] = useState('')
 
   const load = async () => {
     setErr('')
@@ -35,14 +37,24 @@ export default function App() {
     if (on) await addWatch(tk); else await removeWatch(tk)
     await loadWatch()
   }
+  const viewCustom = async (tk: string) => {
+    setFocusErr(''); setFocusH(null)
+    try {
+      const res = await fetchFocus(tk)
+      setFocusH(res.holding)
+      await addWatch(tk, 'user'); await loadWatch()
+    } catch (e: any) { setFocusErr(String(e.message || e)) }
+  }
 
   const recompute = async () => {
     setRunning(true); setErr('')
     try { await runEngine(true); await load() } catch (e: any) { setErr('重算失败：' + String(e.message || e)) }
     setRunning(false)
   }
-  const goto = (v: View) => { setView(v); setSel(null) }
+  const goto = (v: View) => { setView(v); setSel(null); setFocusH(null) }
   const selHolding = sel && snap ? snap.holdings.find((h) => h.ticker === sel) : null
+  const detailH = focusH || selHolding
+  const backFromDetail = () => { setSel(null); setFocusH(null) }
 
   return (
     <>
@@ -51,7 +63,7 @@ export default function App() {
           <div className="brand" onClick={() => goto('signals')}>SENTINEL<span className="ver">{ver}</span></div>
           <nav className="nav">
             {NAV.map((n) => (
-              <a key={n.key} className={!sel && view === n.key ? 'active' : ''} onClick={() => goto(n.key)}>{n.label}</a>
+              <a key={n.key} className={!detailH && view === n.key ? 'active' : ''} onClick={() => goto(n.key)}>{n.label}</a>
             ))}
           </nav>
           <div className="topbar-right">
@@ -81,11 +93,12 @@ export default function App() {
           </div>
         )}
 
-        {selHolding && <StockDetail h={selHolding} meta={meta} onBack={() => setSel(null)} />}
-        {!sel && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} />}
-        {!sel && view === 'positions' && <Positions />}
-        {!sel && view === 'help' && <Help />}
-        {!sel && view === 'signals' && !snap && !err && <div className="card">加载中…</div>}
+        {focusErr && <div className="card err-card"><b>⚠️ {focusErr}</b></div>}
+        {detailH && <StockDetail h={detailH} meta={meta} onBack={backFromDetail} />}
+        {!detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onCustom={viewCustom} />}
+        {!detailH && view === 'positions' && <Positions />}
+        {!detailH && view === 'help' && <Help />}
+        {!detailH && view === 'signals' && !snap && !err && <div className="card">加载中…</div>}
 
         <div className="disc">
           研究工具，非投资建议。档位=趋势状态（松·只减防御跟法，只减不追涨）；概率带=波动范围的校准估计（非方向预言）；
