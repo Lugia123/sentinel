@@ -15,6 +15,7 @@ import (
 	"sentinel/internal/db"
 	"sentinel/internal/engine"
 	"sentinel/internal/explain"
+	"sentinel/internal/investigate"
 	"sentinel/internal/portfolio"
 	"sentinel/internal/scheduler"
 	"sentinel/internal/store"
@@ -42,7 +43,8 @@ func main() {
 		log.Printf("MinIO 连接失败(大HTML存储降级): %v", berr)
 	}
 	ex := explain.New(st, aic, gdb)
-	a := api.New(st, rn, pf, ex, bs, gdb, cfg.DataDir, cfg.EngineDir, ver)
+	inv := investigate.New(aic, bs, cfg.EngineDir)
+	a := api.New(st, rn, pf, ex, inv, bs, gdb, cfg.DataDir, cfg.EngineDir, ver)
 
 	// 后台定时任务:每日定点自动跑引擎+ingest;启动时若库中无快照则自愈补跑
 	scheduler.New(rn, st, cfg.DataDir, cfg.Capital, cfg.Schedule).Start()

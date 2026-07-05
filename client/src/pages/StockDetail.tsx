@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
-import { fetchHistory, fetchExplain } from '../api'
+import { fetchHistory, fetchExplain, fetchInvestigate } from '../api'
 import type { Holding, HistPoint } from '../types'
 import type { TickerMeta } from '../api'
 import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot } from '../ui'
 
 export default function StockDetail({ h, meta, onBack }: { h: Holding; meta: TickerMeta; onBack: () => void }) {
   const m = meta[h.ticker]
+  const [tab, setTab] = useState<'overview' | 'bg'>('overview')
+  const [bgSrc, setBgSrc] = useState(''); const [bgLoading, setBgLoading] = useState(false); const [bgErr, setBgErr] = useState('')
+  const loadBg = async (force = false) => {
+    setBgLoading(true); setBgErr('')
+    try { const r = await fetchInvestigate(h.ticker, force); setBgSrc(`/api/blob?key=${r.key}&_=${Date.now()}`) }
+    catch (e: any) { setBgErr(String(e.message || e)) }
+    setBgLoading(false)
+  }
+  useEffect(() => { if (tab === 'bg' && !bgSrc && !bgLoading) loadBg(false) }, [tab])
   const [hist, setHist] = useState<HistPoint[]>([])
   const [ai, setAi] = useState<string>(''); const [aiLoading, setAiLoading] = useState(true); const [aiErr, setAiErr] = useState('')
   const priceRef = useRef<HTMLDivElement>(null)
@@ -52,6 +61,23 @@ export default function StockDetail({ h, meta, onBack }: { h: Holding; meta: Tic
         </div>
       </div>
 
+      <div className="tabs">
+        <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>策略概览</button>
+        <button className={tab === 'bg' ? 'active' : ''} onClick={() => setTab('bg')}>背景调查</button>
+      </div>
+
+      {tab === 'bg' && (
+        <div className="card ai-card">
+          <h3>🏢 公司背景调查 <span className="muted" style={{ fontWeight: 400 }}>· AI 调研,存于对象存储</span>
+            <button className="ghost mini" style={{ float: 'right' }} onClick={() => loadBg(true)} disabled={bgLoading}>{bgLoading ? '调研中…' : '重新背调'}</button>
+          </h3>
+          {bgLoading && <div className="muted">正在调研公司背景…（首次约 30 秒）</div>}
+          {bgErr && <div className="down" style={{ fontSize: 13 }}>{bgErr}</div>}
+          {bgSrc && !bgLoading && <iframe src={bgSrc} title="背景调查" style={{ width: '100%', height: 520, border: '1px solid var(--border)', borderRadius: 8, background: '#16120d' }} />}
+        </div>
+      )}
+
+      {tab === 'overview' && (<>
       {h.reason && <div className="card"><h3>为什么选它</h3><p style={{ margin: 0 }}>{h.reason}</p></div>}
 
       {/* AI 讲解 */}
@@ -116,6 +142,7 @@ export default function StockDetail({ h, meta, onBack }: { h: Holding; meta: Tic
           </table>
         </div>
       </div>
+      </>)}
     </>
   )
 }

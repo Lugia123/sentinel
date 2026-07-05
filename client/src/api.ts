@@ -70,6 +70,13 @@ export async function fetchFocus(ticker: string): Promise<{ asof: string; ticker
   return j
 }
 
+export async function fetchInvestigate(ticker: string, force = false): Promise<{ ticker: string; key: string; cached: boolean }> {
+  const r = await fetch(`/api/investigate?ticker=${ticker}${force ? '&force=1' : ''}`)
+  const j = await r.json()
+  if (!r.ok || j.error) throw new Error(j.error || '背景调查失败')
+  return j
+}
+
 export type TickerMeta = Record<string, { cn: string; sector: string }>
 export async function fetchMeta(): Promise<TickerMeta> {
   const r = await fetch('/api/meta')

@@ -10,6 +10,7 @@ import (
 	"sentinel/internal/blob"
 	"sentinel/internal/engine"
 	"sentinel/internal/explain"
+	"sentinel/internal/investigate"
 	"sentinel/internal/pipeline"
 	"sentinel/internal/portfolio"
 	"sentinel/internal/store"
@@ -21,6 +22,7 @@ type API struct {
 	runner    *engine.Runner
 	port      *portfolio.Store
 	explain   *explain.Service
+	invest    *investigate.Service
 	blob      *blob.Store
 	gdb       *gorm.DB
 	dataDir   string
@@ -28,8 +30,8 @@ type API struct {
 	ver       version.Info
 }
 
-func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, bs *blob.Store, gdb *gorm.DB, dataDir, engineDir string, ver version.Info) *API {
-	return &API{store: st, runner: rn, port: pf, explain: ex, blob: bs, gdb: gdb, dataDir: dataDir, engineDir: engineDir, ver: ver}
+func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, inv *investigate.Service, bs *blob.Store, gdb *gorm.DB, dataDir, engineDir string, ver version.Info) *API {
+	return &API{store: st, runner: rn, port: pf, explain: ex, invest: inv, blob: bs, gdb: gdb, dataDir: dataDir, engineDir: engineDir, ver: ver}
 }
 
 func (a *API) Routes() http.Handler {
@@ -49,7 +51,23 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/watchlist", a.watchlist)
 	mux.HandleFunc("/api/focus", a.focus)
 	mux.HandleFunc("/api/trend", a.trend)
+	mux.HandleFunc("/api/investigate", a.investigate)
 	return cors(mux)
+}
+
+// investigate AI 公司背景调查(→HTML→MinIO)。?ticker=X&force=1;返回 {key},前端用 /api/blob?key= 取。
+func (a *API) investigate(w http.ResponseWriter, r *http.Request) {
+	tk := r.URL.Query().Get("ticker")
+	if tk == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
+		return
+	}
+	res, err := a.invest.Investigate(r.Context(), tk, r.URL.Query().Get("force") == "1")
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 // focus 单股观察:任意 ticker 用同规则分析(资金池=这一只)。?ticker=X
