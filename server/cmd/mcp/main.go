@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -167,6 +168,31 @@ func tools() []tool {
 			func(a map[string]any) (string, error) { return httpCall("GET", "/api/datastatus", nil, nil) }},
 		{"sentinel_version", "版本信息。", obj(nil),
 			func(a map[string]any) (string, error) { return httpCall("GET", "/api/version", nil, nil) }},
+		{"sentinel_trend_tickers", "【走势页多选下拉】列出所有有档位历史的可选股票(带样本数)。", obj(nil),
+			func(a map[string]any) (string, error) { return httpCall("GET", "/api/trend/tickers", nil, nil) }},
+		{"sentinel_allocate", "【建议股数·AI分配按钮】在候选股上用 AI 分配购买比例(做取舍,不必全买)。tickers 逗号分隔,省略则用全部持仓;capital 资金池(省略用默认)。",
+			obj(map[string]any{"tickers": str("逗号分隔代码,省略=全部持仓"), "capital": str("资金池美元,省略用默认")}),
+			func(a map[string]any) (string, error) {
+				body := map[string]any{}
+				if v, ok := a["tickers"].(string); ok && strings.TrimSpace(v) != "" {
+					var ts []string
+					for _, t := range strings.Split(v, ",") {
+						if t = strings.TrimSpace(t); t != "" {
+							ts = append(ts, t)
+						}
+					}
+					body["tickers"] = ts
+				}
+				switch t := a["capital"].(type) {
+				case float64:
+					body["capital"] = t
+				case string:
+					if f, e := strconv.ParseFloat(strings.TrimSpace(t), 64); e == nil {
+						body["capital"] = f
+					}
+				}
+				return httpCall("POST", "/api/allocate", nil, body)
+			}},
 	}
 }
 

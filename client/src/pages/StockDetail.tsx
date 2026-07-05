@@ -6,6 +6,7 @@ import type { TickerMeta } from '../api'
 import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot } from '../ui'
 import Select, { type SelectOption } from '../components/Select'
 import EarningsChart from '../components/EarningsChart'
+import ProbBandChart from '../components/ProbBandChart'
 
 export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta }) {
   const m = meta[h.ticker]
@@ -186,6 +187,7 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
       {/* 概率带 5/20/60 */}
       <div className="card">
         <h3>到价概率带 <InfoDot text="不同时间跨度下,未来收益的70%概率范围 + 参考止损/目标。波动范围估计,非涨跌预测。" /></h3>
+        <ProbBandChart prob={h.prob} />
         <div className="tbl-scroll">
           <table>
             <thead><tr><th>跨度</th><th>最可能(中位)</th><th>70%区间</th><th>参考止损</th><th>参考目标</th><th>到目标概率</th></tr></thead>
