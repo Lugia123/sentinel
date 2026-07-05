@@ -45,7 +45,27 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/history", a.history)
 	mux.HandleFunc("/api/blob", a.blobHandler)
 	mux.HandleFunc("/api/meta", a.meta)
+	mux.HandleFunc("/api/strategies", a.strategies)
 	return cors(mux)
+}
+
+// strategies 返回当天启用的策略组合(从最新快照的 strategy_config 提取)。
+func (a *API) strategies(w http.ResponseWriter, r *http.Request) {
+	raw, err := a.store.Latest()
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "无快照"})
+		return
+	}
+	var snap struct {
+		StrategyConfig json.RawMessage `json:"strategy_config"`
+	}
+	_ = json.Unmarshal(raw, &snap)
+	if len(snap.StrategyConfig) == 0 {
+		writeJSON(w, http.StatusOK, map[string]string{"note": "该快照无策略元数据(重算后即有)"})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_, _ = w.Write(snap.StrategyConfig)
 }
 
 // blobHandler 从 MinIO 取大 HTML(背调/财报):?key=... 直接返回 HTML。
