@@ -5,59 +5,96 @@ import (
 	"strings"
 )
 
-// trend 历史分析走势(从回填的 holdings 查):
-//   ?ticker=X            → 单股全指标序列 [{date,grade,price,median20}]
-//   ?tickers=X,Y,Z       → 多股档位序列对比 {ticker:[{date,grade}]}
+// trend 历史分析走势(从回填快照的 raw JSONB 里挖多维序列):
+//   ?ticker=X 或 ?tickers=X,Y,Z  → {series:{TK:[{date,grade,median20,mom21,vol,pct_from_high,bandwidth,price,sy}]}}
+//   兼容旧单股:?ticker=X 也返回 points(= series[X])。
 //   可选 ?from=&to=(YYYY-MM-DD)
 func (a *API) trend(w http.ResponseWriter, r *http.Request) {
 	from := q(r, "from", "2000-01-01")
 	to := q(r, "to", "2100-01-01")
 
+	var tickers []string
 	if multi := r.URL.Query().Get("tickers"); multi != "" {
-		out := map[string]any{}
 		for _, tk := range strings.Split(multi, ",") {
-			tk = strings.TrimSpace(strings.ToUpper(tk))
-			if tk == "" {
-				continue
+			if tk = strings.TrimSpace(strings.ToUpper(tk)); tk != "" {
+				tickers = append(tickers, tk)
 			}
-			out[tk] = a.gradeSeries(tk, from, to)
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"series": out})
-		return
+	} else if tk := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("ticker"))); tk != "" {
+		tickers = append(tickers, tk)
 	}
-
-	tk := strings.ToUpper(r.URL.Query().Get("ticker"))
-	if tk == "" {
+	if len(tickers) == 0 {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker 或 tickers"})
 		return
 	}
-	type pt struct {
-		Date     string   `json:"date"`
-		Grade    int      `json:"grade"`
-		Price    float64  `json:"price"`
-		Median20 *float64 `json:"median20"`
+
+	series := map[string]any{}
+	for _, tk := range tickers {
+		series[tk] = a.richSeries(tk, from, to)
 	}
-	var rows []pt
-	a.gdb.Raw(`
-		SELECT s.asof::text AS date, h.grade, h.price, (h.prob->'h20'->>'median')::float AS median20
-		FROM holdings h JOIN snapshots s ON s.id = h.snapshot_id
-		WHERE h.ticker = ? AND s.asof BETWEEN ?::date AND ?::date
-		ORDER BY s.asof`, tk, from, to).Scan(&rows)
-	writeJSON(w, http.StatusOK, map[string]any{"ticker": tk, "points": rows})
+	out := map[string]any{"series": series}
+	if len(tickers) == 1 { // 兼容旧单股调用
+		out["ticker"] = tickers[0]
+		out["points"] = series[tickers[0]]
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
-func (a *API) gradeSeries(tk, from, to string) []map[string]any {
-	type gp struct {
-		Date  string `json:"date"`
-		Grade int    `json:"grade"`
+// richSeries 从 snapshots.raw 的 holdings 数组里,按 ticker 抽取每个交易日的多维指标。
+func (a *API) richSeries(tk, from, to string) []map[string]any {
+	type row struct {
+		Date        string   `json:"date"`
+		Grade       *int     `json:"grade"`
+		Median20    *float64 `json:"median20"`
+		Mom21       *float64 `json:"mom21"`
+		Mom126      *float64 `json:"mom126"`
+		Vol         *float64 `json:"vol"`
+		PctFromHigh *float64 `json:"pct_from_high"`
+		Bandwidth   *float64 `json:"bandwidth"`
+		Price       *float64 `json:"price"`
+		Sy          *float64 `json:"sy"`
 	}
-	var rows []gp
+	var rows []row
 	a.gdb.Raw(`
-		SELECT s.asof::text AS date, h.grade FROM holdings h JOIN snapshots s ON s.id = h.snapshot_id
-		WHERE h.ticker = ? AND s.asof BETWEEN ?::date AND ?::date ORDER BY s.asof`, tk, from, to).Scan(&rows)
+		SELECT s.asof::text AS date,
+		       (elem->>'grade')::int                                   AS grade,
+		       (elem->'prob'->'h20'->>'median')::float                 AS median20,
+		       (elem->'indicators'->>'mom21')::float                   AS mom21,
+		       (elem->'indicators'->>'mom126')::float                  AS mom126,
+		       (elem->'indicators'->>'vol_annual')::float              AS vol,
+		       (elem->'indicators'->>'pct_from_high')::float           AS pct_from_high,
+		       ((elem->'prob'->'h20'->'band70'->>1)::float
+		        - (elem->'prob'->'h20'->'band70'->>0)::float)          AS bandwidth,
+		       (elem->>'price')::float                                 AS price,
+		       (elem->'indicators'->>'sy_yield')::float                AS sy
+		FROM snapshots s, jsonb_array_elements(s.raw->'holdings') elem
+		WHERE elem->>'ticker' = ? AND s.asof BETWEEN ?::date AND ?::date
+		ORDER BY s.asof`, tk, from, to).Scan(&rows)
 	out := make([]map[string]any, len(rows))
 	for i, r := range rows {
-		out[i] = map[string]any{"date": r.Date, "grade": r.Grade}
+		out[i] = map[string]any{
+			"date": r.Date, "grade": r.Grade, "median20": r.Median20,
+			"mom21": r.Mom21, "mom126": r.Mom126, "vol": r.Vol,
+			"pct_from_high": r.PctFromHigh, "bandwidth": r.Bandwidth,
+			"price": r.Price, "sy": r.Sy,
+		}
 	}
 	return out
+}
+
+// trendTickers 列出所有【有档位历史】的股票(供走势页多选下拉),带中文名+样本数。
+func (a *API) trendTickers(w http.ResponseWriter, r *http.Request) {
+	type trow struct {
+		Ticker string `json:"ticker"`
+		N      int    `json:"n"`
+	}
+	var rows []trow
+	a.gdb.Raw(`
+		SELECT ticker, COUNT(*) AS n FROM holdings
+		GROUP BY ticker ORDER BY n DESC, ticker`).Scan(&rows)
+	out := make([]map[string]any, len(rows))
+	for i, r := range rows {
+		out[i] = map[string]any{"ticker": r.Ticker, "n": r.N}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"tickers": out})
 }

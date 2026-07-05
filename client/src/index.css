@@ -160,6 +160,9 @@ select.qsel { background: var(--surface-2); border: 1px solid var(--border); col
 .ms-chip button { background: none; border: 0; color: var(--gold-hi); cursor: pointer; padding: 0 2px; font-size: 14px; line-height: 1; font-weight: 700; }
 .ms-chip button:hover { color: var(--down); }
 .sel-opt .ss-sub { margin-left: 4px; }
+/* 走势页控制条 */
+.trend-ctl { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.ctl-lbl { font-size: 12px; color: var(--ink-mute); margin-bottom: 6px; }
 .sig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
 .sig { display: flex; gap: 10px; align-items: flex-start; background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
 .sig-dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }

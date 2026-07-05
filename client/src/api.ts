@@ -56,10 +56,21 @@ export async function fetchTrend(ticker: string, from?: string, to?: string): Pr
   const r = await fetch(`/api/trend?${qs}`)
   return r.ok ? (await r.json()).points || [] : []
 }
-export async function fetchTrendMulti(tickers: string[], from?: string, to?: string): Promise<Record<string, { date: string; grade: number }[]>> {
-  const qs = new URLSearchParams({ tickers: tickers.join(',') }); if (from) qs.set('from', from); if (to) qs.set('to', to)
+// 富序列:每个交易日的多维指标(档位/中位/动量/波动/距高/概率带宽等)
+export interface RichTrendPoint {
+  date: string; grade: number | null; median20: number | null; mom21: number | null; mom126: number | null
+  vol: number | null; pct_from_high: number | null; bandwidth: number | null; price: number | null; sy: number | null
+}
+export async function fetchTrendRich(tickers: string[]): Promise<Record<string, RichTrendPoint[]>> {
+  if (!tickers.length) return {}
+  const qs = new URLSearchParams({ tickers: tickers.join(',') })
   const r = await fetch(`/api/trend?${qs}`)
   return r.ok ? (await r.json()).series || {} : {}
+}
+// 有档位历史的可选股票(供多选下拉)
+export async function fetchTrendTickers(): Promise<{ ticker: string; n: number }[]> {
+  const r = await fetch('/api/trend/tickers')
+  return r.ok ? (await r.json()).tickers || [] : []
 }
 
 import type { Holding } from './types'
