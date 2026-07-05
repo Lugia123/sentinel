@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type MouseEvent } from 'react'
 
 export const pct = (x: number) => `${(x * 100).toFixed(1)}%`
 export const pct2 = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`
@@ -15,13 +15,17 @@ export const gradeCls = (g: number) => (g >= 2 ? 'g-3' : g >= 0 ? 'g-1' : g === 
 export const actionColor = (a: string) => (a.includes('清仓') ? 'var(--down)' : a.includes('减') ? 'var(--warn)' : 'var(--up)')
 export const verdictCls = (v: string) => (v === '多' ? 'up' : v === '空' ? 'down' : 'muted')
 
-// 悬浮说明小圆点
+// 悬浮说明小圆点 —— tooltip 用 fixed 定位跟随触发点,绝不被表格 overflow 裁掉
 export function InfoDot({ text }: { text: string }) {
-  const [show, setShow] = useState(false)
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  const enter = (e: MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setPos({ x: r.left + r.width / 2, y: r.top - 6 })
+  }
   return (
-    <span className="infodot" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+    <span className="infodot" onMouseEnter={enter} onMouseLeave={() => setPos(null)}>
       ?
-      {show && <span className="tip">{text}</span>}
+      {pos && <span className="tip-fixed" style={{ left: pos.x, top: pos.y }}>{text}</span>}
     </span>
   )
 }
