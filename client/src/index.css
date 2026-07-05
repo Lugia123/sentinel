@@ -163,6 +163,9 @@ select.qsel { background: var(--surface-2); border: 1px solid var(--border); col
 /* 走势页控制条 */
 .trend-ctl { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
 .ctl-lbl { font-size: 12px; color: var(--ink-mute); margin-bottom: 6px; }
+/* 数据来源引用(强制标注)*/
+.src-cite { margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 12px; color: var(--ink-mute); line-height: 1.6; }
+.src-cite a { color: var(--gold-hi); }
 .sig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
 .sig { display: flex; gap: 10px; align-items: flex-start; background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
 .sig-dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }

@@ -5,6 +5,7 @@ import type { Holding, HistPoint } from '../types'
 import type { TickerMeta } from '../api'
 import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot } from '../ui'
 import Select, { type SelectOption } from '../components/Select'
+import EarningsChart from '../components/EarningsChart'
 
 export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta }) {
   const m = meta[h.ticker]
@@ -96,6 +97,12 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
           {bgLoading && <div className="muted">正在调研公司背景…（首次约 30 秒）</div>}
           {bgErr && <div className="down" style={{ fontSize: 13 }}>{bgErr}</div>}
           {bgHtml && !bgLoading && <div className="doc-html" dangerouslySetInnerHTML={{ __html: bgHtml }} />}
+          {bgHtml && !bgLoading && (
+            <div className="src-cite">
+              📚 信息来源:AI(DeepSeek)依训练时掌握的公开资料综合生成,<b>非实时联网检索</b>,具体数字可能过时。
+              请以 <a href={`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${h.ticker}&type=10-K`} target="_blank" rel="noreferrer">SEC EDGAR 年报</a>、公司投资者关系官网为准核实。
+            </div>
+          )}
         </div>
       )}
 
@@ -115,9 +122,21 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
             <button className="ghost" onClick={() => loadEarn(false)} disabled={earnLoading || !qSel}>{earnLoading ? '解读中…' : '解读这一季'}</button>
             {earnHtml && <button className="ghost mini" onClick={() => loadEarn(true)} disabled={earnLoading}>重新解读</button>}
           </div>
+          {quarters.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div className="muted" style={{ marginBottom: 2 }}>营收 / 净利润 / 净利率(近8季 · SEC 官方数据)</div>
+              <EarningsChart quarters={quarters} />
+            </div>
+          )}
           {earnLoading && <div className="muted">正在解读财报…（首次约 30 秒）</div>}
           {earnHtml && !earnLoading && <div className="doc-html" dangerouslySetInnerHTML={{ __html: earnHtml }} />}
-          {!earnHtml && !earnLoading && quarters.length > 0 && <div className="muted">切换季度自动解读(解读过的会秒回)。数据来自 SEC 官方季报。</div>}
+          {!earnHtml && !earnLoading && quarters.length > 0 && <div className="muted">切换季度自动解读(解读过的会秒回)。</div>}
+          {quarters.length > 0 && (
+            <div className="src-cite">
+              📚 数据来源:<a href={`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${h.ticker}&type=10-Q`} target="_blank" rel="noreferrer">SEC EDGAR</a>
+              {' '}官方季度财报(us-gaap XBRL 概念:Revenues / NetIncomeLoss / OperatingIncomeLoss / GrossProfit / EPS)。图表为原始数据确定性绘制,非 AI 生成;解读文字为 AI 基于同一数据生成。
+            </div>
+          )}
         </div>
       )}
 
