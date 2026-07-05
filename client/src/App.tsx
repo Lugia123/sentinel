@@ -56,7 +56,6 @@ export default function App() {
   const goto = (v: View) => { setView(v); setSel(null); setFocusH(null) }
   const selHolding = sel && snap ? snap.holdings.find((h) => h.ticker === sel) : null
   const detailH = focusH || selHolding
-  const backFromDetail = () => { setSel(null); setFocusH(null) }
 
   return (
     <>
@@ -96,7 +95,7 @@ export default function App() {
         )}
 
         {focusErr && <div className="card err-card"><b>⚠️ {focusErr}</b></div>}
-        {detailH && <StockDetail h={detailH} meta={meta} onBack={backFromDetail} />}
+        {detailH && <StockDetail h={detailH} meta={meta} />}
         {!detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onCustom={viewCustom} />}
         {!detailH && view === 'positions' && <Positions />}
         {!detailH && view === 'trends' && <Trends meta={meta} watch={watch} />}

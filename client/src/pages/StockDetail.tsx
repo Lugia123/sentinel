@@ -5,7 +5,7 @@ import type { Holding, HistPoint } from '../types'
 import type { TickerMeta } from '../api'
 import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot } from '../ui'
 
-export default function StockDetail({ h, meta, onBack }: { h: Holding; meta: TickerMeta; onBack: () => void }) {
+export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta }) {
   const m = meta[h.ticker]
   const [tab, setTab] = useState<'overview' | 'bg' | 'earnings'>('overview')
   // 背景调查:取回 HTML 片段注入页面(不用 iframe,随整页滚)
@@ -32,6 +32,8 @@ export default function StockDetail({ h, meta, onBack }: { h: Holding; meta: Tic
     catch (e: any) { setEarnErr(String(e.message || e)) }
     setEarnLoading(false)
   }
+  // 和背景调查一致:进入财报tab或切换季度时自动加载(已解读过的会秒回缓存,没解读的自动解读一次)
+  useEffect(() => { if (tab === 'earnings' && qSel && !earnHtml && !earnLoading) loadEarn(false) }, [tab, qSel])
   const [hist, setHist] = useState<HistPoint[]>([])
   const [ai, setAi] = useState<string>(''); const [aiLoading, setAiLoading] = useState(true); const [aiErr, setAiErr] = useState('')
   const priceRef = useRef<HTMLDivElement>(null)
@@ -52,20 +54,19 @@ export default function StockDetail({ h, meta, onBack }: { h: Holding; meta: Tic
     })
     chart.setOption({
       backgroundColor: 'transparent', grid: { left: 55, right: 15, top: 30, bottom: 30 },
-      legend: { textStyle: { color: '#aeb9c9' }, top: 0 },
-      tooltip: { trigger: 'axis', backgroundColor: '#1b2433', borderColor: '#26303f', textStyle: { color: '#e6edf6' } },
-      xAxis: { type: 'category', data: hist.map((p) => p.date?.slice(5)), axisLabel: { color: '#6b7787' }, axisLine: { lineStyle: { color: '#26303f' } } },
-      yAxis: { type: 'value', scale: true, axisLabel: { color: '#6b7787' }, splitLine: { lineStyle: { color: '#26303f' } } },
-      series: [mk('close', '收盘', '#e6edf6', 2), mk('sma20', '20日线', '#2ecc9b'), mk('sma50', '50日线', '#f5a623'), mk('sma200', '200日线', '#ff5c6c')],
+      legend: { textStyle: { color: '#bcae97' }, top: 0 },
+      tooltip: { trigger: 'axis', backgroundColor: '#1f1913', borderColor: '#2c2418', textStyle: { color: '#f1e9da' } },
+      xAxis: { type: 'category', data: hist.map((p) => p.date?.slice(5)), axisLabel: { color: '#b0a488' }, axisLine: { lineStyle: { color: '#2c2418' } } },
+      yAxis: { type: 'value', scale: true, axisLabel: { color: '#b0a488' }, splitLine: { lineStyle: { color: '#2c2418' } } },
+      series: [mk('close', '收盘', '#f1e9da', 2), mk('sma20', '20日线', '#6fae86'), mk('sma50', '50日线', '#c8a253'), mk('sma200', '200日线', '#cf6f5d')],
     })
     const onR = () => chart.resize(); window.addEventListener('resize', onR)
     return () => { window.removeEventListener('resize', onR); chart.dispose() }
-  }, [hist])
+  }, [hist, tab]) // 含 tab:从背调/财报切回概览时容器重新挂载,须重新 init(否则图空白)
 
   const ind = h.indicators
   return (
     <>
-      <button className="ghost" onClick={onBack}>‹ 返回列表</button>
       <div className="card detail-head">
         <div>
           <span className="dh-tk">{h.ticker}</span>
@@ -108,7 +109,7 @@ export default function StockDetail({ h, meta, onBack }: { h: Holding; meta: Tic
           </div>
           {earnLoading && <div className="muted">正在解读财报…（首次约 30 秒）</div>}
           {earnHtml && !earnLoading && <div className="doc-html" dangerouslySetInnerHTML={{ __html: earnHtml }} />}
-          {!earnHtml && !earnLoading && quarters.length > 0 && <div className="muted">选一个季度,点「解读这一季」。数据来自 SEC 官方季报。</div>}
+          {!earnHtml && !earnLoading && quarters.length > 0 && <div className="muted">切换季度自动解读(解读过的会秒回)。数据来自 SEC 官方季报。</div>}
         </div>
       )}
 

@@ -30,9 +30,9 @@ export default function Trends({ meta, watch }: { meta: TickerMeta; watch: Set<s
     if (mode === 'single') {
       chart.setOption({
         backgroundColor: 'transparent', grid: { left: 45, right: 50, top: 30, bottom: 30 },
-        legend: { textStyle: { color: '#aeb9c9' }, top: 0 },
-        tooltip: { trigger: 'axis', backgroundColor: '#1b2433', borderColor: '#26303f', textStyle: { color: '#e6edf6' } },
-        xAxis: { type: 'category', data: single.map((p) => p.date.slice(5)), axisLabel: { color: '#6b7787' }, axisLine: { lineStyle: { color: '#26303f' } } },
+        legend: { textStyle: { color: '#bcae97' }, top: 0 },
+        tooltip: { trigger: 'axis', backgroundColor: '#1f1913', borderColor: '#2c2418', textStyle: { color: '#f1e9da' } },
+        xAxis: { type: 'category', data: single.map((p) => p.date.slice(5)), axisLabel: { color: '#b0a488' }, axisLine: { lineStyle: { color: '#2c2418' } } },
         yAxis: [
           { type: 'value', name: '档位', min: -3, max: 3, interval: 1, position: 'left', axisLabel: { color: '#c8a253' }, splitLine: { lineStyle: { color: '#241d15' } } },
           { type: 'value', name: '20日中位%', position: 'right', axisLabel: { color: '#6fae86', formatter: (v: number) => (v * 100).toFixed(0) + '%' }, splitLine: { show: false } },
@@ -46,10 +46,10 @@ export default function Trends({ meta, watch }: { meta: TickerMeta; watch: Set<s
       const keys = Object.keys(multi)
       chart.setOption({
         backgroundColor: 'transparent', grid: { left: 45, right: 20, top: 30, bottom: 30 },
-        legend: { textStyle: { color: '#aeb9c9' }, top: 0 },
-        tooltip: { trigger: 'axis', backgroundColor: '#1b2433', borderColor: '#26303f', textStyle: { color: '#e6edf6' } },
-        xAxis: { type: 'time', axisLabel: { color: '#6b7787' }, axisLine: { lineStyle: { color: '#26303f' } } },
-        yAxis: { type: 'value', name: '档位', min: -3, max: 3, interval: 1, axisLabel: { color: '#6b7787' }, splitLine: { lineStyle: { color: '#241d15' } } },
+        legend: { textStyle: { color: '#bcae97' }, top: 0 },
+        tooltip: { trigger: 'axis', backgroundColor: '#1f1913', borderColor: '#2c2418', textStyle: { color: '#f1e9da' } },
+        xAxis: { type: 'time', axisLabel: { color: '#b0a488' }, axisLine: { lineStyle: { color: '#2c2418' } } },
+        yAxis: { type: 'value', name: '档位', min: -3, max: 3, interval: 1, axisLabel: { color: '#b0a488' }, splitLine: { lineStyle: { color: '#241d15' } } },
         series: keys.map((k, i) => ({
           name: k + (meta[k] ? ' ' + meta[k].cn : ''), type: 'line', step: 'end', showSymbol: false,
           lineStyle: { color: C[i % C.length] }, itemStyle: { color: C[i % C.length] }, // 图例圆点跟线同色

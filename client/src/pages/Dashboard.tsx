@@ -23,14 +23,14 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
       backgroundColor: 'transparent',
       grid: { left: 55, right: 20, top: 12, bottom: 40 },
       tooltip: {
-        backgroundColor: '#1b2433', borderColor: '#26303f', textStyle: { color: '#e6edf6' },
+        backgroundColor: '#1f1913', borderColor: '#2c2418', textStyle: { color: '#f1e9da' },
         formatter: (p: any) => {
           const h = hs[p.data.value[0]]; const b = h.prob['h20']
           return `<b>${h.ticker}</b>（未来20日）<br/>最可能落在：${pct2(b.median)}<br/>70%概率区间：${pct2(b.band70[0])} ~ ${pct2(b.band70[1])}<br/>参考止损 $${b.stop} / 目标 $${b.target}`
         },
       },
-      xAxis: { type: 'category', data: hs.map((h) => h.ticker), axisLabel: { color: '#6b7787' }, axisLine: { lineStyle: { color: '#26303f' } } },
-      yAxis: { type: 'value', name: '未来20日\n收益范围', nameTextStyle: { color: '#6b7787', fontSize: 10 }, axisLabel: { formatter: '{value}%', color: '#6b7787' }, splitLine: { lineStyle: { color: '#26303f' } } },
+      xAxis: { type: 'category', data: hs.map((h) => h.ticker), axisLabel: { color: '#b0a488' }, axisLine: { lineStyle: { color: '#2c2418' } } },
+      yAxis: { type: 'value', name: '未来20日\n收益范围', nameTextStyle: { color: '#b0a488', fontSize: 12 }, axisLabel: { formatter: '{value}%', color: '#b0a488' }, splitLine: { lineStyle: { color: '#2c2418' } } },
       series: [{
         type: 'custom',
         encode: { x: 0, y: [1, 2, 3] }, // 让 y 轴涵盖 上/下沿/中位 全范围(修正正区间被截断)
