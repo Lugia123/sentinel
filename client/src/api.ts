@@ -50,6 +50,18 @@ export async function removeWatch(ticker: string): Promise<void> {
   await fetch(`/api/watchlist?ticker=${ticker}`, { method: 'DELETE' })
 }
 
+export interface TrendPoint { date: string; grade: number; price: number; median20: number | null }
+export async function fetchTrend(ticker: string, from?: string, to?: string): Promise<TrendPoint[]> {
+  const qs = new URLSearchParams({ ticker }); if (from) qs.set('from', from); if (to) qs.set('to', to)
+  const r = await fetch(`/api/trend?${qs}`)
+  return r.ok ? (await r.json()).points || [] : []
+}
+export async function fetchTrendMulti(tickers: string[], from?: string, to?: string): Promise<Record<string, { date: string; grade: number }[]>> {
+  const qs = new URLSearchParams({ tickers: tickers.join(',') }); if (from) qs.set('from', from); if (to) qs.set('to', to)
+  const r = await fetch(`/api/trend?${qs}`)
+  return r.ok ? (await r.json()).series || {} : {}
+}
+
 import type { Holding } from './types'
 export async function fetchFocus(ticker: string): Promise<{ asof: string; ticker: string; holding: Holding }> {
   const r = await fetch(`/api/focus?ticker=${ticker.toUpperCase()}`)

@@ -5,11 +5,13 @@ import Dashboard from './pages/Dashboard'
 import Positions from './pages/Positions'
 import Help from './pages/Help'
 import StockDetail from './pages/StockDetail'
+import Trends from './pages/Trends'
 
-type View = 'signals' | 'positions' | 'help'
+type View = 'signals' | 'positions' | 'trends' | 'help'
 const NAV: { key: View; label: string }[] = [
   { key: 'signals', label: '策略信号' },
   { key: 'positions', label: '我的持仓' },
+  { key: 'trends', label: '分析走势' },
   { key: 'help', label: '帮助说明' },
 ]
 
@@ -97,6 +99,7 @@ export default function App() {
         {detailH && <StockDetail h={detailH} meta={meta} onBack={backFromDetail} />}
         {!detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onCustom={viewCustom} />}
         {!detailH && view === 'positions' && <Positions />}
+        {!detailH && view === 'trends' && <Trends meta={meta} watch={watch} />}
         {!detailH && view === 'help' && <Help />}
         {!detailH && view === 'signals' && !snap && !err && <div className="card">加载中…</div>}
 

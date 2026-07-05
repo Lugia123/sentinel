@@ -48,6 +48,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/strategies", a.strategies)
 	mux.HandleFunc("/api/watchlist", a.watchlist)
 	mux.HandleFunc("/api/focus", a.focus)
+	mux.HandleFunc("/api/trend", a.trend)
 	return cors(mux)
 }
 
