@@ -38,8 +38,8 @@ export default function Trends({ meta, watch }: { meta: TickerMeta; watch: Set<s
           { type: 'value', name: '20日中位%', position: 'right', axisLabel: { color: '#6fae86', formatter: (v: number) => (v * 100).toFixed(0) + '%' }, splitLine: { show: false } },
         ],
         series: [
-          { name: '档位', type: 'line', step: 'end', symbol: 'none', lineStyle: { color: '#c8a253', width: 2 }, data: single.map((p) => p.grade) },
-          { name: '20日中位', type: 'line', yAxisIndex: 1, showSymbol: false, lineStyle: { color: '#6fae86' }, data: single.map((p) => p.median20) },
+          { name: '档位', type: 'line', step: 'end', symbol: 'none', lineStyle: { color: '#c8a253', width: 2 }, itemStyle: { color: '#c8a253' }, data: single.map((p) => p.grade) },
+          { name: '20日中位', type: 'line', yAxisIndex: 1, showSymbol: false, lineStyle: { color: '#6fae86' }, itemStyle: { color: '#6fae86' }, data: single.map((p) => p.median20) },
         ],
       })
     } else {
@@ -52,7 +52,8 @@ export default function Trends({ meta, watch }: { meta: TickerMeta; watch: Set<s
         yAxis: { type: 'value', name: '档位', min: -3, max: 3, interval: 1, axisLabel: { color: '#6b7787' }, splitLine: { lineStyle: { color: '#241d15' } } },
         series: keys.map((k, i) => ({
           name: k + (meta[k] ? ' ' + meta[k].cn : ''), type: 'line', step: 'end', showSymbol: false,
-          lineStyle: { color: C[i % C.length] }, data: multi[k].map((p) => [p.date, p.grade]),
+          lineStyle: { color: C[i % C.length] }, itemStyle: { color: C[i % C.length] }, // 图例圆点跟线同色
+          data: multi[k].map((p) => [p.date, p.grade]),
         })),
       })
     }
