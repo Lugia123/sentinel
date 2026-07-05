@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import { fetchHistory, fetchExplain } from '../api'
 import type { Holding, HistPoint } from '../types'
+import type { TickerMeta } from '../api'
 import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot } from '../ui'
 
-export default function StockDetail({ h, onBack }: { h: Holding; onBack: () => void }) {
+export default function StockDetail({ h, meta, onBack }: { h: Holding; meta: TickerMeta; onBack: () => void }) {
+  const m = meta[h.ticker]
   const [hist, setHist] = useState<HistPoint[]>([])
   const [ai, setAi] = useState<string>(''); const [aiLoading, setAiLoading] = useState(true); const [aiErr, setAiErr] = useState('')
   const priceRef = useRef<HTMLDivElement>(null)
@@ -41,7 +43,8 @@ export default function StockDetail({ h, onBack }: { h: Holding; onBack: () => v
       <button className="ghost" onClick={onBack}>‹ 返回列表</button>
       <div className="card detail-head">
         <div>
-          <span className="dh-tk">{h.ticker}</span> <SleeveBadge sleeve={h.sleeve} />
+          <span className="dh-tk">{h.ticker}</span>
+          {m && <span className="cn" style={{ fontSize: 15 }}>{m.cn} · {m.sector}</span>} <SleeveBadge sleeve={h.sleeve} />
           <span className="dh-px">${h.price}</span>
         </div>
         <div>

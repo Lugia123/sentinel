@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchSnapshot, runEngine, fetchVersion } from './api'
+import { fetchSnapshot, runEngine, fetchVersion, fetchMeta, fetchWatchlist, addWatch, removeWatch, type TickerMeta } from './api'
 import type { Snapshot } from './types'
 import Dashboard from './pages/Dashboard'
 import Positions from './pages/Positions'
@@ -20,12 +20,21 @@ export default function App() {
   const [running, setRunning] = useState(false)
   const [view, setView] = useState<View>('signals')
   const [sel, setSel] = useState<string | null>(null)
+  const [meta, setMeta] = useState<TickerMeta>({})
+  const [watch, setWatch] = useState<Set<string>>(new Set())
 
   const load = async () => {
     setErr('')
     try { setSnap(await fetchSnapshot()) } catch (e: any) { setErr(String(e.message || e)) }
   }
-  useEffect(() => { load(); fetchVersion().then((v) => setVer(v.version)) }, [])
+  const loadWatch = async () => setWatch(new Set((await fetchWatchlist()).map((w) => w.ticker)))
+  useEffect(() => {
+    load(); fetchVersion().then((v) => setVer(v.version)); fetchMeta().then(setMeta); loadWatch()
+  }, [])
+  const toggleWatch = async (tk: string, on: boolean) => {
+    if (on) await addWatch(tk); else await removeWatch(tk)
+    await loadWatch()
+  }
 
   const recompute = async () => {
     setRunning(true); setErr('')
@@ -72,8 +81,8 @@ export default function App() {
           </div>
         )}
 
-        {selHolding && <StockDetail h={selHolding} onBack={() => setSel(null)} />}
-        {!sel && view === 'signals' && snap && <Dashboard snap={snap} onSelect={setSel} />}
+        {selHolding && <StockDetail h={selHolding} meta={meta} onBack={() => setSel(null)} />}
+        {!sel && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} />}
         {!sel && view === 'positions' && <Positions />}
         {!sel && view === 'help' && <Help />}
         {!sel && view === 'signals' && !snap && !err && <div className="card">加载中…</div>}

@@ -1,10 +1,16 @@
 import { useEffect, useRef } from 'react'
 import * as echarts from 'echarts'
 import type { Snapshot, Holding } from '../types'
+import type { TickerMeta } from '../api'
 import { pct, pct2, usd, InfoDot, GradeBadge, SleeveBadge, actionColor } from '../ui'
 
-export default function Dashboard({ snap, onSelect }: { snap: Snapshot; onSelect: (t: string) => void }) {
+export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect }: {
+  snap: Snapshot; meta: TickerMeta; watch: Set<string>
+  onToggleWatch: (t: string, on: boolean) => void; onSelect: (t: string) => void
+}) {
   const chartRef = useRef<HTMLDivElement>(null)
+  // 关注的置顶(保持各自组内原顺序)
+  const rows = [...snap.holdings].sort((a, b) => (watch.has(b.ticker) ? 1 : 0) - (watch.has(a.ticker) ? 1 : 0))
   useEffect(() => {
     if (!chartRef.current) return
     const chart = echarts.init(chartRef.current)
@@ -71,7 +77,9 @@ export default function Dashboard({ snap, onSelect }: { snap: Snapshot; onSelect
           <table>
             <thead>
               <tr>
+                <th></th>
                 <th>标的</th>
+                <th>板块</th>
                 <th>选股依据 <InfoDot text="动量=趋势强涨得比大盘好；股东回报=回购分红多；双腿=两者都占。" /></th>
                 <th>现价</th>
                 <th>建议股数 <InfoDot text="按你的资金池 + 风险平价(波动低的多给点)算出的目标股数,可买碎股。" /></th>
@@ -81,11 +89,17 @@ export default function Dashboard({ snap, onSelect }: { snap: Snapshot; onSelect
               </tr>
             </thead>
             <tbody>
-              {snap.holdings.map((h: Holding) => {
+              {rows.map((h: Holding) => {
                 const b = h.prob['h20']
+                const on = watch.has(h.ticker)
+                const m = meta[h.ticker]
                 return (
                   <tr key={h.ticker} className="clickable" onClick={() => onSelect(h.ticker)}>
-                    <td><b>{h.ticker}</b> <span className="go">›</span></td>
+                    <td onClick={(e) => { e.stopPropagation(); onToggleWatch(h.ticker, !on) }} style={{ cursor: 'pointer', textAlign: 'center' }}>
+                      <span className={on ? 'star on' : 'star'}>{on ? '★' : '☆'}</span>
+                    </td>
+                    <td><b>{h.ticker}</b>{m && <span className="cn">{m.cn}</span>} <span className="go">›</span></td>
+                    <td className="muted">{m?.sector || '—'}</td>
                     <td><SleeveBadge sleeve={h.sleeve} /></td>
                     <td>${h.price}</td>
                     <td>{h.target_shares}</td>

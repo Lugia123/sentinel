@@ -39,6 +39,23 @@ export async function fetchHistory(ticker: string, n = 120): Promise<HistPoint[]
   return (await r.json()).history || []
 }
 
+export async function fetchWatchlist(): Promise<{ ticker: string; source: string }[]> {
+  const r = await fetch('/api/watchlist')
+  return r.ok ? (await r.json()).watchlist || [] : []
+}
+export async function addWatch(ticker: string, source = 'ai'): Promise<void> {
+  await fetch(`/api/watchlist?ticker=${ticker}&source=${source}`, { method: 'POST' })
+}
+export async function removeWatch(ticker: string): Promise<void> {
+  await fetch(`/api/watchlist?ticker=${ticker}`, { method: 'DELETE' })
+}
+
+export type TickerMeta = Record<string, { cn: string; sector: string }>
+export async function fetchMeta(): Promise<TickerMeta> {
+  const r = await fetch('/api/meta')
+  return r.ok ? r.json() : {}
+}
+
 export async function fetchExplain(ticker: string, force = false): Promise<Explanation> {
   const r = await fetch(`/api/explain?ticker=${ticker}${force ? '&force=1' : ''}`)
   const j = await r.json()

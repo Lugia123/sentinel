@@ -46,6 +46,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/blob", a.blobHandler)
 	mux.HandleFunc("/api/meta", a.meta)
 	mux.HandleFunc("/api/strategies", a.strategies)
+	mux.HandleFunc("/api/watchlist", a.watchlist)
 	return cors(mux)
 }
 
