@@ -27,13 +27,14 @@
 - `/api/trend`(单股全指标序列 + 多股档位对比)
 - 前端「分析走势」页(单股档位/中位双轴 + 多股档位对比)
 
-### P4 AI 升级(部分)
-- ★ 背景调查(#9b):`internal/investigate` DeepSeek→HTML→MinIO→详情「背景调查」tab + 重新背调
+### P4 AI 升级(基本完成)
+- ★ 背景调查(#9b):`internal/investigate` DeepSeek→HTML片段→MinIO→详情「背景调查」tab + 重新背调
+- #2 AI 讲解升级为 HTML:explain 输出结构化 HTML 片段(4 小标题),详情页注入渲染
+- #9c 财报解读:`engine/earnings.py` 拉 SEC EDGAR 真实季度财务 → `internal/earnings` DeepSeek 解读(含 QoQ/YoY)→ MinIO → 详情「财报解读」tab(季度下拉选)
+- ★ 背调/财报 HTML 改【片段注入渲染】(dangerouslySetInnerHTML),不用 iframe——无内嵌滚动,随整页滚(按用户要求)
 
-## 剩余(P4 未完)
-1. **#2 AI 讲解升级为 HTML**:当前讲解是纯文本段落(清晰可用);可改为 DeepSeek 生成富 HTML(配图/图表)存 MinIO,详情页 iframe 展示。参考 investigate 的实现。
-2. **MCP server + skill**:建 Sentinel MCP(无认证,参考 Tinia `_shared/local-mcp`)暴露策略数据工具,让 agentic AI(背调/财报)能自己拉数据做更深调研。当前背调是 DeepSeek 塞 prompt(方案A);MCP 是方案 B。
-3. **#9c 财报解读**:用户选季度 → SEC EDGAR 取 10-Q/10-K(已有 fp 基建可扩)→ AI 解读 → HTML → MinIO → 详情「财报解读」tab(用户触发)。
+## 剩余(P4 只剩 MCP)
+1. **MCP server + skill**:建 Sentinel MCP(无认证,参考 Tinia `_shared/local-mcp`)暴露策略数据工具(snapshot/holding/history/trend/strategies),让 agentic AI 能自己拉数据做更深调研。当前背调/财报是 DeepSeek 塞 prompt(方案A);MCP 是方案 B(agentic)。当前 AI 功能不依赖它也完整可用。
 
 ## 已知增强点
 - P3 走势:某股只在被选中日有档位(gappy);连续任意股走势需 per-day focus 计算(可加 `engine/trend.py`)。
