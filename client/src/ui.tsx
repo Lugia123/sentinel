@@ -1,4 +1,5 @@
 import { useState, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 
 export const pct = (x: number) => `${(x * 100).toFixed(1)}%`
 export const pct2 = (x: number) => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`
@@ -25,7 +26,10 @@ export function InfoDot({ text }: { text: string }) {
   return (
     <span className="infodot" onMouseEnter={enter} onMouseLeave={() => setPos(null)}>
       ?
-      {pos && <span className="tip-fixed" style={{ left: pos.x, top: pos.y }}>{text}</span>}
+      {pos && createPortal(
+        <span className="tip-fixed" style={{ left: pos.x, top: pos.y }}>{text}</span>,
+        document.body,
+      )}
     </span>
   )
 }

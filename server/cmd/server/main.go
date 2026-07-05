@@ -15,6 +15,7 @@ import (
 	"sentinel/internal/engine"
 	"sentinel/internal/explain"
 	"sentinel/internal/portfolio"
+	"sentinel/internal/scheduler"
 	"sentinel/internal/store"
 	"sentinel/internal/version"
 )
@@ -37,6 +38,9 @@ func main() {
 	aic := ai.New(cfg.DeepSeek.Key, cfg.DeepSeek.Base, cfg.DeepSeek.Model)
 	ex := explain.New(st, aic, gdb)
 	a := api.New(st, rn, pf, ex, gdb, cfg.DataDir, cfg.EngineDir, ver)
+
+	// 后台定时任务:每日定点自动跑引擎+ingest;启动时若库中无快照则自愈补跑
+	scheduler.New(rn, st, cfg.DataDir, cfg.Capital, cfg.Schedule).Start()
 
 	aiState := "已启用"
 	if !aic.Enabled() {

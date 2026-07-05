@@ -15,6 +15,8 @@ type Config struct {
 	EngineDir string // Python 引擎目录
 	PythonBin string // python 解释器(默认复用 safna_jr 的 uv venv)
 	DBDSN     string // PostgreSQL DSN(密码在 server/.env,不入库)
+	Capital   string // 默认资金池
+	Schedule  string // 每日自动运行时刻 HH:MM(本地时间,默认美股收盘后)
 	DeepSeek  DeepSeekConfig
 }
 
@@ -35,6 +37,8 @@ func Load() Config {
 		EngineDir: envOr("SENTINEL_ENGINE", filepath.Join(root, "engine")),
 		PythonBin: envOr("SENTINEL_PYTHON", "/Users/lugia/lugia_fc/TradingAgents/.venv/bin/python"),
 		DBDSN:     envOr("SENTINEL_DB_DSN", "host=localhost port=5433 user=bestfunc dbname=sentinel sslmode=disable"),
+		Capital:   envOr("SENTINEL_CAPITAL", "4000"),
+		Schedule:  envOr("SENTINEL_SCHEDULE", "05:30"),
 		DeepSeek: DeepSeekConfig{
 			Key:   os.Getenv("SENTINEL_DEEPSEEK_KEY"),
 			Base:  envOr("SENTINEL_DEEPSEEK_BASE", "https://api.deepseek.com"),

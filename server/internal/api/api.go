@@ -4,13 +4,12 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 
 	"gorm.io/gorm"
 
 	"sentinel/internal/engine"
 	"sentinel/internal/explain"
+	"sentinel/internal/pipeline"
 	"sentinel/internal/portfolio"
 	"sentinel/internal/store"
 	"sentinel/internal/version"
@@ -128,25 +127,12 @@ func (a *API) run(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	asof := q(r, "asof", "latest")
-	out, err := a.runner.RunDaily(asof, q(r, "capital", "4000"), r.URL.Query().Get("sy") != "0")
+	res, err := pipeline.RunAndIngest(a.runner, a.store, a.dataDir, asof, q(r, "capital", "4000"), r.URL.Query().Get("sy") != "0")
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error(), "log": out})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error(), "log": res.Log})
 		return
 	}
-	// ingest 引擎产出的 latest 快照 + 价格
-	snapRaw, e1 := os.ReadFile(filepath.Join(a.dataDir, "snapshot_latest.json"))
-	priceRaw, e2 := os.ReadFile(filepath.Join(a.dataDir, "prices_latest.json"))
-	if e1 != nil || e2 != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "引擎产出读取失败", "log": out})
-		return
-	}
-	sid, e3 := a.store.IngestSnapshot(snapRaw)
-	nPx, e4 := a.store.IngestPrices(priceRaw)
-	if e3 != nil || e4 != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": errStr(e3, e4), "log": out})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "done", "snapshot_id": sid, "n_prices": nPx, "log": out})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "done", "snapshot_id": res.SnapshotID, "n_prices": res.NPrices, "log": res.Log})
 }
 
 func (a *API) positions(w http.ResponseWriter, r *http.Request) {
@@ -179,15 +165,6 @@ func q(r *http.Request, k, d string) string {
 		return v
 	}
 	return d
-}
-
-func errStr(errs ...error) string {
-	for _, e := range errs {
-		if e != nil {
-			return e.Error()
-		}
-	}
-	return ""
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
