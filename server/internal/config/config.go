@@ -18,6 +18,11 @@ type Config struct {
 	Capital   string // 默认资金池
 	Schedule  string // 每日自动运行时刻 HH:MM(本地时间,默认美股收盘后)
 	DeepSeek  DeepSeekConfig
+	Minio     MinioConfig
+}
+
+type MinioConfig struct {
+	Endpoint, Key, Secret, Bucket string
 }
 
 type DeepSeekConfig struct {
@@ -43,6 +48,12 @@ func Load() Config {
 			Key:   os.Getenv("SENTINEL_DEEPSEEK_KEY"),
 			Base:  envOr("SENTINEL_DEEPSEEK_BASE", "https://api.deepseek.com"),
 			Model: envOr("SENTINEL_DEEPSEEK_MODEL", "deepseek-chat"),
+		},
+		Minio: MinioConfig{
+			Endpoint: os.Getenv("SENTINEL_MINIO_ENDPOINT"),
+			Key:      os.Getenv("SENTINEL_MINIO_KEY"),
+			Secret:   os.Getenv("SENTINEL_MINIO_SECRET"),
+			Bucket:   envOr("SENTINEL_MINIO_BUCKET", "sentinel"),
 		},
 	}
 }

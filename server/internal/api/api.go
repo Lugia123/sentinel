@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"sentinel/internal/blob"
 	"sentinel/internal/engine"
 	"sentinel/internal/explain"
 	"sentinel/internal/pipeline"
@@ -16,18 +17,19 @@ import (
 )
 
 type API struct {
-	store   *store.Store
-	runner  *engine.Runner
-	port    *portfolio.Store
-	explain *explain.Service
+	store     *store.Store
+	runner    *engine.Runner
+	port      *portfolio.Store
+	explain   *explain.Service
+	blob      *blob.Store
 	gdb       *gorm.DB
 	dataDir   string
 	engineDir string
 	ver       version.Info
 }
 
-func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, gdb *gorm.DB, dataDir, engineDir string, ver version.Info) *API {
-	return &API{store: st, runner: rn, port: pf, explain: ex, gdb: gdb, dataDir: dataDir, engineDir: engineDir, ver: ver}
+func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, bs *blob.Store, gdb *gorm.DB, dataDir, engineDir string, ver version.Info) *API {
+	return &API{store: st, runner: rn, port: pf, explain: ex, blob: bs, gdb: gdb, dataDir: dataDir, engineDir: engineDir, ver: ver}
 }
 
 func (a *API) Routes() http.Handler {
@@ -41,7 +43,24 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/positions", a.positions)
 	mux.HandleFunc("/api/explain", a.explainHandler)
 	mux.HandleFunc("/api/history", a.history)
+	mux.HandleFunc("/api/blob", a.blobHandler)
 	return cors(mux)
+}
+
+// blobHandler 从 MinIO 取大 HTML(背调/财报):?key=... 直接返回 HTML。
+func (a *API) blobHandler(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Query().Get("key")
+	if key == "" || a.blob == nil || !a.blob.Enabled() {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "缺 key 或 MinIO 未配置"})
+		return
+	}
+	html, err := a.blob.GetHTML(r.Context(), key)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(html))
 }
 
 // explainHandler AI 白话讲解某股:?ticker=X&date=&force=1

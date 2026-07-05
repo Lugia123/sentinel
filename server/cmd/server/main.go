@@ -10,6 +10,7 @@ import (
 
 	"sentinel/internal/ai"
 	"sentinel/internal/api"
+	"sentinel/internal/blob"
 	"sentinel/internal/config"
 	"sentinel/internal/db"
 	"sentinel/internal/engine"
@@ -36,8 +37,12 @@ func main() {
 	rn := engine.New(cfg.PythonBin, cfg.EngineDir)
 	pf := portfolio.New(gdb)
 	aic := ai.New(cfg.DeepSeek.Key, cfg.DeepSeek.Base, cfg.DeepSeek.Model)
+	bs, berr := blob.New(cfg.Minio.Endpoint, cfg.Minio.Key, cfg.Minio.Secret, cfg.Minio.Bucket)
+	if berr != nil {
+		log.Printf("MinIO 连接失败(大HTML存储降级): %v", berr)
+	}
 	ex := explain.New(st, aic, gdb)
-	a := api.New(st, rn, pf, ex, gdb, cfg.DataDir, cfg.EngineDir, ver)
+	a := api.New(st, rn, pf, ex, bs, gdb, cfg.DataDir, cfg.EngineDir, ver)
 
 	// 后台定时任务:每日定点自动跑引擎+ingest;启动时若库中无快照则自愈补跑
 	scheduler.New(rn, st, cfg.DataDir, cfg.Capital, cfg.Schedule).Start()
@@ -47,7 +52,11 @@ func main() {
 		aiState = "未配置(讲解功能降级,其余不受影响)"
 	}
 	log.Printf("Sentinel %s 后端启动 :%s (%s)", ver.Version, cfg.Port, ver.Branch)
-	log.Printf("  PostgreSQL 已连接 + 迁移完成 | DeepSeek AI: %s", aiState)
+	minioState := "未配置"
+	if bs != nil && bs.Enabled() {
+		minioState = "已连接(" + cfg.Minio.Bucket + ")"
+	}
+	log.Printf("  PostgreSQL 已连接 + 迁移完成 | DeepSeek AI: %s | MinIO: %s", aiState, minioState)
 	log.Printf("  API: /api/snapshot · /api/run · /api/positions · /api/explain · /api/datastatus")
 	if err := http.ListenAndServe(":"+cfg.Port, a.Routes()); err != nil {
 		log.Fatal(err)
