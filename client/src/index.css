@@ -166,6 +166,36 @@ select.qsel { background: var(--surface-2); border: 1px solid var(--border); col
 /* 数据来源引用(强制标注)*/
 .src-cite { margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 12px; color: var(--ink-mute); line-height: 1.6; }
 .src-cite a { color: var(--gold-hi); }
+
+/* 模态窗 */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.62); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+.modal { background: var(--surface); border: 1px solid var(--gold-dim); border-radius: 14px; width: 560px; max-width: 100%; max-height: 88vh; overflow-y: auto; box-shadow: var(--shadow); }
+.modal.wide { width: 860px; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.modal-head h3 { margin: 0; font-size: 15px; color: var(--gold-hi); font-weight: 600; }
+.modal-x { background: none; border: 0; color: var(--ink-mute); font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.modal-x:hover { color: var(--down); }
+.modal-body { padding: 16px 18px; }
+button.primary { background: var(--gold); color: #1a140a; }
+.th-btn { background: var(--surface-2); border: 1px solid var(--border-2); color: var(--gold-hi); border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 600; margin-left: 8px; cursor: pointer; }
+.th-btn:hover { border-color: var(--gold-dim); }
+.linkbtn { background: none; border: 0; color: var(--gold-hi); cursor: pointer; font-size: 12px; text-decoration: underline; padding: 0 4px; }
+.alloc-banner { background: var(--gold-glow); border: 1px solid var(--gold-dim); border-radius: 8px; padding: 8px 12px; font-size: 13px; color: var(--ink-soft); margin-bottom: 10px; }
+/* 分配弹窗 */
+.alloc-modes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.alloc-modes button { background: var(--surface-2); color: var(--ink-soft); border: 1px solid var(--border-2); font-weight: 600; }
+.alloc-modes button.active { background: var(--gold-glow); color: var(--gold-hi); border-color: var(--gold-dim); }
+.alloc-modes button.primary { background: var(--gold); color: #1a140a; border: 0; }
+.alloc-grid { display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
+.alloc-sub { font-size: 12px; color: var(--ink-mute); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+.alloc-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.alloc-item { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+.alloc-item.on { background: var(--surface-2); }
+.alloc-item .ss-sub { flex: 1; }
+.alloc-g { font-size: 12px; font-weight: 700; }
+.alloc-g[data-g="up"] { color: var(--up); } .alloc-g[data-g="mid"] { color: var(--gold-hi); } .alloc-g[data-g="down"] { color: var(--down); }
+.alloc-note { background: var(--gold-glow); border: 1px solid var(--gold-dim); border-radius: 8px; padding: 8px 11px; font-size: 12px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 8px; }
+@media (max-width: 720px) { .alloc-grid { grid-template-columns: 1fr; } .modal.wide { width: 100%; } }
 .sig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
 .sig { display: flex; gap: 10px; align-items: flex-start; background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
 .sig-dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }

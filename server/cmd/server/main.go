@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"sentinel/internal/ai"
+	"sentinel/internal/allocate"
 	"sentinel/internal/api"
 	"sentinel/internal/blob"
 	"sentinel/internal/config"
@@ -46,7 +47,8 @@ func main() {
 	ex := explain.New(st, aic, gdb)
 	inv := investigate.New(aic, bs, cfg.EngineDir)
 	earn := earnings.New(rn, aic, bs)
-	a := api.New(st, rn, pf, ex, inv, earn, bs, gdb, cfg.DataDir, cfg.EngineDir, ver)
+	al := allocate.New(aic, st)
+	a := api.New(st, rn, pf, ex, inv, earn, al, bs, gdb, cfg.DataDir, cfg.EngineDir, ver)
 
 	// 后台定时任务:每日定点自动跑引擎+ingest;启动时若库中无快照则自愈补跑
 	scheduler.New(rn, st, cfg.DataDir, cfg.Capital, cfg.Schedule).Start()

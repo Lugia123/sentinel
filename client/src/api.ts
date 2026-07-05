@@ -105,6 +105,17 @@ export async function fetchEarningsInterpret(ticker: string, period: string, for
   return j
 }
 
+export interface AllocItem { ticker: string; weight: number; shares: number; value: number; reason: string }
+export interface AllocResult { mode: string; capital: number; allocations: AllocItem[]; cash_pct: number; note: string }
+export async function fetchAIAllocate(tickers: string[], capital: number): Promise<AllocResult> {
+  const r = await fetch('/api/allocate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tickers, capital }),
+  })
+  const j = await r.json()
+  if (!r.ok || j.error) throw new Error(j.error || 'AI 分配失败')
+  return j
+}
+
 export type TickerMeta = Record<string, { cn: string; sector: string }>
 export async function fetchMeta(): Promise<TickerMeta> {
   const r = await fetch('/api/meta')

@@ -15,6 +15,7 @@ import (
 	"sentinel/internal/pipeline"
 	"sentinel/internal/portfolio"
 	"sentinel/internal/store"
+	"sentinel/internal/allocate"
 	"sentinel/internal/version"
 )
 
@@ -25,6 +26,7 @@ type API struct {
 	explain   *explain.Service
 	invest    *investigate.Service
 	earn      *earnings.Service
+	alloc     *allocate.Service
 	blob      *blob.Store
 	gdb       *gorm.DB
 	dataDir   string
@@ -32,8 +34,8 @@ type API struct {
 	ver       version.Info
 }
 
-func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, inv *investigate.Service, earn *earnings.Service, bs *blob.Store, gdb *gorm.DB, dataDir, engineDir string, ver version.Info) *API {
-	return &API{store: st, runner: rn, port: pf, explain: ex, invest: inv, earn: earn, blob: bs, gdb: gdb, dataDir: dataDir, engineDir: engineDir, ver: ver}
+func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, inv *investigate.Service, earn *earnings.Service, al *allocate.Service, bs *blob.Store, gdb *gorm.DB, dataDir, engineDir string, ver version.Info) *API {
+	return &API{store: st, runner: rn, port: pf, explain: ex, invest: inv, earn: earn, alloc: al, blob: bs, gdb: gdb, dataDir: dataDir, engineDir: engineDir, ver: ver}
 }
 
 func (a *API) Routes() http.Handler {
@@ -57,6 +59,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/investigate", a.investigate)
 	mux.HandleFunc("/api/earnings/quarters", a.earningsQuarters)
 	mux.HandleFunc("/api/earnings", a.earningsInterpret)
+	mux.HandleFunc("/api/allocate", a.allocateHandler)
 	return cors(mux)
 }
 
