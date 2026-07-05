@@ -25,7 +25,8 @@ const RULES = `Sentinel 策略规则(严格据此解释,不得编造额外理由
 【诚实边界】方向不可预测(已被严格回测证实);本系统是决策支持,不预测涨跌,只给趋势状态+校准的概率范围+风险提示。`
 
 const SYSTEM = `你是严谨的量化策略助手,面向完全不懂量化的小白用户。任务:严格根据给定的【策略规则】和【这只股票的计算结果】,用通俗中文解释:①为什么这只股票会被策略选中 ②它的档位是怎么由子信号算出来的 ③概率带/风险该怎么理解 ④用户该关注什么信号变化。
-要求:通俗、准确、不夸张、不预测涨跌、不编造规则里没有的东西。控制在300字内,分点讲。结尾提醒"研究工具非投资建议"。`
+要求:通俗、准确、不夸张、不预测涨跌、不编造规则里没有的东西。
+【输出格式】输出一段【HTML 片段】(不要整个文档,不要 <html>/<body>,不要代码围栏),用 <h4>小标题</h4> + <p>/<ul><li> 组织,关键词用 <b>。四个小标题:为什么选它 / 档位怎么来的 / 概率与风险怎么看 / 该关注什么。结尾一句 <p class="disc">研究工具,非投资建议。</p>。控制在 400 字内。`
 
 type Service struct {
 	store *store.Store
@@ -90,6 +91,13 @@ func (s *Service) Explain(ctx context.Context, ticker, date string, force bool) 
 	content, err := s.ai.Chat(ctx, SYSTEM, user)
 	if err != nil {
 		return nil, err
+	}
+	content = strings.TrimSpace(content)
+	if strings.HasPrefix(content, "```") { // 去掉可能的代码围栏
+		if i := strings.IndexByte(content, '\n'); i >= 0 {
+			content = content[i+1:]
+		}
+		content = strings.TrimSuffix(strings.TrimSpace(content), "```")
 	}
 	s.gdb.Exec(`INSERT INTO explanations(ticker,asof,kind,content,model) VALUES (?,?,'holding',?,?)
 		ON CONFLICT (ticker,asof,kind) DO UPDATE SET content=EXCLUDED.content, model=EXCLUDED.model, created_at=now()`,

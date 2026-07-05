@@ -87,7 +87,7 @@ export default function StockDetail({ h, meta, onBack }: { h: Holding; meta: Tic
         </h3>
         {aiLoading && <div className="muted">正在生成讲解…（首次约几秒）</div>}
         {aiErr && <div className="down" style={{ fontSize: 13 }}>{aiErr}</div>}
-        {!aiLoading && ai && <div className="ai-text">{ai.split('\n').map((line, i) => <p key={i} style={{ margin: '6px 0' }}>{line}</p>)}</div>}
+        {!aiLoading && ai && <div className="ai-text" dangerouslySetInnerHTML={{ __html: ai }} />}
       </div>
 
       {/* 档位分解 */}
