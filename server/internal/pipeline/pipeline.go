@@ -17,8 +17,8 @@ type Result struct {
 }
 
 // RunAndIngest 跑 run_daily.py 产 JSON → ingest snapshots/holdings/prices 入 PG。
-func RunAndIngest(rn *engine.Runner, st *store.Store, dataDir, asof, capital string, withSY bool) (Result, error) {
-	out, err := rn.RunDaily(asof, capital, withSY)
+func RunAndIngest(rn *engine.Runner, st *store.Store, dataDir, asof, capital string, withSY bool, track []string) (Result, error) {
+	out, err := rn.RunDaily(asof, capital, withSY, track)
 	if err != nil {
 		return Result{Log: out}, err
 	}

@@ -22,13 +22,16 @@ func New(pythonBin, engineDir string) *Runner {
 
 // RunDaily 跑 run_daily.py 产出/刷新快照。asof="latest" 或 YYYY-MM-DD。
 // 返回引擎 stdout(便于前端显示日志);超时 10 分钟(SY 腿较慢)。
-func (r *Runner) RunDaily(asof string, capital string, withSY bool) (string, error) {
+func (r *Runner) RunDaily(asof string, capital string, withSY bool, track []string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	args := []string{filepath.Join(r.engineDir, "run_daily.py"), "--asof", asof, "--capital", capital}
 	if !withSY {
 		args = append(args, "--no-sy")
+	}
+	if len(track) > 0 {
+		args = append(args, "--track", strings.Join(track, ","))
 	}
 	cmd := exec.CommandContext(ctx, r.pythonBin, args...)
 	cmd.Dir = r.engineDir

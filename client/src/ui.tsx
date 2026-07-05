@@ -10,6 +10,7 @@ export const SLEEVE: Record<string, { label: string; hint: string; cls: string }
   momentum: { label: '动量', hint: '因“趋势强、涨得比大盘好”被选中(动量腿)', cls: 'b-mom' },
   SY: { label: '股东回报', hint: '因“回购+分红多、回报股东”被选中(股东收益率腿)', cls: 'b-sy' },
   both: { label: '双腿', hint: '两条腿都选中它(趋势强 且 股东回报高)', cls: 'b-both' },
+  custom: { label: '自选·追踪', hint: '你「添加自定义股票」加入的:非策略选中,但每天也算档位/概率(不占策略仓位,建议股数为0)', cls: 'b-custom' },
 }
 
 export const gradeCls = (g: number) => (g >= 2 ? 'g-3' : g >= 0 ? 'g-1' : g === -1 ? 'g-neg1' : 'g-neg2')

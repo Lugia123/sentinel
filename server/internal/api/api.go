@@ -243,7 +243,7 @@ func (a *API) run(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	asof := q(r, "asof", "latest")
-	res, err := pipeline.RunAndIngest(a.runner, a.store, a.dataDir, asof, q(r, "capital", "4000"), r.URL.Query().Get("sy") != "0")
+	res, err := pipeline.RunAndIngest(a.runner, a.store, a.dataDir, asof, q(r, "capital", "4000"), r.URL.Query().Get("sy") != "0", a.store.TrackedTickers())
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error(), "log": res.Log})
 		return

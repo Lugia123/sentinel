@@ -66,6 +66,7 @@ tr.clickable:hover td { background: var(--gold-glow); }
 .b-mom { background: rgba(111,174,134,.15); color: var(--up); }
 .b-sy { background: var(--gold-glow); color: var(--gold-hi); }
 .b-both { background: rgba(154,142,196,.16); color: var(--c4); }
+.b-custom { background: rgba(123,167,176,.16); color: var(--c5); }
 
 .light { width: 11px; height: 11px; border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 0 10px currentColor; }
 .light.green { background: var(--up); color: var(--up); }

@@ -15,6 +15,14 @@ type Store struct{ gdb *gorm.DB }
 
 func New(gdb *gorm.DB) *Store { return &Store{gdb: gdb} }
 
+// TrackedTickers 用户"添加自定义股票"的追踪清单(watchlist source='user'),
+// 供每日引擎把它们也算档位/概率(纳入每日分析)。
+func (s *Store) TrackedTickers() []string {
+	var ts []string
+	s.gdb.Raw(`SELECT ticker FROM watchlist WHERE source='user' ORDER BY added_at`).Scan(&ts)
+	return ts
+}
+
 // Latest 最新快照的完整 raw JSON。
 func (s *Store) Latest() (json.RawMessage, error) {
 	var raw string
