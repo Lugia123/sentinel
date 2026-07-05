@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "sentinel": {
+      "command": "go",
+      "args": ["run", "./cmd/mcp"],
+      "cwd": "/Users/lugia/lugia_fc/sentinel/server",
+      "env": { "SENTINEL_API": "http://localhost:8787" }
+    }
+  }
+}
