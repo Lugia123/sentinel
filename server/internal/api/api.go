@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"sentinel/internal/blob"
+	"sentinel/internal/earnings"
 	"sentinel/internal/engine"
 	"sentinel/internal/explain"
 	"sentinel/internal/investigate"
@@ -23,6 +24,7 @@ type API struct {
 	port      *portfolio.Store
 	explain   *explain.Service
 	invest    *investigate.Service
+	earn      *earnings.Service
 	blob      *blob.Store
 	gdb       *gorm.DB
 	dataDir   string
@@ -30,8 +32,8 @@ type API struct {
 	ver       version.Info
 }
 
-func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, inv *investigate.Service, bs *blob.Store, gdb *gorm.DB, dataDir, engineDir string, ver version.Info) *API {
-	return &API{store: st, runner: rn, port: pf, explain: ex, invest: inv, blob: bs, gdb: gdb, dataDir: dataDir, engineDir: engineDir, ver: ver}
+func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, inv *investigate.Service, earn *earnings.Service, bs *blob.Store, gdb *gorm.DB, dataDir, engineDir string, ver version.Info) *API {
+	return &API{store: st, runner: rn, port: pf, explain: ex, invest: inv, earn: earn, blob: bs, gdb: gdb, dataDir: dataDir, engineDir: engineDir, ver: ver}
 }
 
 func (a *API) Routes() http.Handler {
@@ -52,7 +54,40 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/focus", a.focus)
 	mux.HandleFunc("/api/trend", a.trend)
 	mux.HandleFunc("/api/investigate", a.investigate)
+	mux.HandleFunc("/api/earnings/quarters", a.earningsQuarters)
+	mux.HandleFunc("/api/earnings", a.earningsInterpret)
 	return cors(mux)
+}
+
+// earningsQuarters 列出可解读的季度。?ticker=X
+func (a *API) earningsQuarters(w http.ResponseWriter, r *http.Request) {
+	tk := r.URL.Query().Get("ticker")
+	if tk == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
+		return
+	}
+	qs, err := a.earn.Quarters(tk)
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ticker": tk, "quarters": qs})
+}
+
+// earningsInterpret AI解读某季度(→HTML→MinIO)。?ticker=X&period=YYYY-MM-DD&force=1
+func (a *API) earningsInterpret(w http.ResponseWriter, r *http.Request) {
+	tk := r.URL.Query().Get("ticker")
+	period := r.URL.Query().Get("period")
+	if tk == "" || period == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker 或 period"})
+		return
+	}
+	res, err := a.earn.Interpret(r.Context(), tk, period, r.URL.Query().Get("force") == "1")
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 // investigate AI 公司背景调查(→HTML→MinIO)。?ticker=X&force=1;返回 {key},前端用 /api/blob?key= 取。

@@ -1,21 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
-import { fetchHistory, fetchExplain, fetchInvestigate } from '../api'
+import { fetchHistory, fetchExplain, fetchInvestigate, fetchBlobHTML, fetchEarningsQuarters, fetchEarningsInterpret, type EarnQuarter } from '../api'
 import type { Holding, HistPoint } from '../types'
 import type { TickerMeta } from '../api'
 import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot } from '../ui'
 
 export default function StockDetail({ h, meta, onBack }: { h: Holding; meta: TickerMeta; onBack: () => void }) {
   const m = meta[h.ticker]
-  const [tab, setTab] = useState<'overview' | 'bg'>('overview')
-  const [bgSrc, setBgSrc] = useState(''); const [bgLoading, setBgLoading] = useState(false); const [bgErr, setBgErr] = useState('')
+  const [tab, setTab] = useState<'overview' | 'bg' | 'earnings'>('overview')
+  // 背景调查:取回 HTML 片段注入页面(不用 iframe,随整页滚)
+  const [bgHtml, setBgHtml] = useState(''); const [bgLoading, setBgLoading] = useState(false); const [bgErr, setBgErr] = useState('')
   const loadBg = async (force = false) => {
     setBgLoading(true); setBgErr('')
-    try { const r = await fetchInvestigate(h.ticker, force); setBgSrc(`/api/blob?key=${r.key}&_=${Date.now()}`) }
+    try { const r = await fetchInvestigate(h.ticker, force); setBgHtml(await fetchBlobHTML(r.key)) }
     catch (e: any) { setBgErr(String(e.message || e)) }
     setBgLoading(false)
   }
-  useEffect(() => { if (tab === 'bg' && !bgSrc && !bgLoading) loadBg(false) }, [tab])
+  useEffect(() => { if (tab === 'bg' && !bgHtml && !bgLoading) loadBg(false) }, [tab])
+  // 财报解读
+  const [quarters, setQuarters] = useState<EarnQuarter[]>([]); const [qSel, setQSel] = useState('')
+  const [earnHtml, setEarnHtml] = useState(''); const [earnLoading, setEarnLoading] = useState(false); const [earnErr, setEarnErr] = useState('')
+  useEffect(() => {
+    if (tab === 'earnings' && quarters.length === 0) {
+      fetchEarningsQuarters(h.ticker).then((qs) => { setQuarters(qs); if (qs[0]) setQSel(qs[0].period) }).catch((e) => setEarnErr(String(e.message || e)))
+    }
+  }, [tab])
+  const loadEarn = async (force = false) => {
+    if (!qSel) return
+    setEarnLoading(true); setEarnErr(''); setEarnHtml('')
+    try { const r = await fetchEarningsInterpret(h.ticker, qSel, force); setEarnHtml(await fetchBlobHTML(r.key)) }
+    catch (e: any) { setEarnErr(String(e.message || e)) }
+    setEarnLoading(false)
+  }
   const [hist, setHist] = useState<HistPoint[]>([])
   const [ai, setAi] = useState<string>(''); const [aiLoading, setAiLoading] = useState(true); const [aiErr, setAiErr] = useState('')
   const priceRef = useRef<HTMLDivElement>(null)
@@ -64,16 +80,35 @@ export default function StockDetail({ h, meta, onBack }: { h: Holding; meta: Tic
       <div className="tabs">
         <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>策略概览</button>
         <button className={tab === 'bg' ? 'active' : ''} onClick={() => setTab('bg')}>背景调查</button>
+        <button className={tab === 'earnings' ? 'active' : ''} onClick={() => setTab('earnings')}>财报解读</button>
       </div>
 
       {tab === 'bg' && (
         <div className="card ai-card">
-          <h3>🏢 公司背景调查 <span className="muted" style={{ fontWeight: 400 }}>· AI 调研,存于对象存储</span>
+          <h3>🏢 公司背景调查 <span className="muted" style={{ fontWeight: 400 }}>· AI 调研</span>
             <button className="ghost mini" style={{ float: 'right' }} onClick={() => loadBg(true)} disabled={bgLoading}>{bgLoading ? '调研中…' : '重新背调'}</button>
           </h3>
           {bgLoading && <div className="muted">正在调研公司背景…（首次约 30 秒）</div>}
           {bgErr && <div className="down" style={{ fontSize: 13 }}>{bgErr}</div>}
-          {bgSrc && !bgLoading && <iframe src={bgSrc} title="背景调查" style={{ width: '100%', height: 520, border: '1px solid var(--border)', borderRadius: 8, background: '#16120d' }} />}
+          {bgHtml && !bgLoading && <div className="doc-html" dangerouslySetInnerHTML={{ __html: bgHtml }} />}
+        </div>
+      )}
+
+      {tab === 'earnings' && (
+        <div className="card ai-card">
+          <h3>📊 财报解读 <span className="muted" style={{ fontWeight: 400 }}>· SEC 官方数据 + AI 解读</span></h3>
+          {earnErr && <div className="down" style={{ fontSize: 13, marginBottom: 8 }}>{earnErr}</div>}
+          <div className="pos-add">
+            <select value={qSel} onChange={(e) => { setQSel(e.target.value); setEarnHtml('') }} className="qsel">
+              {quarters.length === 0 && <option>加载季度…</option>}
+              {quarters.map((q) => <option key={q.period} value={q.period}>{q.period} 季报</option>)}
+            </select>
+            <button className="ghost" onClick={() => loadEarn(false)} disabled={earnLoading || !qSel}>{earnLoading ? '解读中…' : '解读这一季'}</button>
+            {earnHtml && <button className="ghost mini" onClick={() => loadEarn(true)} disabled={earnLoading}>重新解读</button>}
+          </div>
+          {earnLoading && <div className="muted">正在解读财报…（首次约 30 秒）</div>}
+          {earnHtml && !earnLoading && <div className="doc-html" dangerouslySetInnerHTML={{ __html: earnHtml }} />}
+          {!earnHtml && !earnLoading && quarters.length > 0 && <div className="muted">选一个季度,点「解读这一季」。数据来自 SEC 官方季报。</div>}
         </div>
       )}
 

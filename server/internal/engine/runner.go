@@ -54,12 +54,30 @@ func (r *Runner) RunFocus(ticker, asof, capital string) (string, error) {
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("focus 运行失败: %v | %s", err, errb.String())
 	}
-	// 取最后一行 JSON(前面可能有装载日志)
-	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	return lastJSON(out.String(), "focus")
+}
+
+// RunEarnings 跑 earnings.py TICKER,返回季度财报 JSON。
+func (r *Runner) RunEarnings(ticker string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, "earnings.py"), ticker)
+	cmd.Dir = r.engineDir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("earnings 运行失败: %v | %s", err, errb.String())
+	}
+	return lastJSON(out.String(), "earnings")
+}
+
+func lastJSON(s, name string) (string, error) {
+	lines := strings.Split(strings.TrimSpace(s), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
 		if strings.HasPrefix(strings.TrimSpace(lines[i]), "{") {
 			return strings.TrimSpace(lines[i]), nil
 		}
 	}
-	return "", fmt.Errorf("focus 无有效输出")
+	return "", fmt.Errorf("%s 无有效输出", name)
 }

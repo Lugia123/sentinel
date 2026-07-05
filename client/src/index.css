@@ -107,6 +107,17 @@ tr.clickable:hover td { background: var(--gold-glow); }
 .ai-text li { margin: 3px 0; }
 .ai-text b { color: var(--ink); }
 .ai-text .disc { color: var(--ink-mute); font-size: 12px; margin-top: 10px; }
+/* AI 生成的 HTML 片段(背调/财报)注入渲染,随整页滚,无内嵌滚动 */
+.doc-html { font-size: 14px; line-height: 1.8; color: var(--ink-soft); }
+.doc-html h3, .doc-html h4 { color: var(--gold-hi); margin: 16px 0 8px; font-size: 15px; }
+.doc-html h3:first-child, .doc-html h4:first-child { margin-top: 4px; }
+.doc-html p { margin: 8px 0; }
+.doc-html ul, .doc-html ol { margin: 8px 0; padding-left: 22px; }
+.doc-html li { margin: 4px 0; }
+.doc-html b, .doc-html strong { color: var(--ink); }
+.doc-html table { margin: 10px 0; }
+.doc-html .disc { color: var(--ink-mute); font-size: 12px; margin-top: 14px; border-top: 1px solid var(--border); padding-top: 8px; }
+select.qsel { background: var(--surface-2); border: 1px solid var(--border); color: var(--ink); border-radius: 7px; padding: 6px 9px; font-size: 13px; }
 .sig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
 .sig { display: flex; gap: 10px; align-items: flex-start; background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
 .sig-dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
