@@ -80,14 +80,14 @@ export async function fetchBlobHTML(key: string): Promise<string> {
   const r = await fetch(`/api/blob?key=${encodeURIComponent(key)}`)
   return r.ok ? r.text() : ''
 }
-export interface EarnQuarter { period: string; revenue: number | null; net_income: number | null; operating_income: number | null; gross_profit: number | null; eps: number | null }
+export interface EarnQuarter { period: string; revenue: number | null; net_income: number | null; operating_income: number | null; gross_profit: number | null; eps: number | null; cached?: boolean }
 export async function fetchEarningsQuarters(ticker: string): Promise<EarnQuarter[]> {
   const r = await fetch(`/api/earnings/quarters?ticker=${ticker}`)
   const j = await r.json()
   if (!r.ok || j.error) throw new Error(j.error || '取财报失败')
   return j.quarters || []
 }
-export async function fetchEarningsInterpret(ticker: string, period: string, force = false): Promise<{ key: string }> {
+export async function fetchEarningsInterpret(ticker: string, period: string, force = false): Promise<{ key: string; cached: boolean }> {
   const r = await fetch(`/api/earnings?ticker=${ticker}&period=${period}${force ? '&force=1' : ''}`)
   const j = await r.json()
   if (!r.ok || j.error) throw new Error(j.error || '财报解读失败')

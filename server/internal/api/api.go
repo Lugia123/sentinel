@@ -66,7 +66,7 @@ func (a *API) earningsQuarters(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
 		return
 	}
-	qs, err := a.earn.Quarters(tk)
+	qs, err := a.earn.QuartersWithStatus(r.Context(), tk)
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 		return

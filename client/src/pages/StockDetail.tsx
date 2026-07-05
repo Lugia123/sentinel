@@ -4,6 +4,7 @@ import { fetchHistory, fetchExplain, fetchInvestigate, fetchBlobHTML, fetchEarni
 import type { Holding, HistPoint } from '../types'
 import type { TickerMeta } from '../api'
 import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot } from '../ui'
+import Select, { type SelectOption } from '../components/Select'
 
 export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta }) {
   const m = meta[h.ticker]
@@ -28,8 +29,11 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
   const loadEarn = async (force = false) => {
     if (!qSel) return
     setEarnLoading(true); setEarnErr(''); setEarnHtml('')
-    try { const r = await fetchEarningsInterpret(h.ticker, qSel, force); setEarnHtml(await fetchBlobHTML(r.key)) }
-    catch (e: any) { setEarnErr(String(e.message || e)) }
+    try {
+      const r = await fetchEarningsInterpret(h.ticker, qSel, force)
+      setEarnHtml(await fetchBlobHTML(r.key))
+      setQuarters((qs) => qs.map((q) => (q.period === qSel ? { ...q, cached: true } : q))) // 解读完→下拉角标翻「已解读」
+    } catch (e: any) { setEarnErr(String(e.message || e)) }
     setEarnLoading(false)
   }
   // 和背景调查一致:进入财报tab或切换季度时自动加载(已解读过的会秒回缓存,没解读的自动解读一次)
@@ -100,10 +104,14 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
           <h3>📊 财报解读 <span className="muted" style={{ fontWeight: 400 }}>· SEC 官方数据 + AI 解读</span></h3>
           {earnErr && <div className="down" style={{ fontSize: 13, marginBottom: 8 }}>{earnErr}</div>}
           <div className="pos-add">
-            <select value={qSel} onChange={(e) => { setQSel(e.target.value); setEarnHtml('') }} className="qsel">
-              {quarters.length === 0 && <option>加载季度…</option>}
-              {quarters.map((q) => <option key={q.period} value={q.period}>{q.period} 季报</option>)}
-            </select>
+            {quarters.length === 0
+              ? <div className="muted">加载季度…</div>
+              : <Select value={qSel} placeholder="选择季度" ariaLabel="选择季度"
+                  onChange={(v) => { setQSel(v); setEarnHtml('') }}
+                  options={quarters.map((q): SelectOption => ({
+                    value: q.period, label: `${q.period} 季报`,
+                    badge: q.cached ? <span className="earn-done">已解读 ✓</span> : <span className="earn-todo">未解读</span>,
+                  }))} />}
             <button className="ghost" onClick={() => loadEarn(false)} disabled={earnLoading || !qSel}>{earnLoading ? '解读中…' : '解读这一季'}</button>
             {earnHtml && <button className="ghost mini" onClick={() => loadEarn(true)} disabled={earnLoading}>重新解读</button>}
           </div>
