@@ -20,14 +20,19 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
     .filter(([tk]) => !heldSet.has(tk))
     .map(([tk, m]) => ({ value: tk, label: tk, sub: `${m.cn} · ${m.sector}`, keywords: m.cn }))
     .sort((a, b) => a.value.localeCompare(b.value))
+  // 横向布局:每股一行(按档位→中位排序),行多时容器内竖向滚动,不再横向挤成一团
+  const rowH = 26
+  const chartH = Math.max(240, snap.holdings.length * rowH + 60)
   useEffect(() => {
     if (!chartRef.current) return
     const chart = echarts.init(chartRef.current)
-    const hs = snap.holdings
+    // 排序:档位高的在上,同档位按中位收益降序
+    const hs = [...snap.holdings].sort((a, b) => b.grade - a.grade || b.prob['h20'].median - a.prob['h20'].median)
     const bands = hs.map((h, i) => ({ value: [i, h.prob['h20'].band70[0] * 100, h.prob['h20'].band70[1] * 100, h.prob['h20'].median * 100], grade: h.grade }))
+    const label = (i: number) => hs[i].ticker + (meta[hs[i].ticker] ? ' ' + meta[hs[i].ticker].cn : '')
     chart.setOption({
       backgroundColor: 'transparent',
-      grid: { left: 55, right: 20, top: 12, bottom: 40 },
+      grid: { left: 96, right: 24, top: 26, bottom: 30 },
       tooltip: {
         backgroundColor: '#1f1913', borderColor: '#2c2418', textStyle: { color: '#f1e9da' },
         formatter: (p: any) => {
@@ -35,21 +40,23 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
           return `<b>${h.ticker}</b>（未来20日）<br/>最可能落在：${pct2(b.median)}<br/>70%概率区间：${pct2(b.band70[0])} ~ ${pct2(b.band70[1])}<br/>参考止损 $${b.stop} / 目标 $${b.target}`
         },
       },
-      xAxis: { type: 'category', data: hs.map((h) => h.ticker), axisLabel: { color: '#b0a488' }, axisLine: { lineStyle: { color: '#2c2418' } } },
-      yAxis: { type: 'value', name: '未来20日\n收益范围', nameTextStyle: { color: '#b0a488', fontSize: 12 }, axisLabel: { formatter: '{value}%', color: '#b0a488' }, splitLine: { lineStyle: { color: '#2c2418' } } },
+      xAxis: { type: 'value', name: '收益范围', nameTextStyle: { color: '#b0a488', fontSize: 12 }, axisLabel: { formatter: '{value}%', color: '#b0a488' }, splitLine: { lineStyle: { color: '#241d15' } } },
+      yAxis: {
+        type: 'category', inverse: true, data: hs.map((_, i) => label(i)),
+        axisLabel: { color: '#b0a488', fontSize: 12 }, axisLine: { lineStyle: { color: '#2c2418' } }, axisTick: { show: false },
+      },
       series: [{
         type: 'custom',
-        encode: { x: 0, y: [1, 2, 3] }, // 让 y 轴涵盖 上/下沿/中位 全范围(修正正区间被截断)
+        encode: { x: [1, 2, 3], y: 0 },
         renderItem: (params: any, api: any) => {
-          const idx = api.value(0)
-          const lo = api.coord([idx, api.value(1)]); const hi = api.coord([idx, api.value(2)]); const med = api.coord([idx, api.value(3)])
+          const cat = api.value(0)
+          const lo = api.coord([api.value(1), cat]); const hi = api.coord([api.value(2), cat]); const med = api.coord([api.value(3), cat])
           const g = bands[params.dataIndex].grade
-          // 颜色=档位健康度(与列表徽章一致):绿偏强/金中性转弱/红跌势
-          const color = g >= 2 ? '#6fae86' : g >= -1 ? '#c8a253' : '#cf6f5d'
-          const w = 16
+          const color = g >= 2 ? '#6fae86' : g >= -1 ? '#c8a253' : '#cf6f5d' // 颜色=档位健康度
+          const bh = 13, y = lo[1] - bh / 2
           return { type: 'group', children: [
-            { type: 'rect', shape: { x: lo[0] - w / 2, y: hi[1], width: w, height: lo[1] - hi[1] }, style: { fill: color, opacity: 0.3 } },
-            { type: 'line', shape: { x1: med[0] - w / 2, y1: med[1], x2: med[0] + w / 2, y2: med[1] }, style: { stroke: color, lineWidth: 2 } },
+            { type: 'rect', shape: { x: lo[0], y, width: hi[0] - lo[0], height: bh }, style: { fill: color, opacity: 0.32 } },
+            { type: 'line', shape: { x1: med[0], y1: y, x2: med[0], y2: y + bh }, style: { stroke: color, lineWidth: 2 } },
           ] }
         },
         data: bands,
@@ -57,7 +64,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
     })
     const onR = () => chart.resize(); window.addEventListener('resize', onR)
     return () => { window.removeEventListener('resize', onR); chart.dispose() }
-  }, [snap])
+  }, [snap, meta])
 
   const rl = snap.risk_light
   return (
@@ -132,15 +139,17 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
       </div>
 
       <div className="card">
-        <h3>未来 20 日收益范围图 <InfoDot text="每根竖条=该股未来20天70%概率的收益范围,横线=最可能的中位。这是波动范围,不是方向预测。" /></h3>
-        <div ref={chartRef} style={{ height: 300 }} />
+        <h3>未来 20 日收益范围图 <InfoDot text="每行=一只股票未来20天70%概率的收益范围,竖线=最可能的中位。按档位从高到低排序。这是波动范围,不是方向预测。" /></h3>
+        <div style={{ maxHeight: 520, overflowY: 'auto' }}>
+          <div ref={chartRef} style={{ height: chartH }} />
+        </div>
         <div className="chart-legend">
           <span><i className="lg" style={{ background: '#6fae86' }} />绿=偏强(+2~+3)</span>
           <span><i className="lg" style={{ background: '#c8a253' }} />金=中性/转弱(-1~+1)</span>
           <span><i className="lg" style={{ background: '#cf6f5d' }} />红=跌势(-2~-3)</span>
         </div>
         <div className="muted" style={{ marginTop: 6 }}>
-          <b>颜色=档位健康度</b>(和列表徽章一致),<b>长度=波动大小</b>——两者独立:红色不代表条短,只代表该股趋势转弱。红/短的股(如 ADBE)= 趋势弱 + 波动也不大;绿/长(如 AMD)= 趋势强 + 波动大。这是波动范围,非涨跌预测。
+          <b>每行一只股</b>(按档位从高到低排),<b>颜色=档位健康度</b>,<b>横条长度=波动大小</b>——两者独立:红色不代表条短,只代表趋势转弱。股票多时可在框内滚动。这是波动范围,非涨跌预测。
         </div>
       </div>
     </>
