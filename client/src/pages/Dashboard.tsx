@@ -29,7 +29,8 @@ export default function Dashboard({ snap, onSelect }: { snap: Snapshot; onSelect
           const idx = api.value(0)
           const lo = api.coord([idx, api.value(1)]); const hi = api.coord([idx, api.value(2)]); const med = api.coord([idx, api.value(3)])
           const g = bands[params.dataIndex].grade
-          const color = g >= 2 ? '#2ecc9b' : g >= 0 ? '#4d9dff' : g === -1 ? '#f5a623' : '#ff5c6c'
+          // 颜色=档位健康度(与列表徽章一致):绿偏强/金中性转弱/红跌势
+          const color = g >= 2 ? '#6fae86' : g >= -1 ? '#c8a253' : '#cf6f5d'
           const w = 16
           return { type: 'group', children: [
             { type: 'rect', shape: { x: lo[0] - w / 2, y: hi[1], width: w, height: lo[1] - hi[1] }, style: { fill: color, opacity: 0.3 } },
@@ -100,9 +101,16 @@ export default function Dashboard({ snap, onSelect }: { snap: Snapshot; onSelect
       </div>
 
       <div className="card">
-        <h3>未来 20 日收益范围图 <InfoDot text="每根竖条=该股未来20天70%概率的收益范围,横线=最可能的中位。条越长说明这股波动越大(不确定性越高)。颜色随档位。这是波动范围,不是方向预测。" /></h3>
+        <h3>未来 20 日收益范围图 <InfoDot text="每根竖条=该股未来20天70%概率的收益范围,横线=最可能的中位。这是波动范围,不是方向预测。" /></h3>
         <div ref={chartRef} style={{ height: 300 }} />
-        <div className="muted" style={{ marginTop: 6 }}>条越长=波动越大越不确定;这是「可能的波动范围」，不是「会涨会跌」的预测。</div>
+        <div className="chart-legend">
+          <span><i className="lg" style={{ background: '#6fae86' }} />绿=偏强(+2~+3)</span>
+          <span><i className="lg" style={{ background: '#c8a253' }} />金=中性/转弱(-1~+1)</span>
+          <span><i className="lg" style={{ background: '#cf6f5d' }} />红=跌势(-2~-3)</span>
+        </div>
+        <div className="muted" style={{ marginTop: 6 }}>
+          <b>颜色=档位健康度</b>(和列表徽章一致),<b>长度=波动大小</b>——两者独立:红色不代表条短,只代表该股趋势转弱。红/短的股(如 ADBE)= 趋势弱 + 波动也不大;绿/长(如 AMD)= 趋势强 + 波动大。这是波动范围,非涨跌预测。
+        </div>
       </div>
     </>
   )
