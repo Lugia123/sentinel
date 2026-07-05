@@ -116,25 +116,29 @@ def prob_bands(price, sig_h, zq, zsort):
                 p_hit_target=round(p_ge(target), 3), p_hit_stop=round(1 - p_ge(stop), 3))
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--asof", default="latest")
-    ap.add_argument("--capital", type=float, default=4000.0)
-    ap.add_argument("--no-sy", action="store_true", help="跳过SY腿(快速demo)")
-    args = ap.parse_args()
-
-    print("装载数据 ...", flush=True)
+def load_all(with_sy=True):
+    """装一次数据 + fp(回填时复用,省固定成本)。"""
     uni, spy, master = bl2.load_universe(DATA_DIR, spy_path=SPY_PATH)
+    fp = None
+    if with_sy:
+        from backtest_r24 import FundamentalsPITExtended
+        fp = FundamentalsPITExtended(verbose=False)
+    return uni, spy, master, fp
+
+
+def resolve_asof(uni, target):
+    """把目标日(latest 或 YYYY-MM-DD)解析成 <=目标 的最后一个交易日 Timestamp。"""
     a0 = next(iter(uni.values()))
     all_dates = pd.to_datetime(a0["date"]).tolist()
-    if args.asof == "latest":
-        asof_i = len(all_dates) - 1
-    else:
-        target = pd.Timestamp(args.asof)
-        asof_i = max(i for i, d in enumerate(all_dates) if d <= target)
-    asof = all_dates[asof_i]
-    print(f"as-of(收盘日): {asof.date()}", flush=True)
+    if target == "latest":
+        return all_dates[-1]
+    t = pd.Timestamp(target)
+    cand = [d for d in all_dates if d <= t]
+    return max(cand) if cand else None
 
+
+def compute_snapshot(uni, spy, master, fp, asof, capital=4000.0, with_sy=True):
+    """纯计算:给定预载数据 + fp + asof(Timestamp),返回 (snap_dict, prices_out)。不写文件。"""
     # ★ 无前视关键:按【日期】per-ticker 定位,不用共享位置索引(各票上市日/行数不同,
     #   位置索引会错位取到未来价)。POS[tk] = 该票 <=asof 的最后一行位置。
     asof64 = np.datetime64(asof)
@@ -183,10 +187,8 @@ def main():
     sy_picks = []
     sy_scores = {}       # ticker -> 股东收益率
     sy_rank = {}         # ticker -> SY 排名
-    if not args.no_sy:
+    if with_sy and fp is not None:
         try:
-            from backtest_r24 import FundamentalsPITExtended
-            fp = FundamentalsPITExtended(verbose=False)
             avail = [tk for tk in uni if (r := row(tk)) and not pd.isna(r["close"]) and r["close"] >= 5]
             scored = {}
             for tk in avail:
@@ -244,7 +246,7 @@ def main():
             prob[f"h{h}"] = prob_bands(px, sig_h, zq, zsort)
         sleeve = ("both" if tk in mom_picks and tk in sy_picks
                   else ("momentum" if tk in mom_picks else "SY"))
-        tv = base[tk] * args.capital * exposure
+        tv = base[tk] * capital * exposure
         # 选股理由(透明化:为什么入选)
         reasons = []
         if tk in mom_picks:
@@ -271,23 +273,15 @@ def main():
 
     snap = dict(
         asof=str(asof.date()), generated_at=str(pd.Timestamp("today").date()),
-        capital=args.capital, disclaimer="研究工具,非投资建议",
+        capital=capital, disclaimer="研究工具,非投资建议",
         risk_light=dict(level=light, spy_vol=round(spyvol, 3), exposure=round(exposure, 3),
                         note={"green": "波动正常,可满仓", "amber": "波动偏高,建议降仓",
                               "red": "波动极高,大幅降仓"}[light]),
         holdings=holdings,
         portfolio=dict(n_holdings=len(holdings),
-                       gross_exposure=round(sum(h["target_value"] for h in holdings) / args.capital, 3),
-                       cash_pct=round(1 - sum(h["target_value"] for h in holdings) / args.capital, 3)),
+                       gross_exposure=round(sum(h["target_value"] for h in holdings) / capital, 3),
+                       cash_pct=round(1 - sum(h["target_value"] for h in holdings) / capital, 3)),
     )
-    os.makedirs(OUT_DIR, exist_ok=True)
-    out = os.path.join(OUT_DIR, f"snapshot_{asof.date()}.json")
-    with open(out, "w") as f:
-        json.dump(snap, f, ensure_ascii=False, indent=2)
-    # latest 软链方便后端读
-    latest = os.path.join(OUT_DIR, "snapshot_latest.json")
-    with open(latest, "w") as f:
-        json.dump(snap, f, ensure_ascii=False, indent=2)
     # 价格表(全池 asof 收盘价)——供后端算用户持仓盈亏,as-of 一致
     prices = {}
     for tk, df in uni.items():
@@ -297,14 +291,36 @@ def main():
             if not pd.isna(c):
                 prices[tk] = round(float(c), 4)
     pd_out = dict(asof=str(asof.date()), prices=prices)
-    for name in (f"prices_{asof.date()}.json", "prices_latest.json"):
+    return snap, pd_out
+
+
+def write_snapshot(snap, pd_out, asof, also_latest=True):
+    """把 compute 结果写成 JSON 文件(main 用;backfill 直连DB不用这个)。"""
+    os.makedirs(OUT_DIR, exist_ok=True)
+    names = [f"snapshot_{asof.date()}.json"] + (["snapshot_latest.json"] if also_latest else [])
+    for name in names:
+        with open(os.path.join(OUT_DIR, name), "w") as f:
+            json.dump(snap, f, ensure_ascii=False, indent=2)
+    pnames = [f"prices_{asof.date()}.json"] + (["prices_latest.json"] if also_latest else [])
+    for name in pnames:
         with open(os.path.join(OUT_DIR, name), "w") as f:
             json.dump(pd_out, f, ensure_ascii=False)
 
-    print(f"快照写入 {out}", flush=True)
-    print(f"价格表 {len(prices)} 只", flush=True)
-    print(f"持仓 {len(holdings)} 只 | 风险灯 {light}(SPYvol {spyvol:.1%},建议仓位 {exposure:.0%})", flush=True)
-    print(f"动量腿 {len(mom_picks)} / SY腿 {len(sy_picks)}", flush=True)
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--asof", default="latest")
+    ap.add_argument("--capital", type=float, default=4000.0)
+    ap.add_argument("--no-sy", action="store_true", help="跳过SY腿(快速demo)")
+    args = ap.parse_args()
+    print("装载数据 ...", flush=True)
+    uni, spy, master, fp = load_all(with_sy=not args.no_sy)
+    asof = resolve_asof(uni, args.asof)
+    print(f"as-of(收盘日): {asof.date()}", flush=True)
+    snap, pd_out = compute_snapshot(uni, spy, master, fp, asof, args.capital, with_sy=not args.no_sy)
+    write_snapshot(snap, pd_out, asof)
+    rl = snap["risk_light"]
+    print(f"快照写入 snapshot_{asof.date()}.json | 持仓{len(snap['holdings'])} 风险灯{rl['level']} | 价格表{len(pd_out['prices'])}只", flush=True)
 
 
 if __name__ == "__main__":
