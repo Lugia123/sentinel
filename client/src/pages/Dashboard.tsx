@@ -3,17 +3,23 @@ import * as echarts from 'echarts'
 import type { Snapshot, Holding } from '../types'
 import type { TickerMeta } from '../api'
 import { pct, pct2, usd, InfoDot, GradeBadge, SleeveBadge, actionColor } from '../ui'
+import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 
 export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onCustom }: {
   snap: Snapshot; meta: TickerMeta; watch: Set<string>
   onToggleWatch: (t: string, on: boolean) => void; onSelect: (t: string) => void; onCustom: (t: string) => void
 }) {
   const chartRef = useRef<HTMLDivElement>(null)
-  const [ct, setCt] = useState('')
   const [loading, setLoading] = useState(false)
-  const doCustom = async () => { if (!ct) return; setLoading(true); await onCustom(ct.trim()); setLoading(false); setCt('') }
+  const pickCustom = async (tk: string) => { setLoading(true); await onCustom(tk); setLoading(false) }
   // 关注的置顶(保持各自组内原顺序)
   const rows = [...snap.holdings].sort((a, b) => (watch.has(b.ticker) ? 1 : 0) - (watch.has(a.ticker) ? 1 : 0))
+  // 可添加的自定义股 = 有中文名+数据的池子里、尚未在列表的(搜索下拉,杜绝打错)
+  const heldSet = new Set(snap.holdings.map((h) => h.ticker))
+  const addable: SearchOption[] = Object.entries(meta)
+    .filter(([tk]) => !heldSet.has(tk))
+    .map(([tk, m]) => ({ value: tk, label: tk, sub: `${m.cn} · ${m.sector}`, keywords: m.cn }))
+    .sort((a, b) => a.value.localeCompare(b.value))
   useEffect(() => {
     if (!chartRef.current) return
     const chart = echarts.init(chartRef.current)
@@ -78,10 +84,10 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
           <h3 style={{ margin: 0 }}>建议持仓 <span className="muted" style={{ fontWeight: 400 }}>· 点行看详情 · ★关注置顶</span></h3>
           <div className="pos-add" style={{ margin: 0 }}>
-            <input placeholder="看任意股 如 NVDA" value={ct} onChange={(e) => setCt(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && doCustom()} />
-            <button className="ghost" onClick={doCustom} disabled={loading}>{loading ? '分析中…' : '自选股分析'}</button>
-            <InfoDot text="输入任意股票代码,用同一套档位/概率规则分析它(即便不是AI选中的),资金池假设全押这一只,看它自己的趋势。" />
+            <SearchSelect options={addable} onPick={pickCustom} disabled={loading}
+              placeholder={loading ? '分析中…' : '添加自定义股票:输代码或中文名'}
+              emptyText="没有匹配的可添加股票(或已在列表中)" />
+            <InfoDot text="从有数据的股票里搜索添加(输代码或中文名)。已在列表里的不再出现。选中后用同一套档位/概率规则分析它,并纳入关注。" />
           </div>
         </div>
         <div className="tbl-scroll">
