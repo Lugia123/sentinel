@@ -4,6 +4,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -90,7 +91,7 @@ func (a *API) earningsQuarters(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
 		return
 	}
-	qs, err := a.earn.QuartersWithStatus(r.Context(), tk)
+	qs, err := a.earn.QuartersWithStatus(r.Context(), auth.UserID(r), tk)
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 		return
@@ -106,7 +107,7 @@ func (a *API) earningsInterpret(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker 或 period"})
 		return
 	}
-	res, err := a.earn.Interpret(r.Context(), tk, period, r.URL.Query().Get("force") == "1")
+	res, err := a.earn.Interpret(r.Context(), auth.UserID(r), tk, period, r.URL.Query().Get("force") == "1")
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 		return
@@ -121,7 +122,7 @@ func (a *API) investigate(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
 		return
 	}
-	res, err := a.invest.Investigate(r.Context(), tk, r.URL.Query().Get("force") == "1")
+	res, err := a.invest.Investigate(r.Context(), auth.UserID(r), tk, r.URL.Query().Get("force") == "1")
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 		return
@@ -187,7 +188,7 @@ func (a *API) explainHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
 		return
 	}
-	res, err := a.explain.Explain(r.Context(), ticker, r.URL.Query().Get("date"), r.URL.Query().Get("force") == "1")
+	res, err := a.explain.Explain(r.Context(), auth.UserID(r), ticker, r.URL.Query().Get("date"), r.URL.Query().Get("force") == "1")
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 		return
@@ -242,9 +243,86 @@ func (a *API) snapshot(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "无快照,请先 POST /api/run 生成", "detail": err.Error()})
 		return
 	}
+	raw = a.mergeCustomHoldings(auth.UserID(r), raw) // 合并该用户的自定义追踪股(隔离)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(raw)
+}
+
+// mergeCustomHoldings 把当前用户的自定义追踪股(watchlist source=user)并入共享快照,
+// 各以 sleeve=custom、股数0 呈现(隔离:别的用户看不到)。档位按 user+asof 缓存。
+func (a *API) mergeCustomHoldings(uid int64, raw json.RawMessage) json.RawMessage {
+	if uid == 0 {
+		return raw
+	}
+	var snap map[string]any
+	if json.Unmarshal(raw, &snap) != nil {
+		return raw
+	}
+	asof, _ := snap["asof"].(string)
+	holdings, _ := snap["holdings"].([]any)
+	held := map[string]bool{}
+	for _, h := range holdings {
+		if m, ok := h.(map[string]any); ok {
+			if tk, ok := m["ticker"].(string); ok {
+				held[strings.ToUpper(tk)] = true
+			}
+		}
+	}
+	var customTk []string
+	a.gdb.Raw(`SELECT ticker FROM watchlist WHERE user_id=? AND source='user'`, uid).Scan(&customTk)
+	added := false
+	for _, tk := range customTk {
+		tk = strings.ToUpper(strings.TrimSpace(tk))
+		if tk == "" || held[tk] {
+			continue
+		}
+		if h := a.focusHolding(uid, tk, asof); h != nil {
+			holdings = append(holdings, h)
+			held[tk] = true
+			added = true
+		}
+	}
+	if !added {
+		return raw
+	}
+	snap["holdings"] = holdings
+	if out, err := json.Marshal(snap); err == nil {
+		return out
+	}
+	return raw
+}
+
+// focusHolding 取用户某股在 asof 的档位(缓存;无则跑 focus 并缓存)。sleeve=custom,不占仓位。
+func (a *API) focusHolding(uid int64, ticker, asof string) map[string]any {
+	var cached string
+	a.gdb.Raw(`SELECT holding::text FROM focus_cache WHERE user_id=? AND ticker=? AND asof=?`, uid, ticker, asof).Row().Scan(&cached)
+	if cached != "" {
+		var h map[string]any
+		if json.Unmarshal([]byte(cached), &h) == nil {
+			return h
+		}
+	}
+	out, err := a.runner.RunFocus(ticker, asof, "4000")
+	if err != nil {
+		return nil
+	}
+	var fr struct {
+		Holding map[string]any `json:"holding"`
+	}
+	if json.Unmarshal([]byte(out), &fr) != nil || fr.Holding == nil {
+		return nil
+	}
+	fr.Holding["sleeve"] = "custom"
+	fr.Holding["target_shares"] = 0.0
+	fr.Holding["target_value"] = 0.0
+	fr.Holding["base_weight"] = 0.0
+	fr.Holding["reason"] = "用户自定义 · 每日追踪(不占策略仓位)"
+	if hb, e := json.Marshal(fr.Holding); e == nil {
+		a.gdb.Exec(`INSERT INTO focus_cache(user_id,ticker,asof,holding) VALUES(?,?,?,?::jsonb)
+			ON CONFLICT (user_id,ticker,asof) DO UPDATE SET holding=EXCLUDED.holding`, uid, ticker, asof, string(hb))
+	}
+	return fr.Holding
 }
 
 func (a *API) dates(w http.ResponseWriter, r *http.Request) {
@@ -263,7 +341,7 @@ func (a *API) run(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	asof := q(r, "asof", "latest")
-	res, err := pipeline.RunAndIngest(a.runner, a.store, a.dataDir, asof, q(r, "capital", "4000"), r.URL.Query().Get("sy") != "0", a.store.TrackedTickers())
+	res, err := pipeline.RunAndIngest(a.runner, a.store, a.dataDir, asof, q(r, "capital", "4000"), r.URL.Query().Get("sy") != "0", nil)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error(), "log": res.Log})
 		return
@@ -274,7 +352,7 @@ func (a *API) run(w http.ResponseWriter, r *http.Request) {
 func (a *API) positions(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		res, err := a.port.Compute(r.URL.Query().Get("date"))
+		res, err := a.port.Compute(auth.UserID(r), r.URL.Query().Get("date"))
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
@@ -286,7 +364,7 @@ func (a *API) positions(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "body 应为持仓数组: " + err.Error()})
 			return
 		}
-		if err := a.port.Save(ps); err != nil {
+		if err := a.port.Save(auth.UserID(r), ps); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}

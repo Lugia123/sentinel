@@ -29,14 +29,16 @@ func New(aic *ai.Client, bs *blob.Store, engineDir string) *Service {
 	return &Service{ai: aic, blob: bs, engineDir: engineDir}
 }
 
-func key(ticker string) string { return "investigate/" + ticker + ".html" }
+func key(userID int64, ticker string) string {
+	return fmt.Sprintf("investigate/%d/%s.html", userID, ticker)
+}
 
-// Investigate 返回 {ticker, key, cached}。前端用 /api/blob?key=<key> 取 HTML。
-func (s *Service) Investigate(ctx context.Context, ticker string, force bool) (map[string]any, error) {
+// Investigate 返回 {ticker, key, cached}。前端用 /api/blob?key=<key> 取 HTML。按用户隔离。
+func (s *Service) Investigate(ctx context.Context, userID int64, ticker string, force bool) (map[string]any, error) {
 	if s.blob == nil || !s.blob.Enabled() {
 		return nil, fmt.Errorf("MinIO 未配置,背景调查不可用")
 	}
-	k := key(ticker)
+	k := key(userID, ticker)
 	if !force && s.blob.Exists(ctx, k) {
 		return map[string]any{"ticker": ticker, "key": k, "cached": true}, nil
 	}

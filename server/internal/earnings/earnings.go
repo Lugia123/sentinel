@@ -26,9 +26,9 @@ type Quarter struct {
 	Cached          bool     `json:"cached"` // 该季是否已解读过(MinIO 有缓存)
 }
 
-// earnKey 财报解读 HTML 的 MinIO key。
-func earnKey(ticker, period string) string {
-	return fmt.Sprintf("earnings/%s_%s.html", ticker, period)
+// earnKey 财报解读 HTML 的 MinIO key(按用户隔离)。
+func earnKey(userID int64, ticker, period string) string {
+	return fmt.Sprintf("earnings/%d/%s_%s.html", userID, ticker, period)
 }
 
 type Service struct {
@@ -61,25 +61,25 @@ func (s *Service) Quarters(ticker string) ([]Quarter, error) {
 }
 
 // QuartersWithStatus 在季度列表上标注每季是否已解读(下拉框区分已/未解读)。
-func (s *Service) QuartersWithStatus(ctx context.Context, ticker string) ([]Quarter, error) {
+func (s *Service) QuartersWithStatus(ctx context.Context, userID int64, ticker string) ([]Quarter, error) {
 	qs, err := s.Quarters(ticker)
 	if err != nil {
 		return nil, err
 	}
 	if s.blob != nil && s.blob.Enabled() {
 		for i := range qs {
-			qs[i].Cached = s.blob.Exists(ctx, earnKey(ticker, qs[i].Period))
+			qs[i].Cached = s.blob.Exists(ctx, earnKey(userID, ticker, qs[i].Period))
 		}
 	}
 	return qs, nil
 }
 
 // Interpret 解读指定季度(→HTML→MinIO,返回 key)。
-func (s *Service) Interpret(ctx context.Context, ticker, period string, force bool) (map[string]any, error) {
+func (s *Service) Interpret(ctx context.Context, userID int64, ticker, period string, force bool) (map[string]any, error) {
 	if s.blob == nil || !s.blob.Enabled() {
 		return nil, fmt.Errorf("MinIO 未配置")
 	}
-	k := earnKey(ticker, period)
+	k := earnKey(userID, ticker, period)
 	if !force && s.blob.Exists(ctx, k) {
 		return map[string]any{"ticker": ticker, "period": period, "key": k, "cached": true}, nil
 	}

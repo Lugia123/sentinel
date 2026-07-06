@@ -60,8 +60,8 @@ type holding struct {
 	Prob       json.RawMessage `json:"prob"`
 }
 
-// Explain 返回某股白话讲解(优先缓存;force=true 强制重算)。
-func (s *Service) Explain(ctx context.Context, ticker, date string, force bool) (map[string]any, error) {
+// Explain 返回某股白话讲解(按用户缓存;force=true 强制重算)。
+func (s *Service) Explain(ctx context.Context, userID int64, ticker, date string, force bool) (map[string]any, error) {
 	raw, err := s.snapshot(date)
 	if err != nil {
 		return nil, err
@@ -86,8 +86,8 @@ func (s *Service) Explain(ctx context.Context, ticker, date string, force bool) 
 
 	if !force {
 		var cached string
-		if s.gdb.Raw(`SELECT content FROM explanations WHERE ticker=? AND asof=? AND kind='holding'`,
-			h.Ticker, snap.Asof).Row().Scan(&cached) == nil && cached != "" {
+		if s.gdb.Raw(`SELECT content FROM explanations WHERE user_id=? AND ticker=? AND asof=? AND kind='holding'`,
+			userID, h.Ticker, snap.Asof).Row().Scan(&cached) == nil && cached != "" {
 			return map[string]any{"ticker": h.Ticker, "asof": snap.Asof, "content": cached, "cached": true}, nil
 		}
 	}
@@ -108,9 +108,9 @@ func (s *Service) Explain(ctx context.Context, ticker, date string, force bool) 
 		}
 		content = strings.TrimSuffix(strings.TrimSpace(content), "```")
 	}
-	s.gdb.Exec(`INSERT INTO explanations(ticker,asof,kind,content,model) VALUES (?,?,'holding',?,?)
-		ON CONFLICT (ticker,asof,kind) DO UPDATE SET content=EXCLUDED.content, model=EXCLUDED.model, created_at=now()`,
-		h.Ticker, snap.Asof, content, "deepseek")
+	s.gdb.Exec(`INSERT INTO explanations(user_id,ticker,asof,kind,content,model) VALUES (?,?,?,'holding',?,?)
+		ON CONFLICT (user_id,ticker,asof,kind) DO UPDATE SET content=EXCLUDED.content, model=EXCLUDED.model, created_at=now()`,
+		userID, h.Ticker, snap.Asof, content, "deepseek")
 	return map[string]any{"ticker": h.Ticker, "asof": snap.Asof, "content": content, "cached": false}, nil
 }
 

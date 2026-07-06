@@ -35,22 +35,22 @@ type Store struct{ gdb *gorm.DB }
 
 func New(gdb *gorm.DB) *Store { return &Store{gdb: gdb} }
 
-// Get 读全部持仓。
-func (s *Store) Get() ([]db.Position, error) {
+// Get 读某用户的持仓(隔离)。
+func (s *Store) Get(uid int64) ([]db.Position, error) {
 	var ps []db.Position
-	err := s.gdb.Order("ticker").Find(&ps).Error
+	err := s.gdb.Where("user_id = ?", uid).Order("ticker").Find(&ps).Error
 	return ps, err
 }
 
-// Save 整体替换持仓(事务:清空 + 批量插)。
-func (s *Store) Save(in []Input) error {
+// Save 整体替换某用户的持仓(事务:清空 + 批量插)。
+func (s *Store) Save(uid int64, in []Input) error {
 	return s.gdb.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec(`DELETE FROM positions`).Error; err != nil {
+		if err := tx.Exec(`DELETE FROM positions WHERE user_id=?`, uid).Error; err != nil {
 			return err
 		}
 		for _, p := range in {
-			if err := tx.Exec(`INSERT INTO positions(ticker,shares,cost,opened_at,note,created_at,updated_at)
-				VALUES (?,?,?,?,?,now(),now())`, p.Ticker, p.Shares, p.Cost, p.OpenedAt, p.Note).Error; err != nil {
+			if err := tx.Exec(`INSERT INTO positions(user_id,ticker,shares,cost,opened_at,note,created_at,updated_at)
+				VALUES (?,?,?,?,?,?,now(),now())`, uid, p.Ticker, p.Shares, p.Cost, p.OpenedAt, p.Note).Error; err != nil {
 				return err
 			}
 		}
@@ -58,8 +58,8 @@ func (s *Store) Save(in []Input) error {
 	})
 }
 
-// Compute 按 as-of 价格(date 空=最新快照日)算每笔盈亏 + 组合汇总。
-func (s *Store) Compute(date string) (map[string]any, error) {
+// Compute 按 as-of 价格(date 空=最新快照日)算某用户每笔盈亏 + 组合汇总。
+func (s *Store) Compute(uid int64, date string) (map[string]any, error) {
 	asof := date
 	if asof == "" || asof == "latest" {
 		if err := s.gdb.Raw(`SELECT asof::text FROM snapshots ORDER BY asof DESC LIMIT 1`).Row().Scan(&asof); err != nil || asof == "" {
@@ -70,7 +70,7 @@ func (s *Store) Compute(date string) (map[string]any, error) {
 	if asof == "" {
 		return nil, fmt.Errorf("无价格数据(先 POST /api/run 生成)")
 	}
-	ps, err := s.Get()
+	ps, err := s.Get(uid)
 	if err != nil {
 		return nil, err
 	}
