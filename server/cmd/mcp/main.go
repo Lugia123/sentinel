@@ -142,14 +142,36 @@ func tools() []tool {
 				}
 				return httpCall("POST", "/api/run", q, nil)
 			}},
-		{"sentinel_watchlist", "查看关注列表。", obj(nil),
+		{"sentinel_watchlist", "查看该用户的关注★+自定义追踪股(带 starred/custom 标记)。", obj(nil),
 			func(a map[string]any) (string, error) { return httpCall("GET", "/api/watchlist", nil, nil) }},
-		{"sentinel_watch_add", "【★关注按钮】把某股加入关注(会在列表置顶)。source=ai/user。",
-			obj(map[string]any{"ticker": str("代码"), "source": str("ai或user,默认ai")}, "ticker"),
-			func(a map[string]any) (string, error) { return httpCall("POST", "/api/watchlist", qs(a, "ticker", "source"), nil) }},
-		{"sentinel_watch_remove", "【★取消关注】把某股移出关注。",
+		{"sentinel_star", "【★关注/取消】关注或取消关注某股(会置顶;独立于自定义追踪)。on=true关注/false取消。",
+			obj(map[string]any{"ticker": str("代码"), "on": boolean("true关注,false取消,默认true")}, "ticker"),
+			func(a map[string]any) (string, error) {
+				q := url.Values{}
+				q.Set("ticker", fmt.Sprint(a["ticker"]))
+				if v, ok := a["on"].(bool); ok && !v {
+					q.Set("on", "0")
+				} else {
+					q.Set("on", "1")
+				}
+				return httpCall("POST", "/api/watchlist/star", q, nil)
+			}},
+		{"sentinel_track_add", "【添加自定义股票】把某股加入你的每日追踪(不自动关注;后端同步预热档位约3秒)。",
 			obj(map[string]any{"ticker": str("代码")}, "ticker"),
-			func(a map[string]any) (string, error) { return httpCall("DELETE", "/api/watchlist", qs(a, "ticker"), nil) }},
+			func(a map[string]any) (string, error) { return httpCall("POST", "/api/watchlist/custom", qs(a, "ticker"), nil) }},
+		{"sentinel_track_remove", "【移除自定义股票】把某股移出你的追踪列表。",
+			obj(map[string]any{"ticker": str("代码")}, "ticker"),
+			func(a map[string]any) (string, error) { return httpCall("DELETE", "/api/watchlist/custom", qs(a, "ticker"), nil) }},
+		{"sentinel_capital", "【我的资金池】GET 读当前资金池;传 set=金额 则改资金池(建议股数按它缩放)。",
+			obj(map[string]any{"set": str("要设置的资金池金额,省略=只读")}),
+			func(a map[string]any) (string, error) {
+				if v, ok := a["set"]; ok && v != nil && fmt.Sprint(v) != "" {
+					if f, e := strconv.ParseFloat(strings.TrimSpace(fmt.Sprint(v)), 64); e == nil {
+						return httpCall("PUT", "/api/capital", nil, map[string]any{"capital": f})
+					}
+				}
+				return httpCall("GET", "/api/capital", nil, nil)
+			}},
 		{"sentinel_focus", "【自选股分析按钮】对任意股用同一套档位/概率规则分析(资金池假设全押这一只)。",
 			obj(map[string]any{"ticker": str("代码")}, "ticker"),
 			func(a map[string]any) (string, error) { return httpCall("GET", "/api/focus", qs(a, "ticker"), nil) }},
@@ -180,8 +202,10 @@ func tools() []tool {
 			func(a map[string]any) (string, error) {
 				return withBlob(httpCall("GET", "/api/earnings", forceQS(a, "ticker", "period"), nil))
 			}},
-		{"sentinel_meta", "全部股票的中文名+板块映射。", obj(nil),
+		{"sentinel_meta", "有中文名的股票→{中文名,板块}映射。", obj(nil),
 			func(a map[string]any) (string, error) { return httpCall("GET", "/api/meta", nil, nil) }},
+		{"sentinel_universe", "【添加自定义股票搜索源】全部可分析股(数据池1393只,带中文名的会标)。", obj(nil),
+			func(a map[string]any) (string, error) { return httpCall("GET", "/api/universe", nil, nil) }},
 		{"sentinel_strategies", "当前启用的策略组件(选股/定仓/趋势/预测/风险闸)+ 可用清单。", obj(nil),
 			func(a map[string]any) (string, error) { return httpCall("GET", "/api/strategies", nil, nil) }},
 		{"sentinel_history", "个股价格+均线历史(近 n 日,默认120)。",
