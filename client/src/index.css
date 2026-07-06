@@ -166,6 +166,36 @@ select.qsel { background: var(--surface-2); border: 1px solid var(--border); col
 .ctl-lbl { font-size: 12px; color: var(--ink-mute); margin-bottom: 6px; }
 .trend-panel { margin-top: 10px; }
 .trend-panel + .trend-panel { border-top: 1px solid var(--border); padding-top: 6px; }
+
+/* 登录页 */
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); padding: 20px; }
+.login-card { width: 360px; max-width: 100%; background: var(--surface); border: 1px solid var(--gold-dim); border-radius: 14px; padding: 30px 28px; box-shadow: var(--shadow); }
+.login-brand { font-size: 24px; font-weight: 800; color: var(--gold); letter-spacing: 2px; text-align: center; }
+.login-sub { font-size: 12px; color: var(--ink-mute); text-align: center; margin: 6px 0 22px; }
+.login-in { display: block; width: 100%; background: var(--surface-2); border: 1px solid var(--border-2); color: var(--ink); border-radius: 8px; padding: 10px 12px; font-size: 14px; margin-bottom: 12px; }
+.login-in:focus { outline: none; border-color: var(--gold); }
+.login-btn { width: 100%; background: var(--gold); color: #1a140a; border: 0; border-radius: 8px; padding: 11px; font-size: 14px; font-weight: 700; cursor: pointer; }
+.login-btn:hover { filter: brightness(1.05); }
+.login-links { text-align: center; margin-top: 12px; }
+.login-hint { font-size: 12px; color: var(--ink-mute); margin-bottom: 12px; }
+.login-err { background: rgba(207,111,93,.12); color: var(--down); border-radius: 8px; padding: 8px 11px; font-size: 13px; margin-top: 12px; }
+.login-msg { background: rgba(111,174,134,.12); color: var(--up); border-radius: 8px; padding: 8px 11px; font-size: 13px; margin-top: 12px; word-break: break-all; }
+
+/* 用户菜单 */
+.user-menu { position: relative; display: inline-block; margin-left: 8px; }
+.user-pop { position: absolute; right: 0; top: calc(100% + 6px); background: var(--elevated); border: 1px solid var(--gold-dim); border-radius: 10px; padding: 6px; min-width: 180px; z-index: 1500; box-shadow: var(--shadow); }
+.user-pop-email { font-size: 12px; color: var(--ink-mute); padding: 6px 8px; border-bottom: 1px solid var(--border); margin-bottom: 4px; word-break: break-all; }
+.user-pop button { display: block; width: 100%; text-align: left; background: none; border: 0; color: var(--ink-soft); padding: 7px 8px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.user-pop button:hover { background: var(--surface-2); color: var(--gold-hi); }
+
+/* 系统管理 */
+.admin-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.admin-form input { width: 160px; }
+.admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.admin-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-mute); }
+.admin-grid label input { background: var(--surface-2); border: 1px solid var(--border-2); color: var(--ink); border-radius: 7px; padding: 7px 9px; font-size: 13px; width: 100%; }
+.admin-grid label.chk { flex-direction: row; align-items: center; gap: 7px; color: var(--ink-soft); font-size: 13px; }
+.admin-grid label.chk input { width: auto; }
 /* 数据来源引用(强制标注)*/
 .src-cite { margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 12px; color: var(--ink-mute); line-height: 1.6; }
 .src-cite a { color: var(--gold-hi); }
