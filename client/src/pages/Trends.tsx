@@ -7,14 +7,14 @@ import type { SearchOption } from '../components/SearchSelect'
 import { InfoDot } from '../ui'
 
 // 可选的分析维度(都来自每日快照,挖出来对比)
+// 注:未来20日中位/概率带宽 = 年化波动率 × 固定常数(概率带是"波动缩放固定分位"),
+// 三者形状完全相同、无独立信息,故走势维度里只保留年化波动率,不再单列那两个。
 const METRICS: MetricDef[] = [
   { key: 'grade', label: '档位(-3 ~ +3)', pct: false, fixed: true },
-  { key: 'median20', label: '未来20日中位预测', pct: true, fixed: false },
   { key: 'mom21', label: '近21日动量', pct: true, fixed: false },
   { key: 'mom126', label: '近半年动量', pct: true, fixed: false },
   { key: 'vol', label: '年化波动率', pct: true, fixed: false },
   { key: 'pct_from_high', label: '距52周高', pct: true, fixed: false },
-  { key: 'bandwidth', label: '概率带宽(不确定性)', pct: true, fixed: false },
 ]
 const METRIC_OPTS: SearchOption[] = METRICS.map((m) => ({ value: m.key, label: m.label }))
 
