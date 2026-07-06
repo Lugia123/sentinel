@@ -35,9 +35,12 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
     const hs = [...snap.holdings].sort((a, b) => b.grade - a.grade || b.prob['h20'].median - a.prob['h20'].median)
     const bands = hs.map((h, i) => ({ value: [i, h.prob['h20'].band70[0] * 100, h.prob['h20'].band70[1] * 100, h.prob['h20'].median * 100], grade: h.grade }))
     const label = (i: number) => hs[i].ticker + (meta[hs[i].ticker] ? ' ' + meta[hs[i].ticker].cn : '')
+    // 左轴宽度自适应:按最长标签估算像素(中文≈13px,其余≈7.5px @12px字号),避免长名被遮挡
+    const labelPx = (s: string) => [...s].reduce((w, c) => w + (/[一-鿿]/.test(c) ? 13 : 7.5), 0)
+    const gridLeft = Math.min(200, Math.max(90, Math.ceil(Math.max(...hs.map((_, i) => labelPx(label(i))))) + 18))
     chart.setOption({
       backgroundColor: 'transparent',
-      grid: { left: 96, right: 24, top: 26, bottom: 30 },
+      grid: { left: gridLeft, right: 24, top: 26, bottom: 30 },
       tooltip: {
         backgroundColor: '#1f1913', borderColor: '#2c2418', textStyle: { color: '#f1e9da' },
         formatter: (p: any) => {
