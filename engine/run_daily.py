@@ -35,9 +35,48 @@ from strategies import (  # noqa 可插拔策略框架
 )
 
 
-def load_all(with_sy=True):
-    """装一次数据 + fp(回填时复用,省固定成本)。"""
-    uni, spy, master = bl2.load_universe(DATA_DIR, spy_path=SPY_PATH)
+def _load_lite(tickers=None, min_date=None, recent=300):
+    """轻量加载(省内存):只读 tickers(None=全部)的 CSV;每只算完指标后只留
+    min_date 之后 或 近 recent 行,再存进字典——避免把 22 年 × 1393 只全驻留内存。
+    指标在完整历史上算好再裁,近端值与全量加载完全一致。"""
+    import glob
+    import backtest_lib as bl  # 复用同一套指标计算 _add_indicators
+    uni, all_dates = {}, set()
+    if tickers:
+        paths = [os.path.join(DATA_DIR, f"{t}.csv") for t in tickers]
+        paths = [p for p in paths if os.path.exists(p)]
+    else:
+        paths = sorted(glob.glob(os.path.join(DATA_DIR, "*.csv")))
+
+    def trim(df):
+        if min_date is not None:
+            return df[df["date"] >= pd.Timestamp(min_date)].reset_index(drop=True)
+        if recent:
+            return df.tail(recent).reset_index(drop=True)
+        return df
+
+    for path in paths:
+        tkr = os.path.splitext(os.path.basename(path))[0]
+        df = pd.read_csv(path)
+        df["date"] = pd.to_datetime(df["date"])
+        df = trim(bl._add_indicators(df))  # 先算指标(全历史)再裁,近端值不变
+        if len(df):
+            uni[tkr] = df
+            all_dates.update(df["date"].tolist())
+    spy = pd.read_csv(SPY_PATH)
+    spy["date"] = pd.to_datetime(spy["date"])
+    spy = spy.sort_values("date").reset_index(drop=True)
+    spy["sma200"] = spy["close"].rolling(200).mean()
+    spy["sma200_slope"] = spy["sma200"] - spy["sma200"].shift(10)
+    spy = trim(spy)
+    all_dates.update(spy["date"].tolist())
+    return uni, spy, sorted(all_dates)
+
+
+def load_all(with_sy=True, tickers=None, min_date=None, recent=300):
+    """装一次数据 + fp。默认走轻量加载(recent=300 行,省内存);
+    backfill 传 min_date(保留回填区间+回看窗口);focus 传 tickers=[单只]。"""
+    uni, spy, master = _load_lite(tickers=tickers, min_date=min_date, recent=recent)
     fp = None
     if with_sy:
         from backtest_r24 import FundamentalsPITExtended

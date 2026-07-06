@@ -49,7 +49,9 @@ async def ingest(conn, snap, prices, asof):
 async def run(args):
     print("装载数据(一次)...", flush=True)
     t0 = time.time()
-    uni, spy, master, fp = R.load_all(with_sy=not args.no_sy)
+    # 回填保留 [起点-400天, 最新] 的历史(400天≈252交易日回看,够算sma200/52周高),省内存
+    uni, spy, master, fp = R.load_all(with_sy=not args.no_sy,
+                                      min_date=pd.Timestamp(args.frm) - pd.Timedelta(days=400))
     print(f"装载 {time.time()-t0:.1f}s", flush=True)
 
     a0 = next(iter(uni.values()))

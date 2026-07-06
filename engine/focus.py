@@ -22,7 +22,8 @@ def main():
     args = ap.parse_args()
     tk = args.ticker.upper()
 
-    uni, spy, master, _ = R.load_all(with_sy=False)  # focus 无需 SY 选股
+    # 只加载这一只 + SPY(不再全池 1393 加载),内存从 ~2.7GB 降到 ~50MB
+    uni, spy, master, _ = R.load_all(with_sy=False, tickers=[tk], recent=300)
     if tk not in uni:
         print(json.dumps({"error": f"{tk} 不在数据池(暂无该股数据,实时源接入后可支持)"}, ensure_ascii=False))
         return
