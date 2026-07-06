@@ -19,6 +19,26 @@ import (
 
 var api = env("SENTINEL_API", "http://localhost:8787")
 var httpc = &http.Client{Timeout: 90 * time.Second}
+var token string // 登录后带上(全app需鉴权)
+
+// login 用管理员凭据登录拿 JWT(MCP 以管理员身份驱动全部功能)。
+func login() {
+	body, _ := json.Marshal(map[string]string{
+		"email":    env("SENTINEL_ADMIN_EMAIL", "admin@sentinel.local"),
+		"password": env("SENTINEL_ADMIN_PASSWORD", "admin123"),
+	})
+	resp, err := httpc.Post(api+"/api/auth/login", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	var r struct {
+		Token string `json:"token"`
+	}
+	if json.NewDecoder(resp.Body).Decode(&r) == nil {
+		token = r.Token
+	}
+}
 
 func env(k, d string) string {
 	if v := os.Getenv(k); v != "" {
@@ -64,6 +84,9 @@ func httpCall(method, path string, query url.Values, body any) (string, error) {
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	resp, err := httpc.Do(req)
 	if err != nil {
@@ -214,6 +237,7 @@ type rpcReq struct {
 }
 
 func main() {
+	login() // 以管理员登录拿令牌(全app需鉴权)
 	reg := map[string]tool{}
 	var list []map[string]any
 	for _, t := range tools() {
