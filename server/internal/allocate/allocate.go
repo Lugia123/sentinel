@@ -9,22 +9,25 @@ import (
 	"fmt"
 	"strings"
 
+	"gorm.io/gorm"
+
 	"sentinel/internal/ai"
 	"sentinel/internal/store"
 )
 
-const SYSTEM = `你是严谨的组合配置助手,面向资金有限的散户。给你一个资金池和一组候选股(来自策略当日建议),请分配【购买比例】。
+const SYSTEM = `你是严谨的组合配置助手,面向资金有限的散户。给你一个资金池和一组候选股(用户选定的,可能含策略推荐股 + 用户自定义追踪股),请分配【购买比例】。
 原则:①不必全买——资金有限要做取舍,优先档位高、趋势好(action=持有优于减仓)、概率中位为正、波动适中的;②单只权重不超过 25%,避免过度集中;③可以保留现金(总权重可小于100%),尤其风险偏高时;④被你排除的股票要在 note 里说明为什么舍弃。
 【只输出 JSON,不要任何多余文字/代码围栏】格式:
 {"allocations":[{"ticker":"AAPL","weight_pct":18.5,"reason":"档位+3趋势强,波动适中"}],"cash_pct":10,"note":"舍弃了ADBE/CRM(档位-3趋势走弱);整体因风险灯偏黄留了现金"}
 weight_pct 是占资金池的百分比(0-100),所有 allocations 的 weight_pct 加 cash_pct 应≈100。reason/note 用简洁中文。`
 
 type Service struct {
-	ai *ai.Client
-	st *store.Store
+	ai  *ai.Client
+	st  *store.Store
+	gdb *gorm.DB
 }
 
-func New(aic *ai.Client, st *store.Store) *Service { return &Service{ai: aic, st: st} }
+func New(aic *ai.Client, st *store.Store, gdb *gorm.DB) *Service { return &Service{ai: aic, st: st, gdb: gdb} }
 
 type holding struct {
 	Ticker     string          `json:"ticker"`
@@ -48,8 +51,8 @@ type Alloc struct {
 	Reason string  `json:"reason"`
 }
 
-// AIAllocate 让 DeepSeek 在候选股上分配比例。tickers 为空则用全部持仓。
-func (s *Service) AIAllocate(ctx context.Context, tickers []string, capital float64) (map[string]any, error) {
+// AIAllocate 让 DeepSeek 在候选股上分配比例。tickers 为空则用全部持仓。含用户自定义追踪股(从 focus 缓存补)。
+func (s *Service) AIAllocate(ctx context.Context, userID int64, tickers []string, capital float64) (map[string]any, error) {
 	if !s.ai.Enabled() {
 		return nil, fmt.Errorf("未配置 DeepSeek,AI 分配不可用(可用均分/风险平价)")
 	}
@@ -74,9 +77,28 @@ func (s *Service) AIAllocate(ctx context.Context, tickers []string, capital floa
 		want[strings.ToUpper(t)] = true
 	}
 	var cands []holding
+	inCand := map[string]bool{}
 	for _, h := range snap.Holdings {
 		if len(want) == 0 || want[strings.ToUpper(h.Ticker)] {
 			cands = append(cands, h)
+			inCand[strings.ToUpper(h.Ticker)] = true
+		}
+	}
+	// 补上不在共享快照里、但被选中的用户自定义追踪股(从 focus 缓存取档位/价)
+	if s.gdb != nil {
+		for tk := range want {
+			if inCand[tk] {
+				continue
+			}
+			var raw2 string
+			s.gdb.Raw(`SELECT holding::text FROM focus_cache WHERE user_id=? AND ticker=? AND asof=?`, userID, tk, snap.Asof).Row().Scan(&raw2)
+			if raw2 != "" {
+				var ch holding
+				if json.Unmarshal([]byte(raw2), &ch) == nil && ch.Ticker != "" {
+					cands = append(cands, ch)
+					inCand[tk] = true
+				}
+			}
 		}
 	}
 	if len(cands) == 0 {

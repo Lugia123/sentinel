@@ -49,7 +49,7 @@ func main() {
 	ex := explain.New(st, aic, gdb)
 	inv := investigate.New(aic, bs, cfg.EngineDir)
 	earn := earnings.New(rn, aic, bs)
-	al := allocate.New(aic, st)
+	al := allocate.New(aic, st, gdb)
 	au := auth.New(gdb, env("SENTINEL_JWT_SECRET", ""))
 	adminEmail := env("SENTINEL_ADMIN_EMAIL", "admin@sentinel.local")
 	if err := au.EnsureAdmin(adminEmail, env("SENTINEL_ADMIN_PASSWORD", "admin123")); err != nil {
