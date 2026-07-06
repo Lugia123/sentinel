@@ -5,6 +5,7 @@ import type { TickerMeta } from '../api'
 import { pct, pct2, usd, InfoDot, GradeBadge, SleeveBadge, actionColor } from '../ui'
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
+import { fetchUniverse, type UniverseItem } from '../api'
 
 export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onCustom }: {
   snap: Snapshot; meta: TickerMeta; watch: Set<string>
@@ -19,12 +20,13 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
   const [allocNote, setAllocNote] = useState('')
   // 关注的置顶(保持各自组内原顺序)
   const rows = [...snap.holdings].sort((a, b) => (watch.has(b.ticker) ? 1 : 0) - (watch.has(a.ticker) ? 1 : 0))
-  // 可添加的自定义股 = 有中文名+数据的池子里、尚未在列表的(搜索下拉,杜绝打错)
+  // 可添加的自定义股 = 全部可分析股(数据池1393只)里尚未在列表的(不再只限98大盘股)
+  const [universe, setUniverse] = useState<UniverseItem[]>([])
+  useEffect(() => { fetchUniverse().then(setUniverse) }, [])
   const heldSet = new Set(snap.holdings.map((h) => h.ticker))
-  const addable: SearchOption[] = Object.entries(meta)
-    .filter(([tk]) => !heldSet.has(tk))
-    .map(([tk, m]) => ({ value: tk, label: tk, sub: `${m.cn} · ${m.sector}`, keywords: m.cn }))
-    .sort((a, b) => a.value.localeCompare(b.value))
+  const addable: SearchOption[] = universe
+    .filter((u) => !heldSet.has(u.ticker))
+    .map((u) => ({ value: u.ticker, label: u.ticker, sub: u.cn ? `${u.cn}${u.sector ? ' · ' + u.sector : ''}` : '', keywords: u.cn }))
   // 横向布局:每股一行(按档位→中位排序),行多时容器内竖向滚动,不再横向挤成一团
   const rowH = 26
   const chartH = Math.max(240, snap.holdings.length * rowH + 60)

@@ -116,6 +116,12 @@ export async function fetchAIAllocate(tickers: string[], capital: number): Promi
   return j
 }
 
+export interface UniverseItem { ticker: string; cn?: string; sector?: string }
+export async function fetchUniverse(): Promise<UniverseItem[]> {
+  const r = await fetch('/api/universe')
+  return r.ok ? (await r.json()).universe || [] : []
+}
+
 export type TickerMeta = Record<string, { cn: string; sector: string }>
 export async function fetchMeta(): Promise<TickerMeta> {
   const r = await fetch('/api/meta')

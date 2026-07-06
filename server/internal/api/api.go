@@ -51,6 +51,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/history", a.history)
 	mux.HandleFunc("/api/blob", a.blobHandler)
 	mux.HandleFunc("/api/meta", a.meta)
+	mux.HandleFunc("/api/universe", a.universe)
 	mux.HandleFunc("/api/strategies", a.strategies)
 	mux.HandleFunc("/api/watchlist", a.watchlist)
 	mux.HandleFunc("/api/focus", a.focus)
