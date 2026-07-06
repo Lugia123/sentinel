@@ -52,6 +52,8 @@ func (a *API) richSeries(tk, from, to string) []map[string]any {
 		PctFromHigh *float64 `json:"pct_from_high"`
 		Bandwidth   *float64 `json:"bandwidth"`
 		Price       *float64 `json:"price"`
+		Sma20       *float64 `json:"sma20"`
+		Sma50       *float64 `json:"sma50"`
 		Sy          *float64 `json:"sy"`
 	}
 	var rows []row
@@ -66,6 +68,8 @@ func (a *API) richSeries(tk, from, to string) []map[string]any {
 		       ((elem->'prob'->'h20'->'band70'->>1)::float
 		        - (elem->'prob'->'h20'->'band70'->>0)::float)          AS bandwidth,
 		       (elem->>'price')::float                                 AS price,
+		       (elem->'indicators'->>'sma20')::float                   AS sma20,
+		       (elem->'indicators'->>'sma50')::float                   AS sma50,
 		       (elem->'indicators'->>'sy_yield')::float                AS sy
 		FROM snapshots s, jsonb_array_elements(s.raw->'holdings') elem
 		WHERE elem->>'ticker' = ? AND s.asof BETWEEN ?::date AND ?::date
@@ -76,7 +80,7 @@ func (a *API) richSeries(tk, from, to string) []map[string]any {
 			"date": r.Date, "grade": r.Grade, "median20": r.Median20,
 			"mom21": r.Mom21, "mom126": r.Mom126, "vol": r.Vol,
 			"pct_from_high": r.PctFromHigh, "bandwidth": r.Bandwidth,
-			"price": r.Price, "sy": r.Sy,
+			"price": r.Price, "sma20": r.Sma20, "sma50": r.Sma50, "sy": r.Sy,
 		}
 	}
 	return out

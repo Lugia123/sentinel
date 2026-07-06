@@ -7,14 +7,19 @@ import type { SearchOption } from '../components/SearchSelect'
 import { InfoDot } from '../ui'
 
 // 可选的分析维度(都来自每日快照,挖出来对比)
-// 注:未来20日中位/概率带宽 = 年化波动率 × 固定常数(概率带是"波动缩放固定分位"),
-// 三者形状完全相同、无独立信息,故走势维度里只保留年化波动率,不再单列那两个。
+// 每个维度=1个主指标 + 相关辅助指标(单选1只股时叠加显示,多选时只显示主指标做对比)。
+// 注:未来20日中位/概率带宽 = 年化波动率 × 固定常数,无独立信息,已并入年化波动率不单列。
 const METRICS: MetricDef[] = [
-  { key: 'grade', label: '档位(-3 ~ +3)', pct: false, fixed: true },
-  { key: 'mom21', label: '近21日动量', pct: true, fixed: false },
-  { key: 'mom126', label: '近半年动量', pct: true, fixed: false },
-  { key: 'vol', label: '年化波动率', pct: true, fixed: false },
-  { key: 'pct_from_high', label: '距52周高', pct: true, fixed: false },
+  { key: 'grade', label: '档位(-3 ~ +3)', pct: false, fixed: true,
+    aux: [{ key: 'price', label: '收盘价', dollar: true }, { key: 'sma20', label: '20日线', dollar: true }] },
+  { key: 'mom21', label: '近21日动量', pct: true, fixed: false,
+    aux: [{ key: 'mom126', label: '近半年动量', dollar: false }] },
+  { key: 'mom126', label: '近半年动量', pct: true, fixed: false,
+    aux: [{ key: 'mom21', label: '近21日动量', dollar: false }] },
+  { key: 'vol', label: '年化波动率', pct: true, fixed: false,
+    aux: [{ key: 'price', label: '收盘价', dollar: true }] },
+  { key: 'pct_from_high', label: '距52周高', pct: true, fixed: false,
+    aux: [{ key: 'price', label: '收盘价', dollar: true }] },
 ]
 const METRIC_OPTS: SearchOption[] = METRICS.map((m) => ({ value: m.key, label: m.label }))
 
@@ -42,8 +47,8 @@ export default function Trends({ meta }: { meta: TickerMeta; watch: Set<string> 
   return (
     <>
       <div className="hint">
-        📈 挑几只股票,选<b>一个或多个分析维度</b>,看它们随时间怎么变化(每个维度一张图)。所有维度都来自每天回填的策略快照。
-        <b>注意</b>:只有「被策略选中过」的交易日才有数据,常被选的股(如 AMD/INTC)曲线连续,偶尔选中的会有断点。
+        📈 挑股票 + 选<b>分析维度</b>(每个维度一张图)。<b>只选 1 只</b>=深度模式,图上会叠加相关<b>辅助指标</b>(如档位图配 收盘价+20日线);<b>选多只</b>=对比模式,只画主指标。
+        <b>注意</b>:只有「被策略选中过」的交易日才有数据,常被选的股曲线连续,偶尔选中的会有断点。
       </div>
       <div className="card">
         <div className="trend-ctl">
