@@ -18,23 +18,19 @@ const METRICS: MetricDef[] = [
 ]
 const METRIC_OPTS: SearchOption[] = METRICS.map((m) => ({ value: m.key, label: m.label }))
 
-export default function Trends({ meta, watch }: { meta: TickerMeta; watch: Set<string> }) {
+export default function Trends({ meta }: { meta: TickerMeta; watch: Set<string> }) {
   const [avail, setAvail] = useState<SearchOption[]>([])
-  const [sel, setSel] = useState<string[]>([])
-  const [metrics, setMetrics] = useState<string[]>(['grade'])
+  const [sel, setSel] = useState<string[]>([]) // 无默认股票
+  const [metrics, setMetrics] = useState<string[]>([]) // 无默认维度
   const [series, setSeries] = useState<Record<string, RichTrendPoint[]>>({})
 
-  // 初始化:拉可选股票(有档位历史),默认选样本最多的3只(优先关注列表里的)
+  // 只拉可选股票清单(有档位历史),不预选任何股票/维度——由用户自己挑
   useEffect(() => {
     fetchTrendTickers().then((ts) => {
-      const opts = ts.map((t): SearchOption => ({
+      setAvail(ts.map((t): SearchOption => ({
         value: t.ticker, label: t.ticker,
         sub: (meta[t.ticker]?.cn || '') + ` · ${t.n}天`, keywords: meta[t.ticker]?.cn,
-      }))
-      setAvail(opts)
-      const watched = ts.filter((t) => watch.has(t.ticker)).map((t) => t.ticker)
-      const def = (watched.length ? watched : ts.map((t) => t.ticker)).slice(0, 3)
-      setSel(def)
+      })))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta])
@@ -57,11 +53,15 @@ export default function Trends({ meta, watch }: { meta: TickerMeta; watch: Set<s
           </div>
           <div>
             <div className="ctl-lbl">分析维度(可多选,每个一张图)</div>
-            <MultiSelect value={metrics} options={METRIC_OPTS} onChange={(v) => setMetrics(v.length ? v : ['grade'])}
+            <MultiSelect value={metrics} options={METRIC_OPTS} onChange={setMetrics}
               placeholder="选维度…" max={METRICS.length} />
           </div>
         </div>
-        {sel.length === 0 && <div className="muted" style={{ marginTop: 12 }}>上面搜索添加股票开始对比。</div>}
+        {(sel.length === 0 || metrics.length === 0) && (
+          <div className="muted" style={{ marginTop: 12 }}>
+            上面先<b>搜索添加股票</b>(1 只或多只),再<b>选分析维度</b>(1 个或多个,每个维度一张图),即可开始对比。
+          </div>
+        )}
         {sel.length > 0 && shownMetrics.map((m) => (
           <div key={m.key} className="trend-panel">
             <TrendChart m={m} series={series} meta={meta} />
