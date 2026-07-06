@@ -390,5 +390,2641 @@
 "XOM": {
 "cn": "埃克森美孚",
 "sector": "能源"
+},
+"AA": {
+"cn": "美国铝业",
+"sector": ""
+},
+"AAL": {
+"cn": "美国航空",
+"sector": ""
+},
+"ADI": {
+"cn": "亚德诺",
+"sector": ""
+},
+"ADM": {
+"cn": "阿彻丹尼尔斯米德兰",
+"sector": ""
+},
+"ADP": {
+"cn": "自动数据处理",
+"sector": ""
+},
+"ADSK": {
+"cn": "欧特克",
+"sector": ""
+},
+"AEP": {
+"cn": "美国电力",
+"sector": ""
+},
+"AFL": {
+"cn": "安富来",
+"sector": ""
+},
+"AGCO": {
+"cn": "爱科",
+"sector": ""
+},
+"AIG": {
+"cn": "美国国际集团",
+"sector": ""
+},
+"AKAM": {
+"cn": "阿卡迈",
+"sector": ""
+},
+"ALB": {
+"cn": "雅保",
+"sector": ""
+},
+"ALGN": {
+"cn": "艾利科技",
+"sector": ""
+},
+"ALL": {
+"cn": "好事达",
+"sector": ""
+},
+"AMAT": {
+"cn": "应用材料",
+"sector": ""
+},
+"AME": {
+"cn": "阿美特克",
+"sector": ""
+},
+"AMP": {
+"cn": "阿默普莱斯金融",
+"sector": ""
+},
+"ANET": {
+"cn": "Arista网络",
+"sector": ""
+},
+"ANF": {
+"cn": "阿贝克隆比&费奇",
+"sector": ""
+},
+"AON": {
+"cn": "怡安",
+"sector": ""
+},
+"APA": {
+"cn": "阿帕奇",
+"sector": ""
+},
+"APH": {
+"cn": "安费诺",
+"sector": ""
+},
+"APO": {
+"cn": "阿波罗全球管理",
+"sector": ""
+},
+"APTV": {
+"cn": "安波福",
+"sector": ""
+},
+"ARE": {
+"cn": "亚历山大房地产",
+"sector": ""
+},
+"AVY": {
+"cn": "艾利丹尼森",
+"sector": ""
+},
+"AWK": {
+"cn": "美国水务",
+"sector": ""
+},
+"AXON": {
+"cn": "Axon",
+"sector": ""
+},
+"AZO": {
+"cn": "汽车地带",
+"sector": ""
+},
+"BALL": {
+"cn": "波尔",
+"sector": ""
+},
+"BAX": {
+"cn": "百特",
+"sector": ""
+},
+"BBWI": {
+"cn": "Bath & Body Works",
+"sector": ""
+},
+"BBY": {
+"cn": "百思买",
+"sector": ""
+},
+"BDX": {
+"cn": "碧迪",
+"sector": ""
+},
+"BEN": {
+"cn": "富兰克林资源",
+"sector": ""
+},
+"BG": {
+"cn": "邦吉",
+"sector": ""
+},
+"BIIB": {
+"cn": "百健",
+"sector": ""
+},
+"BIO": {
+"cn": "Bio-Rad",
+"sector": ""
+},
+"BJ": {
+"cn": "BJ批发俱乐部",
+"sector": ""
+},
+"BKR": {
+"cn": "贝克休斯",
+"sector": ""
+},
+"BMRN": {
+"cn": "百慕大",
+"sector": ""
+},
+"BNY": {
+"cn": "纽约梅隆",
+"sector": ""
+},
+"BOX": {
+"cn": "Box",
+"sector": ""
+},
+"BR": {
+"cn": "Broadridge",
+"sector": ""
+},
+"BRK-B": {
+"cn": "伯克希尔哈撒韦",
+"sector": ""
+},
+"BRO": {
+"cn": "Brown & Brown",
+"sector": ""
+},
+"BSX": {
+"cn": "波士顿科学",
+"sector": ""
+},
+"BURL": {
+"cn": "伯灵顿百货",
+"sector": ""
+},
+"BX": {
+"cn": "黑石",
+"sector": ""
+},
+"BYD": {
+"cn": "比亚迪",
+"sector": ""
+},
+"CAH": {
+"cn": "嘉德诺",
+"sector": ""
+},
+"CAR": {
+"cn": "安飞士",
+"sector": ""
+},
+"CARR": {
+"cn": "开利",
+"sector": ""
+},
+"CBOE": {
+"cn": "芝加哥期权交易所",
+"sector": ""
+},
+"CBRE": {
+"cn": "世邦魏理仕",
+"sector": ""
+},
+"CCI": {
+"cn": "冠城国际",
+"sector": ""
+},
+"CCL": {
+"cn": "嘉年华",
+"sector": ""
+},
+"CDNS": {
+"cn": "Cadence",
+"sector": ""
+},
+"CDW": {
+"cn": "CDW",
+"sector": ""
+},
+"CF": {
+"cn": "CF工业",
+"sector": ""
+},
+"CG": {
+"cn": "凯雷",
+"sector": ""
+},
+"CHD": {
+"cn": "丘奇德怀特",
+"sector": ""
+},
+"CHRW": {
+"cn": "C.H. Robinson",
+"sector": ""
+},
+"CHTR": {
+"cn": "特许通讯",
+"sector": ""
+},
+"CHWY": {
+"cn": "Chewy",
+"sector": ""
+},
+"CI": {
+"cn": "信诺",
+"sector": ""
+},
+"CIEN": {
+"cn": "Ciena",
+"sector": ""
+},
+"CINF": {
+"cn": "辛辛那提金融",
+"sector": ""
+},
+"CLF": {
+"cn": "克利夫兰克里夫斯",
+"sector": ""
+},
+"CLX": {
+"cn": "高乐氏",
+"sector": ""
+},
+"CME": {
+"cn": "芝加哥商品交易所",
+"sector": ""
+},
+"CMG": {
+"cn": "Chipotle",
+"sector": ""
+},
+"CMI": {
+"cn": "康明斯",
+"sector": ""
+},
+"CNC": {
+"cn": "Centene",
+"sector": ""
+},
+"CNH": {
+"cn": "凯斯纽荷兰工业",
+"sector": ""
+},
+"CNP": {
+"cn": "CenterPoint能源",
+"sector": ""
+},
+"COF": {
+"cn": "第一资本",
+"sector": ""
+},
+"COKE": {
+"cn": "可口可乐装瓶",
+"sector": ""
+},
+"COLM": {
+"cn": "哥伦比亚运动服饰",
+"sector": ""
+},
+"COO": {
+"cn": "库珀公司",
+"sector": ""
+},
+"CPAY": {
+"cn": "Corpay",
+"sector": ""
+},
+"CPRI": {
+"cn": "Capri控股",
+"sector": ""
+},
+"CPRT": {
+"cn": "科帕特",
+"sector": ""
+},
+"CRH": {
+"cn": "CRH",
+"sector": ""
+},
+"CRI": {
+"cn": "卡特",
+"sector": ""
+},
+"CRL": {
+"cn": "查尔斯河实验室",
+"sector": ""
+},
+"CROX": {
+"cn": "卡骆驰",
+"sector": ""
+},
+"CRUS": {
+"cn": "凌云逻辑",
+"sector": ""
+},
+"CRWD": {
+"cn": "CrowdStrike",
+"sector": ""
+},
+"CSGP": {
+"cn": "科斯塔集团",
+"sector": ""
+},
+"CSL": {
+"cn": "卡莱尔",
+"sector": ""
+},
+"CSX": {
+"cn": "CSX运输",
+"sector": ""
+},
+"CTAS": {
+"cn": "辛塔斯",
+"sector": ""
+},
+"CTSH": {
+"cn": "高知特",
+"sector": ""
+},
+"CTVA": {
+"cn": "科迪华",
+"sector": ""
+},
+"CVI": {
+"cn": "CVR能源",
+"sector": ""
+},
+"CVNA": {
+"cn": "Carvana",
+"sector": ""
+},
+"CWEN": {
+"cn": "Clearway能源",
+"sector": ""
+},
+"CWEN-A": {
+"cn": "Clearway能源A",
+"sector": ""
+},
+"CZR": {
+"cn": "凯撒娱乐",
+"sector": ""
+},
+"DAL": {
+"cn": "达美航空",
+"sector": ""
+},
+"DAR": {
+"cn": "Darling配料",
+"sector": ""
+},
+"DBX": {
+"cn": "Dropbox",
+"sector": ""
+},
+"DCI": {
+"cn": "唐纳森",
+"sector": ""
+},
+"DD": {
+"cn": "杜邦",
+"sector": ""
+},
+"DDOG": {
+"cn": "Datadog",
+"sector": ""
+},
+"DECK": {
+"cn": "Deckers户外",
+"sector": ""
+},
+"DELL": {
+"cn": "戴尔",
+"sector": ""
+},
+"DG": {
+"cn": "达乐",
+"sector": ""
+},
+"DGX": {
+"cn": "奎斯特诊断",
+"sector": ""
+},
+"DHI": {
+"cn": "霍顿房屋",
+"sector": ""
+},
+"DKS": {
+"cn": "迪克体育用品",
+"sector": ""
+},
+"DLB": {
+"cn": "杜比实验室",
+"sector": ""
+},
+"DLR": {
+"cn": "数字房地产信托",
+"sector": ""
+},
+"DLTR": {
+"cn": "美元树",
+"sector": ""
+},
+"DOCU": {
+"cn": "DocuSign",
+"sector": ""
+},
+"DOV": {
+"cn": "多佛",
+"sector": ""
+},
+"DOW": {
+"cn": "陶氏",
+"sector": ""
+},
+"DPZ": {
+"cn": "达美乐披萨",
+"sector": ""
+},
+"DRI": {
+"cn": "达登餐饮",
+"sector": ""
+},
+"DT": {
+"cn": "Dynatrace",
+"sector": ""
+},
+"DTE": {
+"cn": "DTE能源",
+"sector": ""
+},
+"DVA": {
+"cn": "达维塔",
+"sector": ""
+},
+"DVN": {
+"cn": "戴文能源",
+"sector": ""
+},
+"DXC": {
+"cn": "DXC科技",
+"sector": ""
+},
+"DXCM": {
+"cn": "德康医疗",
+"sector": ""
+},
+"EA": {
+"cn": "艺电",
+"sector": ""
+},
+"EAT": {
+"cn": "Brinker International",
+"sector": ""
+},
+"EBAY": {
+"cn": "eBay",
+"sector": ""
+},
+"ECHO": {
+"cn": "Echo Global Logistics",
+"sector": ""
+},
+"ECL": {
+"cn": "艺康",
+"sector": ""
+},
+"ED": {
+"cn": "爱迪生国际",
+"sector": ""
+},
+"EEFT": {
+"cn": "Euronet Worldwide",
+"sector": ""
+},
+"EL": {
+"cn": "雅诗兰黛",
+"sector": ""
+},
+"ELAN": {
+"cn": "Elanco Animal Health",
+"sector": ""
+},
+"ELF": {
+"cn": "e.l.f. Beauty",
+"sector": ""
+},
+"ELS": {
+"cn": "Equity LifeStyle Properties",
+"sector": ""
+},
+"ELV": {
+"cn": "Elevance Health",
+"sector": ""
+},
+"EME": {
+"cn": "EMCOR Group",
+"sector": ""
+},
+"EMN": {
+"cn": "伊士曼化学",
+"sector": ""
+},
+"ENPH": {
+"cn": "Enphase Energy",
+"sector": ""
+},
+"ENR": {
+"cn": "劲量控股",
+"sector": ""
+},
+"ENS": {
+"cn": "EnerSys",
+"sector": ""
+},
+"ENTG": {
+"cn": "英特格",
+"sector": ""
+},
+"EPAM": {
+"cn": "EPAM Systems",
+"sector": ""
+},
+"EPR": {
+"cn": "EPR Properties",
+"sector": ""
+},
+"EQIX": {
+"cn": "Equinix",
+"sector": ""
+},
+"EQR": {
+"cn": "Equity Residential",
+"sector": ""
+},
+"EQT": {
+"cn": "EQT能源",
+"sector": ""
+},
+"ES": {
+"cn": "Eversource Energy",
+"sector": ""
+},
+"ESI": {
+"cn": "Element Solutions",
+"sector": ""
+},
+"ESNT": {
+"cn": "Essent Group",
+"sector": ""
+},
+"ESS": {
+"cn": "Essex Property Trust",
+"sector": ""
+},
+"ETN": {
+"cn": "伊顿",
+"sector": ""
+},
+"ETR": {
+"cn": "Entergy",
+"sector": ""
+},
+"ETSY": {
+"cn": "Etsy",
+"sector": ""
+},
+"EVR": {
+"cn": "Evercore",
+"sector": ""
+},
+"EVRG": {
+"cn": "Evergy",
+"sector": ""
+},
+"EW": {
+"cn": "爱德华生命科学",
+"sector": ""
+},
+"EWBC": {
+"cn": "East West Bancorp",
+"sector": ""
+},
+"EXC": {
+"cn": "Exelon",
+"sector": ""
+},
+"EXEL": {
+"cn": "Exelixis",
+"sector": ""
+},
+"EXPD": {
+"cn": "Expeditors International",
+"sector": ""
+},
+"EXPE": {
+"cn": "Expedia",
+"sector": ""
+},
+"EXPO": {
+"cn": "Exponent",
+"sector": ""
+},
+"EXR": {
+"cn": "Extra Space Storage",
+"sector": ""
+},
+"FANG": {
+"cn": "Diamondback Energy",
+"sector": ""
+},
+"FAST": {
+"cn": "快扣",
+"sector": ""
+},
+"FBIN": {
+"cn": "Fortune Brands Innovations",
+"sector": ""
+},
+"FBP": {
+"cn": "First BanCorp",
+"sector": ""
+},
+"FCF": {
+"cn": "First Commonwealth Financial",
+"sector": ""
+},
+"FCN": {
+"cn": "FTI Consulting",
+"sector": ""
+},
+"FDP": {
+"cn": "Fresh Del Monte Produce",
+"sector": ""
+},
+"FDS": {
+"cn": "FactSet Research Systems",
+"sector": ""
+},
+"FE": {
+"cn": "FirstEnergy",
+"sector": ""
+},
+"FFBC": {
+"cn": "First Financial Bancorp",
+"sector": ""
+},
+"FFIN": {
+"cn": "First Financial Bankshares",
+"sector": ""
+},
+"FFIV": {
+"cn": "F5 Networks",
+"sector": ""
+},
+"FHB": {
+"cn": "First Hawaiian Bank",
+"sector": ""
+},
+"FHI": {
+"cn": "Federated Hermes",
+"sector": ""
+},
+"FHN": {
+"cn": "First Horizon",
+"sector": ""
+},
+"FIBK": {
+"cn": "First Interstate BancSystem",
+"sector": ""
+},
+"FICO": {
+"cn": "费埃哲",
+"sector": ""
+},
+"FIS": {
+"cn": "Fidelity National Information Services",
+"sector": ""
+},
+"FISV": {
+"cn": "Fiserv",
+"sector": ""
+},
+"FITB": {
+"cn": "Fifth Third Bancorp",
+"sector": ""
+},
+"FIVE": {
+"cn": "Five Below",
+"sector": ""
+},
+"FIX": {
+"cn": "Comfort Systems USA",
+"sector": ""
+},
+"FIZZ": {
+"cn": "National Beverage",
+"sector": ""
+},
+"FLEX": {
+"cn": "伟创力",
+"sector": ""
+},
+"FLO": {
+"cn": "Flowers Foods",
+"sector": ""
+},
+"FLR": {
+"cn": "Fluor",
+"sector": ""
+},
+"FLS": {
+"cn": "Flowserve",
+"sector": ""
+},
+"FMC": {
+"cn": "FMC公司",
+"sector": ""
+},
+"FN": {
+"cn": "Fabrinet",
+"sector": ""
+},
+"FNB": {
+"cn": "F.N.B. Corporation",
+"sector": ""
+},
+"FND": {
+"cn": "Floor & Decor",
+"sector": ""
+},
+"FNF": {
+"cn": "Fidelity National Financial",
+"sector": ""
+},
+"FORM": {
+"cn": "FormFactor",
+"sector": ""
+},
+"FOUR": {
+"cn": "Shift4 Payments",
+"sector": ""
+},
+"FOX": {
+"cn": "福克斯公司",
+"sector": ""
+},
+"FOXA": {
+"cn": "福克斯公司",
+"sector": ""
+},
+"FOXF": {
+"cn": "Fox Factory Holding",
+"sector": ""
+},
+"FR": {
+"cn": "First Industrial Realty Trust",
+"sector": ""
+},
+"FRPT": {
+"cn": "Freshpet",
+"sector": ""
+},
+"FRT": {
+"cn": "Federal Realty Investment Trust",
+"sector": ""
+},
+"FSLR": {
+"cn": "第一太阳能",
+"sector": ""
+},
+"FSS": {
+"cn": "Federal Signal",
+"sector": ""
+},
+"FTDR": {
+"cn": "Frontdoor",
+"sector": ""
+},
+"FTI": {
+"cn": "TechnipFMC",
+"sector": ""
+},
+"FTNT": {
+"cn": "飞塔信息",
+"sector": ""
+},
+"FTV": {
+"cn": "Fortive",
+"sector": ""
+},
+"FUL": {
+"cn": "H.B. Fuller",
+"sector": ""
+},
+"FUN": {
+"cn": "雪松娱乐",
+"sector": ""
+},
+"FWRD": {
+"cn": "福沃运输",
+"sector": ""
+},
+"G": {
+"cn": "简伯特",
+"sector": ""
+},
+"GAP": {
+"cn": "盖璞",
+"sector": ""
+},
+"GATX": {
+"cn": "GATX",
+"sector": ""
+},
+"GBCI": {
+"cn": "冰川银行",
+"sector": ""
+},
+"GBX": {
+"cn": "GBX",
+"sector": ""
+},
+"GD": {
+"cn": "通用动力",
+"sector": ""
+},
+"GDDY": {
+"cn": "GoDaddy",
+"sector": ""
+},
+"GDYN": {
+"cn": "Grid Dynamics",
+"sector": ""
+},
+"GEF": {
+"cn": "格雷夫",
+"sector": ""
+},
+"GEN": {
+"cn": "Gen Digital",
+"sector": ""
+},
+"GEO": {
+"cn": "GEO集团",
+"sector": ""
+},
+"GFF": {
+"cn": "格里芬",
+"sector": ""
+},
+"GGG": {
+"cn": "固瑞克",
+"sector": ""
+},
+"GHC": {
+"cn": "Graham Holdings",
+"sector": ""
+},
+"GIII": {
+"cn": "G-III集团",
+"sector": ""
+},
+"GIS": {
+"cn": "通用磨坊",
+"sector": ""
+},
+"GKOS": {
+"cn": "Glaukos",
+"sector": ""
+},
+"GL": {
+"cn": "环球人寿",
+"sector": ""
+},
+"GLPI": {
+"cn": "博彩地产",
+"sector": ""
+},
+"GLW": {
+"cn": "康宁",
+"sector": ""
+},
+"GME": {
+"cn": "游戏驿站",
+"sector": ""
+},
+"GMED": {
+"cn": "Globus Medical",
+"sector": ""
+},
+"GNL": {
+"cn": "全球网络租赁",
+"sector": ""
+},
+"GNRC": {
+"cn": "Generac",
+"sector": ""
+},
+"GNTX": {
+"cn": "镜泰",
+"sector": ""
+},
+"GNW": {
+"cn": "Genworth",
+"sector": ""
+},
+"GO": {
+"cn": "Grocery Outlet",
+"sector": ""
+},
+"GOGO": {
+"cn": "Gogo",
+"sector": ""
+},
+"GOLF": {
+"cn": "Acushnet",
+"sector": ""
+},
+"GOOG": {
+"cn": "谷歌",
+"sector": ""
+},
+"GPC": {
+"cn": "Genuine Parts",
+"sector": ""
+},
+"GPI": {
+"cn": "Group 1汽车",
+"sector": ""
+},
+"GPK": {
+"cn": "Graphic Packaging",
+"sector": ""
+},
+"GPN": {
+"cn": "环汇",
+"sector": ""
+},
+"GRBK": {
+"cn": "Green Brick",
+"sector": ""
+},
+"GRMN": {
+"cn": "佳明",
+"sector": ""
+},
+"GSHD": {
+"cn": "Goosehead",
+"sector": ""
+},
+"GT": {
+"cn": "固特异",
+"sector": ""
+},
+"GTES": {
+"cn": "Gates",
+"sector": ""
+},
+"GTLS": {
+"cn": "查特工业",
+"sector": ""
+},
+"GTM": {
+"cn": "Goodyear Tire",
+"sector": ""
+},
+"GTY": {
+"cn": "Getty Realty",
+"sector": ""
+},
+"GVA": {
+"cn": "Granite Construction",
+"sector": ""
+},
+"GWRE": {
+"cn": "Guidewire",
+"sector": ""
+},
+"GWW": {
+"cn": "固安捷",
+"sector": ""
+},
+"H": {
+"cn": "凯悦酒店",
+"sector": ""
+},
+"HAE": {
+"cn": "Haemonetics",
+"sector": ""
+},
+"HAFC": {
+"cn": "Hanmi Financial",
+"sector": ""
+},
+"HAL": {
+"cn": "哈里伯顿",
+"sector": ""
+},
+"HALO": {
+"cn": "Halozyme",
+"sector": ""
+},
+"HAS": {
+"cn": "孩之宝",
+"sector": ""
+},
+"HASI": {
+"cn": "Hannon Armstrong",
+"sector": ""
+},
+"HBAN": {
+"cn": "亨廷顿银行",
+"sector": ""
+},
+"HCA": {
+"cn": "HCA医疗",
+"sector": ""
+},
+"HCC": {
+"cn": "Warrior Met Coal",
+"sector": ""
+},
+"HCI": {
+"cn": "HCI集团",
+"sector": ""
+},
+"HCSG": {
+"cn": "Healthcare Services",
+"sector": ""
+},
+"HE": {
+"cn": "夏威夷电力",
+"sector": ""
+},
+"HFWA": {
+"cn": "Heritage Financial",
+"sector": ""
+},
+"HGV": {
+"cn": "希尔顿分时度假",
+"sector": ""
+},
+"HIG": {
+"cn": "哈特福德保险",
+"sector": ""
+},
+"HII": {
+"cn": "亨廷顿英戈尔斯",
+"sector": ""
+},
+"HIMS": {
+"cn": "Hims & Hers",
+"sector": ""
+},
+"HIW": {
+"cn": "Highwoods",
+"sector": ""
+},
+"HL": {
+"cn": "赫克拉矿业",
+"sector": ""
+},
+"HLI": {
+"cn": "Houlihan Lokey",
+"sector": ""
+},
+"HLIT": {
+"cn": "Harmonic",
+"sector": ""
+},
+"HLNE": {
+"cn": "Hamilton Lane",
+"sector": ""
+},
+"HLT": {
+"cn": "希尔顿",
+"sector": ""
+},
+"HLX": {
+"cn": "Helix Energy",
+"sector": ""
+},
+"HMN": {
+"cn": "Horace Mann",
+"sector": ""
+},
+"HNI": {
+"cn": "HNI集团",
+"sector": ""
+},
+"HOG": {
+"cn": "哈雷戴维森",
+"sector": ""
+},
+"HOMB": {
+"cn": "Home BancShares",
+"sector": ""
+},
+"HOPE": {
+"cn": "Hope Bancorp",
+"sector": ""
+},
+"HP": {
+"cn": "赫尔默里奇",
+"sector": ""
+},
+"HPE": {
+"cn": "慧与",
+"sector": ""
+},
+"HPQ": {
+"cn": "惠普",
+"sector": ""
+},
+"HQY": {
+"cn": "HealthEquity",
+"sector": ""
+},
+"HR": {
+"cn": "Healthcare Realty",
+"sector": ""
+},
+"HRB": {
+"cn": "H&R Block",
+"sector": ""
+},
+"HRL": {
+"cn": "荷美尔",
+"sector": ""
+},
+"HSIC": {
+"cn": "亨利香恩",
+"sector": ""
+},
+"HST": {
+"cn": "Host Hotels",
+"sector": ""
+},
+"HSTM": {
+"cn": "HealthStream",
+"sector": ""
+},
+"HSY": {
+"cn": "好时",
+"sector": ""
+},
+"HTH": {
+"cn": "Hilltop",
+"sector": ""
+},
+"HTLD": {
+"cn": "Heartland Express",
+"sector": ""
+},
+"HTO": {
+"cn": "HTO",
+"sector": ""
+},
+"HUBB": {
+"cn": "哈勃集团",
+"sector": ""
+},
+"HUBG": {
+"cn": "Hub Group",
+"sector": ""
+},
+"HUM": {
+"cn": "哈门那",
+"sector": ""
+},
+"HWC": {
+"cn": "Hancock Whitney",
+"sector": ""
+},
+"HWKN": {
+"cn": "霍金斯",
+"sector": ""
+},
+"HWM": {
+"cn": "Howmet",
+"sector": ""
+},
+"HXL": {
+"cn": "赫氏",
+"sector": ""
+},
+"HZO": {
+"cn": "MarineMax",
+"sector": ""
+},
+"IART": {
+"cn": "Integra LifeSciences",
+"sector": ""
+},
+"IBKR": {
+"cn": "盈透证券",
+"sector": ""
+},
+"IBOC": {
+"cn": "International Bancshares",
+"sector": ""
+},
+"IBP": {
+"cn": "Installed Building",
+"sector": ""
+},
+"ICE": {
+"cn": "洲际交易所",
+"sector": ""
+},
+"ICHR": {
+"cn": "Ichor",
+"sector": ""
+},
+"ICUI": {
+"cn": "ICU Medical",
+"sector": ""
+},
+"IDA": {
+"cn": "Idacorp",
+"sector": ""
+},
+"IDCC": {
+"cn": "InterDigital",
+"sector": ""
+},
+"IDXX": {
+"cn": "爱德士",
+"sector": ""
+},
+"IEX": {
+"cn": "IDEX",
+"sector": ""
+},
+"IFF": {
+"cn": "国际香料",
+"sector": ""
+},
+"IIIN": {
+"cn": "Insteel",
+"sector": ""
+},
+"IIPR": {
+"cn": "Innovative Industrial",
+"sector": ""
+},
+"ILMN": {
+"cn": "因美纳",
+"sector": ""
+},
+"INCY": {
+"cn": "Incyte",
+"sector": ""
+},
+"INDB": {
+"cn": "Independent Bank",
+"sector": ""
+},
+"INDV": {
+"cn": "Indivior",
+"sector": ""
+},
+"INGR": {
+"cn": "宜瑞安",
+"sector": ""
+},
+"INSP": {
+"cn": "Inspire Medical",
+"sector": ""
+},
+"INSW": {
+"cn": "International Seaways",
+"sector": ""
+},
+"INTU": {
+"cn": "财捷",
+"sector": ""
+},
+"IP": {
+"cn": "国际纸业",
+"sector": ""
+},
+"IQV": {
+"cn": "艾昆纬",
+"sector": ""
+},
+"IR": {
+"cn": "英格索兰",
+"sector": ""
+},
+"IRM": {
+"cn": "铁山",
+"sector": ""
+},
+"IT": {
+"cn": "高德纳",
+"sector": ""
+},
+"ITT": {
+"cn": "ITT工业",
+"sector": ""
+},
+"ITW": {
+"cn": "伊利诺伊工具",
+"sector": ""
+},
+"IVZ": {
+"cn": "景顺",
+"sector": ""
+},
+"J": {
+"cn": "雅各布工程",
+"sector": ""
+},
+"JAZZ": {
+"cn": "爵士制药",
+"sector": ""
+},
+"JBHT": {
+"cn": "JB亨特运输",
+"sector": ""
+},
+"JBL": {
+"cn": "捷普",
+"sector": ""
+},
+"JBLU": {
+"cn": "捷蓝航空",
+"sector": ""
+},
+"JCI": {
+"cn": "江森自控",
+"sector": ""
+},
+"JEF": {
+"cn": "杰富瑞",
+"sector": ""
+},
+"JHG": {
+"cn": "骏利亨德森",
+"sector": ""
+},
+"JKHY": {
+"cn": "杰克亨利",
+"sector": ""
+},
+"JLL": {
+"cn": "仲量联行",
+"sector": ""
+},
+"KBH": {
+"cn": "KB家居",
+"sector": ""
+},
+"KBR": {
+"cn": "KBR",
+"sector": ""
+},
+"KDP": {
+"cn": "Keurig Dr Pepper",
+"sector": ""
+},
+"KEY": {
+"cn": "KeyCorp",
+"sector": ""
+},
+"KEYS": {
+"cn": "是德科技",
+"sector": ""
+},
+"KHC": {
+"cn": "卡夫亨氏",
+"sector": ""
+},
+"KIM": {
+"cn": "金科地产",
+"sector": ""
+},
+"KKR": {
+"cn": "KKR",
+"sector": ""
+},
+"KLAC": {
+"cn": "科磊",
+"sector": ""
+},
+"KMB": {
+"cn": "金佰利",
+"sector": ""
+},
+"KMI": {
+"cn": "金德尔摩根",
+"sector": ""
+},
+"KMX": {
+"cn": "车美仕",
+"sector": ""
+},
+"KNX": {
+"cn": "奈特运输",
+"sector": ""
+},
+"KR": {
+"cn": "克罗格",
+"sector": ""
+},
+"KSS": {
+"cn": "柯尔百货",
+"sector": ""
+},
+"L": {
+"cn": "洛斯保险",
+"sector": ""
+},
+"LAD": {
+"cn": "利西亚车行",
+"sector": ""
+},
+"LAMR": {
+"cn": "拉马尔广告",
+"sector": ""
+},
+"LDOS": {
+"cn": "Leidos",
+"sector": ""
+},
+"LEA": {
+"cn": "李尔",
+"sector": ""
+},
+"LEG": {
+"cn": "礼恩派",
+"sector": ""
+},
+"LEN": {
+"cn": "莱纳",
+"sector": ""
+},
+"LH": {
+"cn": "徕博科",
+"sector": ""
+},
+"LHX": {
+"cn": "L3哈里斯",
+"sector": ""
+},
+"LII": {
+"cn": "雷诺士",
+"sector": ""
+},
+"LKQ": {
+"cn": "LKQ",
+"sector": ""
+},
+"LNC": {
+"cn": "林肯国民",
+"sector": ""
+},
+"LNT": {
+"cn": "Alliant能源",
+"sector": ""
+},
+"LPX": {
+"cn": "路易斯安那太平洋",
+"sector": ""
+},
+"LRCX": {
+"cn": "泛林",
+"sector": ""
+},
+"LSCC": {
+"cn": "莱迪思半导体",
+"sector": ""
+},
+"LULU": {
+"cn": "露露乐蒙",
+"sector": ""
+},
+"LUMN": {
+"cn": "Lumen",
+"sector": ""
+},
+"LUV": {
+"cn": "西南航空",
+"sector": ""
+},
+"LVS": {
+"cn": "拉斯维加斯金沙",
+"sector": ""
+},
+"LW": {
+"cn": "蓝威斯顿",
+"sector": ""
+},
+"LYB": {
+"cn": "利安德巴塞尔",
+"sector": ""
+},
+"LYFT": {
+"cn": "来福车",
+"sector": ""
+},
+"LYV": {
+"cn": "Live Nation",
+"sector": ""
+},
+"M": {
+"cn": "梅西百货",
+"sector": ""
+},
+"MA": {
+"cn": "万事达",
+"sector": ""
+},
+"MAA": {
+"cn": "MAA",
+"sector": ""
+},
+"MAC": {
+"cn": "Macerich",
+"sector": ""
+},
+"MAN": {
+"cn": "万宝盛华",
+"sector": ""
+},
+"MANH": {
+"cn": "曼哈顿软件",
+"sector": ""
+},
+"MAR": {
+"cn": "万豪国际",
+"sector": ""
+},
+"MARA": {
+"cn": "MARA",
+"sector": ""
+},
+"MAS": {
+"cn": "马斯科",
+"sector": ""
+},
+"MAT": {
+"cn": "美泰",
+"sector": ""
+},
+"MATW": {
+"cn": "马修斯国际",
+"sector": ""
+},
+"MATX": {
+"cn": "美森",
+"sector": ""
+},
+"MBIN": {
+"cn": "招商银行(美国)",
+"sector": ""
+},
+"MC": {
+"cn": "莫里斯公司",
+"sector": ""
+},
+"MCHP": {
+"cn": "微芯科技",
+"sector": ""
+},
+"MCK": {
+"cn": "麦克森",
+"sector": ""
+},
+"MCO": {
+"cn": "穆迪",
+"sector": ""
+},
+"MCRI": {
+"cn": "君主赌场",
+"sector": ""
+},
+"MCY": {
+"cn": "水星通用",
+"sector": ""
+},
+"MD": {
+"cn": "迈德奈斯",
+"sector": ""
+},
+"MDU": {
+"cn": "MDU资源",
+"sector": ""
+},
+"MEDP": {
+"cn": "梅德佩斯",
+"sector": ""
+},
+"MET": {
+"cn": "大都会人寿",
+"sector": ""
+},
+"MGEE": {
+"cn": "MGE能源",
+"sector": ""
+},
+"MGM": {
+"cn": "美高梅",
+"sector": ""
+},
+"MGY": {
+"cn": "木兰石油",
+"sector": ""
+},
+"MHK": {
+"cn": "莫霍克工业",
+"sector": ""
+},
+"MHO": {
+"cn": "M/I Homes",
+"sector": ""
+},
+"MIDD": {
+"cn": "中东公司",
+"sector": ""
+},
+"MKC": {
+"cn": "味好美",
+"sector": ""
+},
+"MKSI": {
+"cn": "万机仪器",
+"sector": ""
+},
+"MKTX": {
+"cn": "MarketAxess",
+"sector": ""
+},
+"MLI": {
+"cn": "穆勒工业",
+"sector": ""
+},
+"MLKN": {
+"cn": "米勒诺尔",
+"sector": ""
+},
+"MLM": {
+"cn": "马丁玛丽埃塔",
+"sector": ""
+},
+"MMI": {
+"cn": "摩托罗拉移动",
+"sector": ""
+},
+"MMS": {
+"cn": "马克西姆斯",
+"sector": ""
+},
+"MMSI": {
+"cn": "美瑞健康",
+"sector": ""
+},
+"MNRO": {
+"cn": "孟罗",
+"sector": ""
+},
+"MNST": {
+"cn": "怪物饮料",
+"sector": ""
+},
+"MOG-A": {
+"cn": "莫格",
+"sector": ""
+},
+"MOH": {
+"cn": "莫利纳医疗",
+"sector": ""
+},
+"MORN": {
+"cn": "晨星",
+"sector": ""
+},
+"MOS": {
+"cn": "美盛",
+"sector": ""
+},
+"MP": {
+"cn": "MP材料",
+"sector": ""
+},
+"MPC": {
+"cn": "马拉松石油",
+"sector": ""
+},
+"MPT": {
+"cn": "MPT信托",
+"sector": ""
+},
+"MPWR": {
+"cn": "Monolithic Power",
+"sector": ""
+},
+"MRCY": {
+"cn": "水星系统",
+"sector": ""
+},
+"MRNA": {
+"cn": "莫德纳",
+"sector": ""
+},
+"MRSH": {
+"cn": "马什",
+"sector": ""
+},
+"MRTN": {
+"cn": "马丁运输",
+"sector": ""
+},
+"MRVL": {
+"cn": "美满电子",
+"sector": ""
+},
+"MSA": {
+"cn": "MSA安全",
+"sector": ""
+},
+"MSCI": {
+"cn": "明晟",
+"sector": ""
+},
+"MSEX": {
+"cn": "米德尔塞克斯水务",
+"sector": ""
+},
+"MSGS": {
+"cn": "麦迪逊广场花园体育",
+"sector": ""
+},
+"MSI": {
+"cn": "摩托罗拉解决方案",
+"sector": ""
+},
+"MSM": {
+"cn": "MSC工业",
+"sector": ""
+},
+"MTB": {
+"cn": "M&T银行",
+"sector": ""
+},
+"MTCH": {
+"cn": "Match集团",
+"sector": ""
+},
+"MTD": {
+"cn": "梅特勒-托利多",
+"sector": ""
+},
+"MTDR": {
+"cn": "马塔多资源",
+"sector": ""
+},
+"MTG": {
+"cn": "MGIC投资",
+"sector": ""
+},
+"MTH": {
+"cn": "Meritage Homes",
+"sector": ""
+},
+"MTN": {
+"cn": "维尔度假",
+"sector": ""
+},
+"MTRN": {
+"cn": "马特里恩",
+"sector": ""
+},
+"MTSI": {
+"cn": "M/A-COM",
+"sector": ""
+},
+"MTUS": {
+"cn": "Metallus",
+"sector": ""
+},
+"MTX": {
+"cn": "Minerals Technologies",
+"sector": ""
+},
+"MTZ": {
+"cn": "马斯泰克",
+"sector": ""
+},
+"MU": {
+"cn": "美光",
+"sector": ""
+},
+"MUR": {
+"cn": "墨菲石油",
+"sector": ""
+},
+"MUSA": {
+"cn": "墨菲美国",
+"sector": ""
+},
+"MWA": {
+"cn": "穆勒水产品",
+"sector": ""
+},
+"MXL": {
+"cn": "MaxLinear",
+"sector": ""
+},
+"MYRG": {
+"cn": "Myr集团",
+"sector": ""
+},
+"MZTI": {
+"cn": "MZTI",
+"sector": ""
+},
+"NAVI": {
+"cn": "纳维特",
+"sector": ""
+},
+"NBHC": {
+"cn": "NBHC银行",
+"sector": ""
+},
+"NBIX": {
+"cn": "神经分泌生物科学",
+"sector": ""
+},
+"NBTB": {
+"cn": "NBT银行",
+"sector": ""
+},
+"NCLH": {
+"cn": "挪威邮轮",
+"sector": ""
+},
+"NDAQ": {
+"cn": "纳斯达克",
+"sector": ""
+},
+"NDSN": {
+"cn": "诺信",
+"sector": ""
+},
+"NEO": {
+"cn": "NeoGenomics",
+"sector": ""
+},
+"NEOG": {
+"cn": "Neogen",
+"sector": ""
+},
+"NEU": {
+"cn": "纽马克",
+"sector": ""
+},
+"NFG": {
+"cn": "国家燃气",
+"sector": ""
+},
+"NGVT": {
+"cn": "英格维蒂",
+"sector": ""
+},
+"NHC": {
+"cn": "国家医疗",
+"sector": ""
+},
+"NI": {
+"cn": "NiSource",
+"sector": ""
+},
+"NJR": {
+"cn": "新泽西资源",
+"sector": ""
+},
+"NLY": {
+"cn": "Annaly资本",
+"sector": ""
+},
+"NMIH": {
+"cn": "NMI控股",
+"sector": ""
+},
+"NNN": {
+"cn": "NNN REIT",
+"sector": ""
+},
+"NOC": {
+"cn": "诺斯罗普·格鲁曼",
+"sector": ""
+},
+"NOG": {
+"cn": "北方石油",
+"sector": ""
+},
+"NOV": {
+"cn": "国民油井",
+"sector": ""
+},
+"NOVT": {
+"cn": "新思科技",
+"sector": ""
+},
+"NOW": {
+"cn": "ServiceNow",
+"sector": ""
+},
+"NPK": {
+"cn": "国家汽配",
+"sector": ""
+},
+"NPO": {
+"cn": "恩普罗",
+"sector": ""
+},
+"NRG": {
+"cn": "NRG能源",
+"sector": ""
+},
+"NSA": {
+"cn": "国家存储",
+"sector": ""
+},
+"NSC": {
+"cn": "诺福克南方",
+"sector": ""
+},
+"NSIT": {
+"cn": "Insight企业",
+"sector": ""
+},
+"NSP": {
+"cn": "Insperity",
+"sector": ""
+},
+"NSSC": {
+"cn": "NAPCO安全",
+"sector": ""
+},
+"NTAP": {
+"cn": "NetApp",
+"sector": ""
+},
+"NTCT": {
+"cn": "NetScout",
+"sector": ""
+},
+"NTNX": {
+"cn": "Nutanix",
+"sector": ""
+},
+"NTRS": {
+"cn": "北方信托",
+"sector": ""
+},
+"NUE": {
+"cn": "纽柯",
+"sector": ""
+},
+"NVR": {
+"cn": "NVR",
+"sector": ""
+},
+"NVST": {
+"cn": "Envista",
+"sector": ""
+},
+"NVT": {
+"cn": "nVent",
+"sector": ""
+},
+"NWBI": {
+"cn": "西北银行",
+"sector": ""
+},
+"NWE": {
+"cn": "西北能源",
+"sector": ""
+},
+"NWL": {
+"cn": "新威尔",
+"sector": ""
+},
+"NWN": {
+"cn": "西北天然气",
+"sector": ""
+},
+"NWS": {
+"cn": "新闻集团",
+"sector": ""
+},
+"NWSA": {
+"cn": "新闻集团",
+"sector": ""
+},
+"NX": {
+"cn": "Quanex",
+"sector": ""
+},
+"NXPI": {
+"cn": "恩智浦",
+"sector": ""
+},
+"NXRT": {
+"cn": "NexPoint住宅",
+"sector": ""
+},
+"NXST": {
+"cn": "Nexstar",
+"sector": ""
+},
+"NYT": {
+"cn": "纽约时报",
+"sector": ""
+},
+"OC": {
+"cn": "欧文斯科宁",
+"sector": ""
+},
+"OMC": {
+"cn": "宏盟集团",
+"sector": ""
+},
+"ON": {
+"cn": "安森美半导体",
+"sector": ""
+},
+"OTIS": {
+"cn": "奥的斯",
+"sector": ""
+},
+"OXY": {
+"cn": "西方石油",
+"sector": ""
+},
+"RBC": {
+"cn": "加拿大皇家银行",
+"sector": ""
+},
+"RCL": {
+"cn": "皇家加勒比邮轮",
+"sector": ""
+},
+"REGN": {
+"cn": "再生元制药",
+"sector": ""
+},
+"RF": {
+"cn": "地区金融",
+"sector": ""
+},
+"RGA": {
+"cn": "美国再保险集团",
+"sector": ""
+},
+"RH": {
+"cn": "RH",
+"sector": ""
+},
+"RHI": {
+"cn": "罗伯特哈夫",
+"sector": ""
+},
+"RJF": {
+"cn": "瑞杰金融",
+"sector": ""
+},
+"RL": {
+"cn": "拉夫劳伦",
+"sector": ""
+},
+"RMD": {
+"cn": "瑞思迈",
+"sector": ""
+},
+"ROK": {
+"cn": "罗克韦尔自动化",
+"sector": ""
+},
+"ROKU": {
+"cn": "Roku",
+"sector": ""
+},
+"ROL": {
+"cn": "罗林斯",
+"sector": ""
+},
+"ROP": {
+"cn": "罗珀技术",
+"sector": ""
+},
+"ROST": {
+"cn": "罗斯百货",
+"sector": ""
+},
+"RPM": {
+"cn": "RPM国际",
+"sector": ""
+},
+"RRC": {
+"cn": "山脉资源",
+"sector": ""
+},
+"RS": {
+"cn": "信实钢铁",
+"sector": ""
+},
+"RSG": {
+"cn": "共和废品处理",
+"sector": ""
+},
+"SABR": {
+"cn": "Sabre",
+"sector": ""
+},
+"SAIC": {
+"cn": "科学应用国际公司",
+"sector": ""
+},
+"SAM": {
+"cn": "波士顿啤酒",
+"sector": ""
+},
+"SBAC": {
+"cn": "SBA通信",
+"sector": ""
+},
+"SCHL": {
+"cn": "学乐集团",
+"sector": ""
+},
+"SCI": {
+"cn": "国际服务公司",
+"sector": ""
+},
+"SEDG": {
+"cn": "SolarEdge",
+"sector": ""
+},
+"SEIC": {
+"cn": "SEI投资",
+"sector": ""
+},
+"SF": {
+"cn": "Stifel金融",
+"sector": ""
+},
+"SFM": {
+"cn": "Sprouts Farmers Market",
+"sector": ""
+},
+"SHAK": {
+"cn": "Shake Shack",
+"sector": ""
+},
+"SIG": {
+"cn": "西格内特珠宝",
+"sector": ""
+},
+"SIRI": {
+"cn": "Sirius XM",
+"sector": ""
+},
+"SJM": {
+"cn": "JM斯马克",
+"sector": ""
+},
+"SKT": {
+"cn": "Tanger工厂直销中心",
+"sector": ""
+},
+"SLG": {
+"cn": "SL Green房地产",
+"sector": ""
+},
+"SLM": {
+"cn": "SLM公司",
+"sector": ""
+},
+"SM": {
+"cn": "SM能源",
+"sector": ""
+},
+"SMCI": {
+"cn": "超微电脑",
+"sector": ""
+},
+"SMG": {
+"cn": "Scotts Miracle-Gro",
+"sector": ""
+},
+"SMTC": {
+"cn": "先科电子",
+"sector": ""
+},
+"SNA": {
+"cn": "实耐宝",
+"sector": ""
+},
+"SNPS": {
+"cn": "新思科技",
+"sector": ""
+},
+"SNX": {
+"cn": "TD Synnex",
+"sector": ""
+},
+"SON": {
+"cn": "索诺科",
+"sector": ""
+},
+"SONO": {
+"cn": "Sonos",
+"sector": ""
+},
+"SRE": {
+"cn": "桑普拉能源",
+"sector": ""
+},
+"SRPT": {
+"cn": "Sarepta治疗",
+"sector": ""
+},
+"ST": {
+"cn": "森萨塔科技",
+"sector": ""
+},
+"STAG": {
+"cn": "STAG Industrial",
+"sector": ""
+},
+"STE": {
+"cn": "思泰瑞",
+"sector": ""
+},
+"STT": {
+"cn": "道富",
+"sector": ""
+},
+"STX": {
+"cn": "希捷科技",
+"sector": ""
+},
+"STZ": {
+"cn": "星座品牌",
+"sector": ""
+},
+"SWK": {
+"cn": "史丹利百得",
+"sector": ""
+},
+"SWKS": {
+"cn": "思佳讯",
+"sector": ""
+},
+"SYF": {
+"cn": "同步金融",
+"sector": ""
+},
+"SYK": {
+"cn": "史赛克",
+"sector": ""
+},
+"SYNA": {
+"cn": "新思国际",
+"sector": ""
+},
+"SYY": {
+"cn": "西斯科",
+"sector": ""
+},
+"T": {
+"cn": "AT&T",
+"sector": ""
+},
+"TAP": {
+"cn": "莫尔森库尔斯",
+"sector": ""
+},
+"TDC": {
+"cn": "天睿公司",
+"sector": ""
+},
+"TDG": {
+"cn": "德事隆",
+"sector": ""
+},
+"TDY": {
+"cn": "泰利达",
+"sector": ""
+},
+"TEL": {
+"cn": "泰科电子",
+"sector": ""
+},
+"TER": {
+"cn": "泰瑞达",
+"sector": ""
+},
+"TEX": {
+"cn": "特雷克斯",
+"sector": ""
+},
+"TFC": {
+"cn": "Truist金融",
+"sector": ""
+},
+"TFX": {
+"cn": "泰利福",
+"sector": ""
+},
+"TGT": {
+"cn": "塔吉特",
+"sector": ""
+},
+"THO": {
+"cn": "索尔工业",
+"sector": ""
+},
+"TKR": {
+"cn": "铁姆肯",
+"sector": ""
+},
+"TMUS": {
+"cn": "T-Mobile",
+"sector": ""
+},
+"TOL": {
+"cn": "托尔兄弟",
+"sector": ""
+},
+"TPR": {
+"cn": "Tapestry",
+"sector": ""
+},
+"TRIP": {
+"cn": "Tripadvisor",
+"sector": ""
+},
+"TRMB": {
+"cn": "天宝导航",
+"sector": ""
+},
+"TROW": {
+"cn": "普信集团",
+"sector": ""
+},
+"TRV": {
+"cn": "旅行者保险",
+"sector": ""
+},
+"TSCO": {
+"cn": "拖拉机供应公司",
+"sector": ""
+},
+"TSN": {
+"cn": "泰森食品",
+"sector": ""
+},
+"TTD": {
+"cn": "The Trade Desk",
+"sector": ""
+},
+"TTWO": {
+"cn": "Take-Two互动",
+"sector": ""
+},
+"TWLO": {
+"cn": "Twilio",
+"sector": ""
+},
+"TXT": {
+"cn": "德事隆",
+"sector": ""
+},
+"TYL": {
+"cn": "泰勒科技",
+"sector": ""
+},
+"UA": {
+"cn": "安德玛",
+"sector": ""
+},
+"UAA": {
+"cn": "安德玛",
+"sector": ""
+},
+"UAL": {
+"cn": "联合航空",
+"sector": ""
+},
+"UBER": {
+"cn": "优步",
+"sector": ""
+},
+"ULTA": {
+"cn": "Ulta Beauty",
+"sector": ""
+},
+"UPWK": {
+"cn": "Upwork",
+"sector": ""
+},
+"URI": {
+"cn": "联合租赁",
+"sector": ""
+},
+"V": {
+"cn": "Visa",
+"sector": ""
+},
+"VEEV": {
+"cn": "Veeva Systems",
+"sector": ""
+},
+"VFC": {
+"cn": "威富",
+"sector": ""
+},
+"VIAV": {
+"cn": "维亚维",
+"sector": ""
+},
+"VICI": {
+"cn": "维西",
+"sector": ""
+},
+"VLO": {
+"cn": "瓦莱罗",
+"sector": ""
+},
+"VMC": {
+"cn": "火神材料",
+"sector": ""
+},
+"VNO": {
+"cn": "沃纳多",
+"sector": ""
+},
+"VRSK": {
+"cn": "威瑞斯克",
+"sector": ""
+},
+"VRSN": {
+"cn": "威瑞信",
+"sector": ""
+},
+"VRTX": {
+"cn": "福泰制药",
+"sector": ""
+},
+"VSAT": {
+"cn": "卫讯",
+"sector": ""
+},
+"VSH": {
+"cn": "威世科技",
+"sector": ""
+},
+"VTR": {
+"cn": "威泰克",
+"sector": ""
+},
+"VTRS": {
+"cn": "迈兰",
+"sector": ""
+},
+"WAB": {
+"cn": "西屋制动",
+"sector": ""
+},
+"WAT": {
+"cn": "沃特世",
+"sector": ""
+},
+"WBD": {
+"cn": "华纳兄弟探索",
+"sector": ""
+},
+"WDAY": {
+"cn": "工作日",
+"sector": ""
+},
+"WDC": {
+"cn": "西部数据",
+"sector": ""
+},
+"WEN": {
+"cn": "温蒂",
+"sector": ""
+},
+"WGO": {
+"cn": "温尼巴格",
+"sector": ""
+},
+"WHR": {
+"cn": "惠而浦",
+"sector": ""
+},
+"WLK": {
+"cn": "西湖化学",
+"sector": ""
+},
+"WM": {
+"cn": "废物管理",
+"sector": ""
+},
+"WMB": {
+"cn": "威廉姆斯",
+"sector": ""
+},
+"WMG": {
+"cn": "华纳音乐",
+"sector": ""
+},
+"WRB": {
+"cn": "伯克希尔哈撒韦",
+"sector": ""
+},
+"WTW": {
+"cn": "韦莱韬悦",
+"sector": ""
+},
+"WU": {
+"cn": "西联汇款",
+"sector": ""
+},
+"WY": {
+"cn": "惠好",
+"sector": ""
+},
+"WYNN": {
+"cn": "永利",
+"sector": ""
+},
+"XEL": {
+"cn": "艾索伦",
+"sector": ""
+},
+"XPO": {
+"cn": "XPO物流",
+"sector": ""
+},
+"XRAY": {
+"cn": "登士柏",
+"sector": ""
+},
+"XYL": {
+"cn": "赛莱默",
+"sector": ""
+},
+"YELP": {
+"cn": "Yelp",
+"sector": ""
+},
+"YUM": {
+"cn": "百胜餐饮",
+"sector": ""
+},
+"ZBH": {
+"cn": "捷迈邦美",
+"sector": ""
+},
+"ZBRA": {
+"cn": "斑马技术",
+"sector": ""
+},
+"ZION": {
+"cn": "齐昂银行",
+"sector": ""
+},
+"ZTS": {
+"cn": "硕腾",
+"sector": ""
 }
 }
