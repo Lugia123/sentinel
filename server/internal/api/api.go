@@ -64,6 +64,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/earnings/quarters", a.earningsQuarters)
 	mux.HandleFunc("/api/earnings", a.earningsInterpret)
 	mux.HandleFunc("/api/allocate", a.allocateHandler)
+	mux.HandleFunc("/api/capital", a.capital)
 	a.authSvc.Register(mux) // 认证/管理员路由
 	// 中间件链:cors → 注入用户(解析令牌)→ 登录门(非公开路径需登录)→ mux
 	return cors(a.authSvc.Inject(gate(mux)))
@@ -243,15 +244,16 @@ func (a *API) snapshot(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "无快照,请先 POST /api/run 生成", "detail": err.Error()})
 		return
 	}
-	raw = a.mergeCustomHoldings(auth.UserID(r), raw) // 合并该用户的自定义追踪股(隔离)
+	raw = a.personalizeSnapshot(auth.UserID(r), raw) // 按用户资金池缩放 + 合并其自定义股(隔离)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(raw)
 }
 
-// mergeCustomHoldings 把当前用户的自定义追踪股(watchlist source=user)并入共享快照,
-// 各以 sleeve=custom、股数0 呈现(隔离:别的用户看不到)。档位按 user+asof 缓存。
-func (a *API) mergeCustomHoldings(uid int64, raw json.RawMessage) json.RawMessage {
+// personalizeSnapshot 把共享快照个性化为当前用户视图:
+//  1) 按该用户的资金池线性缩放 target_shares/target_value(资金池只是线性因子,不用重跑引擎)
+//  2) 并入该用户的自定义追踪股(watchlist source=user,sleeve=custom股数0,隔离)
+func (a *API) personalizeSnapshot(uid int64, raw json.RawMessage) json.RawMessage {
 	if uid == 0 {
 		return raw
 	}
@@ -261,6 +263,30 @@ func (a *API) mergeCustomHoldings(uid int64, raw json.RawMessage) json.RawMessag
 	}
 	asof, _ := snap["asof"].(string)
 	holdings, _ := snap["holdings"].([]any)
+	changed := false
+
+	// 1) 按用户资金池缩放
+	userCap := a.authSvc.GetCapital(uid)
+	snapCap, _ := snap["capital"].(float64)
+	if userCap > 0 && snapCap > 0 && userCap != snapCap {
+		scale := userCap / snapCap
+		for _, h := range holdings {
+			m, ok := h.(map[string]any)
+			if !ok {
+				continue
+			}
+			if ts, ok := m["target_shares"].(float64); ok {
+				m["target_shares"] = float64(int(ts*scale*1000+0.5)) / 1000
+			}
+			if tv, ok := m["target_value"].(float64); ok {
+				m["target_value"] = float64(int(tv*scale*100+0.5)) / 100
+			}
+		}
+		snap["capital"] = userCap
+		changed = true
+	}
+
+	// 2) 合并该用户的自定义股
 	held := map[string]bool{}
 	for _, h := range holdings {
 		if m, ok := h.(map[string]any); ok {
@@ -271,7 +297,6 @@ func (a *API) mergeCustomHoldings(uid int64, raw json.RawMessage) json.RawMessag
 	}
 	var customTk []string
 	a.gdb.Raw(`SELECT ticker FROM watchlist WHERE user_id=? AND source='user'`, uid).Scan(&customTk)
-	added := false
 	for _, tk := range customTk {
 		tk = strings.ToUpper(strings.TrimSpace(tk))
 		if tk == "" || held[tk] {
@@ -280,10 +305,11 @@ func (a *API) mergeCustomHoldings(uid int64, raw json.RawMessage) json.RawMessag
 		if h := a.focusHolding(uid, tk, asof); h != nil {
 			holdings = append(holdings, h)
 			held[tk] = true
-			added = true
+			changed = true
 		}
 	}
-	if !added {
+
+	if !changed {
 		return raw
 	}
 	snap["holdings"] = holdings
@@ -291,6 +317,27 @@ func (a *API) mergeCustomHoldings(uid int64, raw json.RawMessage) json.RawMessag
 		return out
 	}
 	return raw
+}
+
+// capital 每个用户的资金池:GET 读 / PUT 改。
+func (a *API) capital(w http.ResponseWriter, r *http.Request) {
+	uid := auth.UserID(r)
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{"capital": a.authSvc.GetCapital(uid)})
+	case http.MethodPut:
+		var b struct {
+			Capital float64 `json:"capital"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&b)
+		if err := a.authSvc.SetCapital(uid, b.Capital); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"capital": b.Capital})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "GET/PUT"})
+	}
 }
 
 // focusHolding 取用户某股在 asof 的档位(缓存;无则跑 focus 并缓存)。sleeve=custom,不占仓位。

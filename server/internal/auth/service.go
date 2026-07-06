@@ -149,6 +149,22 @@ func (s *Service) setPasswordDirect(userID int64, next string) error {
 	return s.db.Exec(`UPDATE users SET password_hash=? WHERE id=?`, string(nh), userID).Error
 }
 
+// ── 用户资金池(每人独立)──
+func (s *Service) GetCapital(uid int64) float64 {
+	var c float64
+	s.db.Raw(`SELECT capital FROM users WHERE id=?`, uid).Scan(&c)
+	if c <= 0 {
+		c = 4000
+	}
+	return c
+}
+func (s *Service) SetCapital(uid int64, capital float64) error {
+	if capital < 1 || capital > 1e12 {
+		return fmt.Errorf("资金池数值不合理")
+	}
+	return s.db.Exec(`UPDATE users SET capital=? WHERE id=?`, capital, uid).Error
+}
+
 // ── 系统设置(键值)──
 func (s *Service) GetSetting(key string) string {
 	var v string

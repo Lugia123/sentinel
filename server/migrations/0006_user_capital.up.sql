@@ -1,0 +1,2 @@
+-- 0006_user_capital — 每个用户独立资金池(默认 4000)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS capital NUMERIC(14,2) NOT NULL DEFAULT 4000;

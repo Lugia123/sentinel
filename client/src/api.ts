@@ -116,6 +116,15 @@ export async function fetchAIAllocate(tickers: string[], capital: number): Promi
   return j
 }
 
+export async function fetchCapital(): Promise<number> {
+  const r = await fetch('/api/capital')
+  return r.ok ? (await r.json()).capital || 4000 : 4000
+}
+export async function saveCapital(capital: number): Promise<void> {
+  const r = await fetch('/api/capital', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ capital }) })
+  const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || '保存资金池失败')
+}
+
 export interface UniverseItem { ticker: string; cn?: string; sector?: string }
 export async function fetchUniverse(): Promise<UniverseItem[]> {
   const r = await fetch('/api/universe')

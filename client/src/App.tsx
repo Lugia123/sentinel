@@ -136,7 +136,7 @@ export default function App() {
 
         {focusErr && <div className="card err-card"><b>⚠️ {focusErr}</b></div>}
         {detailH && <StockDetail h={detailH} meta={meta} />}
-        {!detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onCustom={viewCustom} />}
+        {!detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onCustom={viewCustom} onReload={load} />}
         {!detailH && view === 'positions' && <Positions />}
         {!detailH && view === 'trends' && <Trends meta={meta} watch={watch} />}
         {!detailH && view === 'help' && <Help />}

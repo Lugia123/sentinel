@@ -5,14 +5,26 @@ import type { TickerMeta } from '../api'
 import { pct, pct2, usd, InfoDot, GradeBadge, SleeveBadge, actionColor } from '../ui'
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
-import { fetchUniverse, type UniverseItem } from '../api'
+import { fetchUniverse, saveCapital, type UniverseItem } from '../api'
 
-export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onCustom }: {
+export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onCustom, onReload }: {
   snap: Snapshot; meta: TickerMeta; watch: Set<string>
   onToggleWatch: (t: string, on: boolean) => void; onSelect: (t: string) => void; onCustom: (t: string) => void
+  onReload: () => void
 }) {
   const chartRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(false)
+  // 资金池(每用户可编辑;改后重算缩放的快照)
+  const [capEdit, setCapEdit] = useState(false)
+  const [capVal, setCapVal] = useState(String(snap.capital))
+  const [capBusy, setCapBusy] = useState(false)
+  const saveCap = async () => {
+    const v = parseFloat(capVal)
+    if (!(v >= 1)) return
+    setCapBusy(true)
+    try { await saveCapital(v); await onReload() } catch { /* ignore */ }
+    setCapBusy(false); setCapEdit(false)
+  }
   const pickCustom = async (tk: string) => { setLoading(true); await onCustom(tk); setLoading(false) }
   // 建议股数分配(覆盖):alloc 非空时列表显示分配结果而非策略默认股数
   const [allocOpen, setAllocOpen] = useState(false)
@@ -93,7 +105,24 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
         <div className="card">
           <div className="muted">策略建议组合</div>
           <div className="big">{snap.portfolio.n_holdings} 只</div>
-          <div className="muted">总仓位 {pct(snap.portfolio.gross_exposure)} · 留现金 {pct(snap.portfolio.cash_pct)} · 资金池 {usd(snap.capital)}</div>
+          <div className="muted">总仓位 {pct(snap.portfolio.gross_exposure)} · 留现金 {pct(snap.portfolio.cash_pct)}</div>
+        </div>
+        <div className="card">
+          <div className="muted">我的资金池 <InfoDot text="你的可投金额。建议股数按它×风险平价算,改了会立刻按比例重算(每个用户独立)。" /></div>
+          {!capEdit ? (
+            <>
+              <div className="big">{usd(snap.capital)}</div>
+              <button className="ghost mini" onClick={() => { setCapVal(String(snap.capital)); setCapEdit(true) }}>✎ 编辑</button>
+            </>
+          ) : (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
+              <span className="muted">$</span>
+              <input value={capVal} onChange={(e) => setCapVal(e.target.value.replace(/[^0-9.]/g, ''))}
+                onKeyDown={(e) => e.key === 'Enter' && saveCap()} style={{ width: 100 }} autoFocus />
+              <button className="primary" onClick={saveCap} disabled={capBusy}>{capBusy ? '…' : '保存'}</button>
+              <button className="ghost mini" onClick={() => setCapEdit(false)}>取消</button>
+            </div>
+          )}
         </div>
       </div>
 
