@@ -5,7 +5,7 @@ import type { TickerMeta } from '../api'
 import { pct, pct2, usd, InfoDot, GradeBadge, SleeveBadge, actionColor } from '../ui'
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
-import { fetchUniverse, saveCapital, type UniverseItem } from '../api'
+import { fetchUniverse, saveCapital, fetchPnL, type UniverseItem } from '../api'
 
 export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onCustom, onReload }: {
   snap: Snapshot; meta: TickerMeta; watch: Set<string>
@@ -26,10 +26,17 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
     setCapBusy(false); setCapEdit(false)
   }
   const pickCustom = async (tk: string) => { setLoading(true); await onCustom(tk); setLoading(false) }
-  // 建议股数分配(覆盖):alloc 非空时列表显示分配结果而非策略默认股数
+  // 建议股数分配:纯工具弹窗(不回写列表)
   const [allocOpen, setAllocOpen] = useState(false)
-  const [alloc, setAlloc] = useState<Record<string, number> | null>(null)
-  const [allocNote, setAllocNote] = useState('')
+  // 我的持仓(和「我的持仓」页联动:把实际持仓股数显示到列表)
+  const [myPos, setMyPos] = useState<Record<string, number>>({})
+  useEffect(() => {
+    fetchPnL().then((r) => {
+      const m: Record<string, number> = {}
+      ;(r.positions || []).forEach((p: any) => { m[String(p.ticker).toUpperCase()] = p.shares })
+      setMyPos(m)
+    }).catch(() => {})
+  }, [snap])
   // 关注的置顶(保持各自组内原顺序)
   const rows = [...snap.holdings].sort((a, b) => (watch.has(b.ticker) ? 1 : 0) - (watch.has(a.ticker) ? 1 : 0))
   // 可添加的自定义股 = 全部可分析股(数据池1393只)里尚未在列表的(不再只限98大盘股)
@@ -134,14 +141,9 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
               placeholder={loading ? '分析中…' : '添加自定义股票:输代码或中文名'}
               emptyText="没有匹配的可添加股票(或已在列表中)" />
             <InfoDot text="从有数据的股票里搜索添加(输代码或中文名)。已在列表里的不再出现。选中后用同一套档位/概率规则分析它,并纳入关注。" />
+            <button className="th-btn" onClick={() => setAllocOpen(true)} title="选股票 + 方式,算各股买多少(工具,不改列表)">⚖ 分配计算</button>
           </div>
         </div>
-        {alloc && (
-          <div className="alloc-banner">
-            ⚖ 已应用<b>自定义分配</b>{allocNote ? ` · ${allocNote}` : ''}(建议股数列已按分配显示,未分配的为 0)
-            <button className="linkbtn" onClick={() => { setAlloc(null); setAllocNote('') }}>恢复策略默认</button>
-          </div>
-        )}
         <div className="tbl-scroll">
           <table>
             <thead>
@@ -151,8 +153,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                 <th>板块</th>
                 <th>选股依据 <InfoDot text="动量=趋势强涨得比大盘好；股东回报=回购分红多；双腿=两者都占。" /></th>
                 <th>现价</th>
-                <th>建议股数 <InfoDot text="按你的资金池 + 风险平价(波动低的多给点)算出的目标股数,可买碎股。点右侧「分配」可自选股票重算或用AI分配。" />
-                  <button className="th-btn" onClick={() => setAllocOpen(true)}>⚖ 分配</button></th>
+                <th>我的持仓 <InfoDot text="你在「我的持仓」里录入的实际股数(和持仓页联动)。未持有显示 —。想算该买多少,用上方「⚖ 分配计算」。" /></th>
                 <th>档位 <InfoDot text="趋势健康度 -3到+3,由7个信号(站上均线/动量/排列等)合成。+1及以上=持有,往下=逐步减仓。" /></th>
                 <th>动作 <InfoDot text="档位对应的操作。只减不追涨:走弱才逐档减仓,趋势好就拿住。" /></th>
                 <th>未来20日区间 <InfoDot text="未来20天收益的70%概率范围(15%~85%分位)。这是波动范围估计,不是涨跌预测。" /></th>
@@ -172,7 +173,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                     <td className="muted">{m?.sector || '—'}</td>
                     <td><SleeveBadge sleeve={h.sleeve} /></td>
                     <td>${h.price}</td>
-                    <td className={alloc ? (alloc[h.ticker] ? 'gold' : 'muted') : ''}>{alloc ? (alloc[h.ticker] ?? 0) : h.target_shares}</td>
+                    <td className={myPos[h.ticker] ? 'gold' : 'muted'}>{myPos[h.ticker] ? myPos[h.ticker] : '—'}</td>
                     <td><GradeBadge g={h.grade} label={h.grade_label} /></td>
                     <td style={{ color: actionColor(h.action), fontWeight: 600 }}>{h.action}</td>
                     <td className="muted">{pct2(b.band70[0])} ~ {pct2(b.band70[1])}</td>
@@ -201,7 +202,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
 
       {allocOpen && (
         <AllocateModal holdings={snap.holdings} meta={meta} capital={snap.capital} exposure={rl.exposure}
-          onApply={(m, note) => { setAlloc(m); setAllocNote(note) }} onClose={() => setAllocOpen(false)} />
+          onClose={() => setAllocOpen(false)} />
       )}
     </>
   )

@@ -9,18 +9,20 @@ const r2 = (x: number) => Math.round(x * 100) / 100
 const r3 = (x: number) => Math.round(x * 1000) / 1000
 const r4 = (x: number) => Math.round(x * 10000) / 10000
 
-// 建议股数分配弹窗:选股票 × 分配方式(均分/风险平价/AI),算出各股目标股数;
-// 未选的当 0。确认后回写主列表。
-export default function AllocateModal({ holdings, meta, capital, exposure, onApply, onClose }: {
+// 建议股数分配工具:选股票 × 分配方式(均分/风险平价/AI) → 算出各股目标股数。
+// 纯工具:不回写列表;资金池可在此录入。
+export default function AllocateModal({ holdings, meta, capital: defaultCap, exposure, onClose }: {
   holdings: Holding[]
   meta: TickerMeta
   capital: number
   exposure: number // 风险灯建议总仓位(0-1)
-  onApply: (shares: Record<string, number>, note: string) => void
   onClose: () => void
 }) {
+  const [capital, setCapital] = useState(defaultCap)
+  const [capText, setCapText] = useState(String(defaultCap))
   const [sel, setSel] = useState<Set<string>>(new Set(holdings.map((h) => h.ticker)))
   const [mode, setMode] = useState<Mode>('risk_parity')
+  const [q, setQ] = useState('')
   const [result, setResult] = useState<AllocItem[] | null>(null)
   const [cash, setCash] = useState(0)
   const [note, setNote] = useState('')
@@ -28,8 +30,17 @@ export default function AllocateModal({ holdings, meta, capital, exposure, onApp
   const [err, setErr] = useState('')
 
   const toggle = (tk: string) => setSel((s) => { const n = new Set(s); n.has(tk) ? n.delete(tk) : n.add(tk); return n })
-  const allOn = sel.size === holdings.length
-  const toggleAll = () => setSel(allOn ? new Set() : new Set(holdings.map((h) => h.ticker)))
+  const filtered = holdings.filter((h) => {
+    const s = q.trim().toLowerCase()
+    if (!s) return true
+    return h.ticker.toLowerCase().includes(s) || (meta[h.ticker]?.cn || '').includes(q.trim())
+  })
+  const allOn = filtered.length > 0 && filtered.every((h) => sel.has(h.ticker))
+  const selectAll = () => setSel((s) => { const n = new Set(s); filtered.forEach((h) => n.add(h.ticker)); return n })
+  const clearAll = () => setSel((s) => { const n = new Set(s); filtered.forEach((h) => n.delete(h.ticker)); return n })
+  const invert = () => setSel((s) => { const n = new Set(s); filtered.forEach((h) => (n.has(h.ticker) ? n.delete(h.ticker) : n.add(h.ticker))); return n })
+
+  const applyCapText = () => { const v = parseFloat(capText); if (v >= 1) setCapital(v); else setCapText(String(capital)) }
 
   const compute = async () => {
     setErr(''); setResult(null)
@@ -44,7 +55,6 @@ export default function AllocateModal({ holdings, meta, capital, exposure, onApp
       setLoading(false)
       return
     }
-    // 确定性:均分 / 风险平价(逆波动),总仓位=风险灯exposure
     let w: number[]
     if (mode === 'even') w = chosen.map(() => 1 / chosen.length)
     else {
@@ -58,47 +68,55 @@ export default function AllocateModal({ holdings, meta, capital, exposure, onApp
     setResult(items); setNote(''); setCash(r4(1 - items.reduce((a, b) => a + b.weight, 0)))
   }
 
-  const apply = () => {
-    if (!result) return
-    const m: Record<string, number> = {}
-    holdings.forEach((h) => { m[h.ticker] = 0 }) // 未选/未分配 = 0
-    result.forEach((a) => { m[a.ticker] = a.shares })
-    onApply(m, note || `${mode === 'even' ? '均分' : mode === 'risk_parity' ? '风险平价' : 'AI'}分配 · 选中${sel.size}只`)
-    onClose()
-  }
-
   return (
-    <Modal wide title={<>⚖ 为建议股数分配 <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>· 资金池 {usd(capital)} · 选中的才买,没选的当 0</span></>} onClose={onClose}>
-      <div className="alloc-modes">
-        <button className={mode === 'even' ? 'active' : ''} onClick={() => setMode('even')}>均分</button>
-        <button className={mode === 'risk_parity' ? 'active' : ''} onClick={() => setMode('risk_parity')}>风险平价(波动低多给)</button>
-        <button className={mode === 'ai' ? 'active' : ''} onClick={() => setMode('ai')}>🤖 AI 分配(做取舍)</button>
-        <button className="primary" onClick={compute} disabled={loading} style={{ marginLeft: 'auto' }}>{loading ? 'AI 分配中…（约15秒）' : '计算分配'}</button>
+    <Modal xwide title={<>⚖ 建议股数分配 <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>· 选股票 + 方式 → 算各股买多少(工具,不改列表)</span></>} onClose={onClose}>
+      <div className="alloc-topbar">
+        <div className="alloc-cap">
+          <span className="muted">资金池 $</span>
+          <input value={capText} onChange={(e) => setCapText(e.target.value.replace(/[^0-9.]/g, ''))}
+            onBlur={applyCapText} onKeyDown={(e) => e.key === 'Enter' && applyCapText()} style={{ width: 110 }} />
+        </div>
+        <div className="alloc-modes">
+          <button className={mode === 'even' ? 'active' : ''} onClick={() => setMode('even')}>均分</button>
+          <button className={mode === 'risk_parity' ? 'active' : ''} onClick={() => setMode('risk_parity')}>风险平价</button>
+          <button className={mode === 'ai' ? 'active' : ''} onClick={() => setMode('ai')}>🤖 AI 分配</button>
+        </div>
+        <button className="primary" onClick={compute} disabled={loading}>{loading ? 'AI 分配中…（约15秒）' : '计算分配'}</button>
       </div>
       {err && <div className="down" style={{ fontSize: 13, margin: '8px 0' }}>{err}</div>}
 
       <div className="alloc-grid">
         <div className="alloc-pick">
           <div className="alloc-sub">
-            选择股票 <button className="linkbtn" onClick={toggleAll}>{allOn ? '全不选' : '全选'}</button>
+            <span>选择股票 <span className="muted">({sel.size}/{holdings.length})</span></span>
+            <span className="alloc-acts">
+              <button className="linkbtn" onClick={selectAll}>全选</button>
+              <button className="linkbtn" onClick={invert}>反选</button>
+              <button className="linkbtn" onClick={clearAll}>清空</button>
+            </span>
           </div>
+          <input className="alloc-filter" placeholder="筛选:代码或中文名…" value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="alloc-list">
-            {holdings.map((h) => (
-              <label key={h.ticker} className={`alloc-item ${sel.has(h.ticker) ? 'on' : ''}`}>
-                <input type="checkbox" checked={sel.has(h.ticker)} onChange={() => toggle(h.ticker)} />
-                <b>{h.ticker}</b><span className="ss-sub">{meta[h.ticker]?.cn || ''}</span>
-                <span className="alloc-g" data-g={h.grade >= 2 ? 'up' : h.grade >= -1 ? 'mid' : 'down'}>{h.grade >= 0 ? '+' : ''}{h.grade}</span>
-              </label>
-            ))}
+            {filtered.map((h) => {
+              const on = sel.has(h.ticker)
+              return (
+                <div key={h.ticker} className={`alloc-item ${on ? 'on' : ''}`} onClick={() => toggle(h.ticker)}>
+                  <span className={`ck ${on ? 'ck-on' : ''}`}>{on ? '✓' : ''}</span>
+                  <b>{h.ticker}</b><span className="ss-sub">{meta[h.ticker]?.cn || ''}</span>
+                  <span className="alloc-g" data-g={h.grade >= 2 ? 'up' : h.grade >= -1 ? 'mid' : 'down'}>{h.grade >= 0 ? '+' : ''}{h.grade}</span>
+                </div>
+              )
+            })}
+            {filtered.length === 0 && <div className="muted" style={{ padding: 8 }}>无匹配</div>}
           </div>
         </div>
         <div className="alloc-res">
-          <div className="alloc-sub">分配结果</div>
+          <div className="alloc-sub"><span>分配结果</span></div>
           {!result && <div className="muted">选好股票和方式,点「计算分配」。<br />AI 分配会根据资金池+价+趋势+波动做取舍(不必全买)。</div>}
           {result && (
             <>
               {note && <div className="alloc-note">🤖 {note}</div>}
-              <div className="tbl-scroll" style={{ maxHeight: 300 }}>
+              <div className="tbl-scroll" style={{ maxHeight: 360 }}>
                 <table>
                   <thead><tr><th>标的</th><th>权重</th><th>股数</th><th>金额</th>{mode === 'ai' && <th>理由</th>}</tr></thead>
                   <tbody>
@@ -106,7 +124,7 @@ export default function AllocateModal({ holdings, meta, capital, exposure, onApp
                       <tr key={a.ticker}>
                         <td><b>{a.ticker}</b> <span className="ss-sub">{meta[a.ticker]?.cn || ''}</span></td>
                         <td>{(a.weight * 100).toFixed(1)}%</td>
-                        <td>{a.shares}</td>
+                        <td className="gold">{a.shares}</td>
                         <td>{usd(a.value)}</td>
                         {mode === 'ai' && <td className="muted" style={{ fontSize: 12 }}>{a.reason}</td>}
                       </tr>
@@ -114,10 +132,6 @@ export default function AllocateModal({ holdings, meta, capital, exposure, onApp
                     <tr><td className="muted">留现金</td><td className="muted">{(cash * 100).toFixed(1)}%</td><td /><td className="muted">{usd(capital * cash)}</td>{mode === 'ai' && <td />}</tr>
                   </tbody>
                 </table>
-              </div>
-              <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button className="ghost" onClick={onClose}>取消</button>
-                <button className="primary" onClick={apply}>应用到列表</button>
               </div>
             </>
           )}
