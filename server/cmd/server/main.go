@@ -5,12 +5,14 @@ package main
 
 import (
 	"log"
+	"os"
 	"net/http"
 	"path/filepath"
 
 	"sentinel/internal/ai"
 	"sentinel/internal/allocate"
 	"sentinel/internal/api"
+	"sentinel/internal/auth"
 	"sentinel/internal/blob"
 	"sentinel/internal/config"
 	"sentinel/internal/db"
@@ -48,7 +50,14 @@ func main() {
 	inv := investigate.New(aic, bs, cfg.EngineDir)
 	earn := earnings.New(rn, aic, bs)
 	al := allocate.New(aic, st)
-	a := api.New(st, rn, pf, ex, inv, earn, al, bs, gdb, cfg.DataDir, cfg.EngineDir, ver)
+	au := auth.New(gdb, env("SENTINEL_JWT_SECRET", ""))
+	adminEmail := env("SENTINEL_ADMIN_EMAIL", "admin@sentinel.local")
+	if err := au.EnsureAdmin(adminEmail, env("SENTINEL_ADMIN_PASSWORD", "admin123")); err != nil {
+		log.Printf("种子管理员失败: %v", err)
+	} else {
+		log.Printf("默认管理员: %s(密码见 SENTINEL_ADMIN_PASSWORD,默认 admin123)", adminEmail)
+	}
+	a := api.New(st, rn, pf, ex, inv, earn, al, au, bs, gdb, cfg.DataDir, cfg.EngineDir, ver)
 
 	// 后台定时任务:每日定点自动跑引擎+ingest;启动时若库中无快照则自愈补跑
 	scheduler.New(rn, st, cfg.DataDir, cfg.Capital, cfg.Schedule).Start()
@@ -67,4 +76,11 @@ func main() {
 	if err := http.ListenAndServe(":"+cfg.Port, a.Routes()); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func env(k, d string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return d
 }

@@ -16,6 +16,7 @@ import (
 	"sentinel/internal/portfolio"
 	"sentinel/internal/store"
 	"sentinel/internal/allocate"
+	"sentinel/internal/auth"
 	"sentinel/internal/version"
 )
 
@@ -27,6 +28,7 @@ type API struct {
 	invest    *investigate.Service
 	earn      *earnings.Service
 	alloc     *allocate.Service
+	authSvc   *auth.Service
 	blob      *blob.Store
 	gdb       *gorm.DB
 	dataDir   string
@@ -34,8 +36,8 @@ type API struct {
 	ver       version.Info
 }
 
-func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, inv *investigate.Service, earn *earnings.Service, al *allocate.Service, bs *blob.Store, gdb *gorm.DB, dataDir, engineDir string, ver version.Info) *API {
-	return &API{store: st, runner: rn, port: pf, explain: ex, invest: inv, earn: earn, alloc: al, blob: bs, gdb: gdb, dataDir: dataDir, engineDir: engineDir, ver: ver}
+func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, inv *investigate.Service, earn *earnings.Service, al *allocate.Service, au *auth.Service, bs *blob.Store, gdb *gorm.DB, dataDir, engineDir string, ver version.Info) *API {
+	return &API{store: st, runner: rn, port: pf, explain: ex, invest: inv, earn: earn, alloc: al, authSvc: au, blob: bs, gdb: gdb, dataDir: dataDir, engineDir: engineDir, ver: ver}
 }
 
 func (a *API) Routes() http.Handler {
@@ -45,7 +47,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/datastatus", a.dataStatus)
 	mux.HandleFunc("/api/snapshot", a.snapshot)
 	mux.HandleFunc("/api/snapshot/dates", a.dates)
-	mux.HandleFunc("/api/run", a.run)
+	mux.HandleFunc("/api/run", auth.RequireAdmin(a.run)) // 重算仅管理员
 	mux.HandleFunc("/api/positions", a.positions)
 	mux.HandleFunc("/api/explain", a.explainHandler)
 	mux.HandleFunc("/api/history", a.history)
@@ -61,7 +63,24 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/earnings/quarters", a.earningsQuarters)
 	mux.HandleFunc("/api/earnings", a.earningsInterpret)
 	mux.HandleFunc("/api/allocate", a.allocateHandler)
-	return cors(mux)
+	a.authSvc.Register(mux) // 认证/管理员路由
+	// 中间件链:cors → 注入用户(解析令牌)→ 登录门(非公开路径需登录)→ mux
+	return cors(a.authSvc.Inject(gate(mux)))
+}
+
+// gate 登录门:公开路径放行,其余需已登录。
+func gate(next http.Handler) http.Handler {
+	open := map[string]bool{
+		"/api/auth/login": true, "/api/auth/forgot": true, "/api/auth/reset": true,
+		"/api/health": true, "/api/version": true,
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions || open[r.URL.Path] || auth.UserID(r) != 0 {
+			next.ServeHTTP(w, r)
+			return
+		}
+		http.Error(w, `{"error":"请先登录"}`, http.StatusUnauthorized)
+	})
 }
 
 // earningsQuarters 列出可解读的季度。?ticker=X
