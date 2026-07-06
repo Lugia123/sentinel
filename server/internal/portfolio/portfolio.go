@@ -87,7 +87,7 @@ func (s *Store) Compute(uid int64, date string) (map[string]any, error) {
 
 // ComputePnL 纯函数:给持仓 + 价格表,算每笔盈亏 + 组合汇总(无价不计入汇总)。可测。
 func ComputePnL(ps []db.Position, prices map[string]float64) ([]PnL, map[string]float64) {
-	var rows []PnL
+	rows := []PnL{} // 非 nil,空持仓也返回 [] 而非 null(前端 .map 才不会崩)
 	var totMV, totCost float64
 	for _, p := range ps {
 		px, ok := prices[p.Ticker]

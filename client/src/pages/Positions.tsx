@@ -9,7 +9,7 @@ export default function Positions() {
   const [err, setErr] = useState('')
   const [nt, setNt] = useState(''); const [ns, setNs] = useState(''); const [nc, setNc] = useState('')
 
-  const load = () => fetchPnL().then((d) => { setData(d); setRows(d.positions.map((p) => ({ ticker: p.ticker, shares: p.shares, cost: p.cost }))) }).catch((e) => setErr(String(e.message || e)))
+  const load = () => fetchPnL().then((d) => { setData(d); setRows((d.positions || []).map((p) => ({ ticker: p.ticker, shares: p.shares, cost: p.cost }))) }).catch((e) => setErr(String(e.message || e)))
   useEffect(() => { load() }, [])
 
   const add = () => {
@@ -47,7 +47,7 @@ export default function Positions() {
             <thead><tr><th>标的</th><th>股数</th><th>成本</th><th>现价</th><th>市值</th><th>盈亏</th><th>盈亏%</th><th></th></tr></thead>
             <tbody>
               {rows.map((r, i) => {
-                const p = data?.positions.find((x) => x.ticker === r.ticker && x.shares === r.shares)
+                const p = (data?.positions || []).find((x) => x.ticker === r.ticker && x.shares === r.shares)
                 return (<tr key={i}>
                   <td><b>{r.ticker}</b></td><td>{r.shares}</td><td>${r.cost}</td>
                   <td>{p?.priced ? `$${p.price}` : <span className="muted">无价</span>}</td>

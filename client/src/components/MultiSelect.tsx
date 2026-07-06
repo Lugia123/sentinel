@@ -26,8 +26,10 @@ export default function MultiSelect({ value, options, onChange, placeholder = 'æ
   useEffect(() => {
     if (!open) return
     const onDoc = (e: MouseEvent) => { if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false) }
+    const onScroll = (e: Event) => { if (!wrap.current || !wrap.current.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
+    window.addEventListener('scroll', onScroll, true)
+    return () => { document.removeEventListener('mousedown', onDoc); window.removeEventListener('scroll', onScroll, true) }
   }, [open])
   useEffect(() => { setActive(0) }, [qy])
 

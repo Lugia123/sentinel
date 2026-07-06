@@ -24,8 +24,10 @@ export default function Select({ value, options, onChange, placeholder = '请选
   useEffect(() => {
     if (!open) return
     const onDoc = (e: MouseEvent) => { if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false) }
+    const onScroll = (e: Event) => { if (!wrap.current || !wrap.current.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
+    window.addEventListener('scroll', onScroll, true)
+    return () => { document.removeEventListener('mousedown', onDoc); window.removeEventListener('scroll', onScroll, true) }
   }, [open])
 
   // 打开时把高亮定位到当前选中项

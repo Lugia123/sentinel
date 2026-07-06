@@ -30,8 +30,11 @@ export default function SearchSelect({ options, onPick, placeholder = '搜索…
   useEffect(() => {
     if (!open) return
     const onDoc = (e: MouseEvent) => { if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false) }
+    // 页面滚动时关下拉(避免异步滚动时透出背后内容);下拉自身内部滚动不触发 window scroll
+    const onScroll = (e: Event) => { if (!wrap.current || !wrap.current.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
+    window.addEventListener('scroll', onScroll, true)
+    return () => { document.removeEventListener('mousedown', onDoc); window.removeEventListener('scroll', onScroll, true) }
   }, [open])
   useEffect(() => { setActive(0) }, [qy])
 
