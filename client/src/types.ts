@@ -15,7 +15,7 @@ export interface Indicators {
 }
 export interface Holding {
   ticker: string
-  sleeve: 'momentum' | 'SY' | 'both'
+  sleeve: 'momentum' | 'SY' | 'both' | 'custom' | 'focus'
   price: number
   base_weight: number
   target_shares: number

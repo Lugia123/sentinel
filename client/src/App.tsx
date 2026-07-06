@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchSnapshot, runEngine, fetchVersion, fetchMeta, fetchWatchlist, addWatch, removeWatch, fetchFocus, type TickerMeta } from './api'
+import { fetchSnapshot, runEngine, fetchVersion, fetchMeta, fetchWatchlist, setStar, type TickerMeta } from './api'
 import type { Snapshot, Holding } from './types'
 import Dashboard from './pages/Dashboard'
 import Positions from './pages/Positions'
@@ -33,8 +33,6 @@ export default function App() {
   const [sel, setSel] = useState<string | null>(null)
   const [meta, setMeta] = useState<TickerMeta>({})
   const [watch, setWatch] = useState<Set<string>>(new Set())
-  const [focusH, setFocusH] = useState<Holding | null>(null)
-  const [focusErr, setFocusErr] = useState('')
   const [userMenu, setUserMenu] = useState(false)
   const [pwOpen, setPwOpen] = useState(false)
   const isAdmin = me?.role === 'admin'
@@ -51,7 +49,7 @@ export default function App() {
     setErr('')
     try { setSnap(await fetchSnapshot()) } catch (e: any) { setErr(String(e.message || e)) }
   }
-  const loadWatch = async () => setWatch(new Set((await fetchWatchlist()).map((w) => w.ticker)))
+  const loadWatch = async () => setWatch(new Set((await fetchWatchlist()).filter((w) => w.starred).map((w) => w.ticker)))
   // 登录后加载 app 数据
   useEffect(() => {
     if (!me) return
@@ -60,25 +58,16 @@ export default function App() {
   }, [me])
 
   const toggleWatch = async (tk: string, on: boolean) => {
-    if (on) await addWatch(tk); else await removeWatch(tk)
+    await setStar(tk, on)
     await loadWatch()
-  }
-  const viewCustom = async (tk: string) => {
-    setFocusErr(''); setFocusH(null)
-    try {
-      const res = await fetchFocus(tk)
-      setFocusH(res.holding)
-      await addWatch(tk, 'user'); await loadWatch()
-    } catch (e: any) { setFocusErr(String(e.message || e)) }
   }
   const recompute = async () => {
     setRunning(true); setErr('')
     try { await runEngine(true); await load() } catch (e: any) { setErr('重算失败：' + String(e.message || e)) }
     setRunning(false)
   }
-  const goto = (v: View) => { setView(v); setSel(null); setFocusH(null) }
-  const selHolding = sel && snap ? snap.holdings.find((h) => h.ticker === sel) : null
-  const detailH = focusH || selHolding
+  const goto = (v: View) => { setView(v); setSel(null) }
+  const detailH = sel && snap ? snap.holdings.find((h) => h.ticker === sel) : null
 
   if (!authReady) return <div className="login-wrap"><div className="muted">加载中…</div></div>
   if (!me) return <Login onLogin={(u) => setMe(u)} />
@@ -134,9 +123,8 @@ export default function App() {
           </div>
         )}
 
-        {focusErr && <div className="card err-card"><b>⚠️ {focusErr}</b></div>}
         {detailH && <StockDetail h={detailH} meta={meta} />}
-        {!detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onCustom={viewCustom} onReload={load} />}
+        {!detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onReload={load} />}
         {!detailH && view === 'positions' && <Positions />}
         {!detailH && view === 'trends' && <Trends meta={meta} watch={watch} />}
         {!detailH && view === 'help' && <Help />}

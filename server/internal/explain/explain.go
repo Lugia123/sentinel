@@ -81,7 +81,19 @@ func (s *Service) Explain(ctx context.Context, userID int64, ticker, date string
 		}
 	}
 	if h == nil {
-		return nil, fmt.Errorf("%s 不在 %s 的持仓里", ticker, snap.Asof)
+		// 自定义追踪股不在共享快照里,回退查该用户的 focus 缓存(每日追踪档位)
+		var raw2 string
+		s.gdb.Raw(`SELECT holding::text FROM focus_cache WHERE user_id=? AND ticker=? AND asof=?`,
+			userID, strings.ToUpper(ticker), snap.Asof).Row().Scan(&raw2)
+		if raw2 != "" {
+			var ch holding
+			if json.Unmarshal([]byte(raw2), &ch) == nil {
+				h = &ch
+			}
+		}
+	}
+	if h == nil {
+		return nil, fmt.Errorf("%s 不在 %s 的持仓里(自定义股请稍等档位算完再看讲解)", ticker, snap.Asof)
 	}
 
 	if !force {

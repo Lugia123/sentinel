@@ -215,6 +215,14 @@ button.primary { background: var(--gold); color: #1a140a; }
 .th-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .linkbtn { background: none; border: 0; color: var(--gold-hi); cursor: pointer; font-size: 12px; text-decoration: underline; padding: 0 4px; }
 .alloc-banner { background: var(--gold-glow); border: 1px solid var(--gold-dim); border-radius: 8px; padding: 8px 12px; font-size: 13px; color: var(--ink-soft); margin-bottom: 10px; }
+/* 添加自定义股:已选 chip / 加载中行 / 移除✕ */
+.picked-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--gold-glow); border: 1px solid var(--gold-dim); color: var(--gold-hi); border-radius: 8px; padding: 6px 8px 6px 11px; font-size: 13px; font-weight: 600; }
+.picked-chip button { background: none; border: 0; color: var(--gold-hi); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
+.picked-chip button:hover { color: var(--down); }
+.pending-row td { color: var(--ink-mute); }
+.pending-row b { color: var(--ink-soft); }
+.rm-custom { background: none; border: 0; color: var(--ink-mute); cursor: pointer; font-size: 11px; margin-left: 4px; padding: 0 3px; border-radius: 4px; }
+.rm-custom:hover { color: var(--down); background: var(--surface-2); }
 /* 分配弹窗 */
 .alloc-modes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
 .alloc-modes button { background: var(--surface-2); color: var(--ink-soft); border: 1px solid var(--border-2); font-weight: 600; }

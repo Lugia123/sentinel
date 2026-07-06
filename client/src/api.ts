@@ -39,15 +39,22 @@ export async function fetchHistory(ticker: string, n = 120): Promise<HistPoint[]
   return (await r.json()).history || []
 }
 
-export async function fetchWatchlist(): Promise<{ ticker: string; source: string }[]> {
+export interface WatchItem { ticker: string; starred: boolean; custom: boolean }
+export async function fetchWatchlist(): Promise<WatchItem[]> {
   const r = await fetch('/api/watchlist')
   return r.ok ? (await r.json()).watchlist || [] : []
 }
-export async function addWatch(ticker: string, source = 'ai'): Promise<void> {
-  await fetch(`/api/watchlist?ticker=${ticker}&source=${source}`, { method: 'POST' })
+// 关注★(独立于自定义追踪)
+export async function setStar(ticker: string, on: boolean): Promise<void> {
+  await fetch(`/api/watchlist/star?ticker=${ticker}&on=${on ? 1 : 0}`, { method: 'POST' })
 }
-export async function removeWatch(ticker: string): Promise<void> {
-  await fetch(`/api/watchlist?ticker=${ticker}`, { method: 'DELETE' })
+// 加自定义追踪股(不关注;后端同步预热档位,约3秒)
+export async function addCustom(ticker: string): Promise<void> {
+  const r = await fetch(`/api/watchlist/custom?ticker=${ticker}`, { method: 'POST' })
+  const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || '添加失败')
+}
+export async function removeCustom(ticker: string): Promise<void> {
+  await fetch(`/api/watchlist/custom?ticker=${ticker}`, { method: 'DELETE' })
 }
 
 export interface TrendPoint { date: string; grade: number; price: number; median20: number | null }

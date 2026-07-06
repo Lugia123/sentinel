@@ -5,15 +5,27 @@ import type { TickerMeta } from '../api'
 import { pct, pct2, usd, InfoDot, GradeBadge, SleeveBadge, actionColor } from '../ui'
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
-import { fetchUniverse, saveCapital, fetchPnL, type UniverseItem } from '../api'
+import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, type UniverseItem } from '../api'
 
-export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onCustom, onReload }: {
+export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onReload }: {
   snap: Snapshot; meta: TickerMeta; watch: Set<string>
-  onToggleWatch: (t: string, on: boolean) => void; onSelect: (t: string) => void; onCustom: (t: string) => void
+  onToggleWatch: (t: string, on: boolean) => void; onSelect: (t: string) => void
   onReload: () => void
 }) {
   const chartRef = useRef<HTMLDivElement>(null)
-  const [loading, setLoading] = useState(false)
+  // 添加自定义股:两步(先选中→点添加,防误点);pending=正在算档位的(显示加载中行)
+  const [picked, setPicked] = useState('')
+  const [pending, setPending] = useState<Set<string>>(new Set())
+  const [addErr, setAddErr] = useState('')
+  const doAdd = async () => {
+    const tk = picked
+    if (!tk || pending.has(tk)) return
+    setPicked(''); setAddErr('')
+    setPending((s) => new Set(s).add(tk))
+    try { await addCustom(tk); await onReload() } catch (e: any) { setAddErr(String(e.message || e)) }
+    setPending((s) => { const n = new Set(s); n.delete(tk); return n })
+  }
+  const removeCustomStock = async (tk: string) => { await removeCustom(tk); await onReload() }
   // 资金池(每用户可编辑;改后重算缩放的快照)
   const [capEdit, setCapEdit] = useState(false)
   const [capVal, setCapVal] = useState(String(snap.capital))
@@ -25,7 +37,6 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
     try { await saveCapital(v); await onReload() } catch { /* ignore */ }
     setCapBusy(false); setCapEdit(false)
   }
-  const pickCustom = async (tk: string) => { setLoading(true); await onCustom(tk); setLoading(false) }
   // 建议股数分配:纯工具弹窗(不回写列表)
   const [allocOpen, setAllocOpen] = useState(false)
   // 我的持仓(和「我的持仓」页联动:把实际持仓股数显示到列表)
@@ -137,13 +148,16 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
           <h3 style={{ margin: 0 }}>建议持仓 <span className="muted" style={{ fontWeight: 400 }}>· 点行看详情 · ★关注置顶</span></h3>
           <div className="pos-add" style={{ margin: 0 }}>
-            <SearchSelect options={addable} onPick={pickCustom} disabled={loading}
-              placeholder={loading ? '分析中…' : '添加自定义股票:输代码或中文名'}
-              emptyText="没有匹配的可添加股票(或已在列表中)" />
-            <InfoDot text="从有数据的股票里搜索添加(输代码或中文名)。已在列表里的不再出现。选中后用同一套档位/概率规则分析它,并纳入关注。" />
+            {picked
+              ? <span className="picked-chip">{picked}{meta[picked]?.cn ? ' ' + meta[picked].cn : ''}<button onClick={() => setPicked('')} aria-label="取消">×</button></span>
+              : <SearchSelect options={addable} onPick={setPicked}
+                  placeholder="添加自定义股票:输代码或中文名" emptyText="没有匹配的可添加股票(或已在列表中)" />}
+            <button className="primary" onClick={doAdd} disabled={!picked}>添加</button>
+            <InfoDot text="先搜索选中一只(可输代码或中文名),再点「添加」纳入你的追踪列表(不会自动关注)。添加后会算它的档位/概率,列表出现「加载中」行,算完即显示。" />
             <button className="th-btn" onClick={() => setAllocOpen(true)} title="选股票 + 方式,算各股买多少(工具,不改列表)">⚖ 分配计算</button>
           </div>
         </div>
+        {addErr && <div className="down" style={{ fontSize: 13, marginBottom: 6 }}>{addErr}</div>}
         <div className="tbl-scroll">
           <table>
             <thead>
@@ -160,10 +174,18 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
               </tr>
             </thead>
             <tbody>
+              {[...pending].map((tk) => (
+                <tr key={'pending-' + tk} className="pending-row">
+                  <td></td>
+                  <td><b>{tk}</b>{meta[tk]?.cn && <span className="cn">{meta[tk].cn}</span>}</td>
+                  <td colSpan={7} className="muted">⏳ 加载中…正在算它的档位/概率(约几秒),算完自动显示</td>
+                </tr>
+              ))}
               {rows.map((h: Holding) => {
                 const b = h.prob['h20']
                 const on = watch.has(h.ticker)
                 const m = meta[h.ticker]
+                const isCustom = h.sleeve === 'custom'
                 return (
                   <tr key={h.ticker} className="clickable" onClick={() => onSelect(h.ticker)}>
                     <td onClick={(e) => { e.stopPropagation(); onToggleWatch(h.ticker, !on) }} style={{ cursor: 'pointer', textAlign: 'center' }}>
@@ -171,7 +193,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                     </td>
                     <td><b>{h.ticker}</b>{m && <span className="cn">{m.cn}</span>} <span className="go">›</span></td>
                     <td className="muted">{m?.sector || '—'}</td>
-                    <td><SleeveBadge sleeve={h.sleeve} /></td>
+                    <td><SleeveBadge sleeve={h.sleeve} />{isCustom && <button className="rm-custom" title="从追踪移除" onClick={(e) => { e.stopPropagation(); removeCustomStock(h.ticker) }}>✕</button>}</td>
                     <td>${h.price}</td>
                     <td className={myPos[h.ticker] ? 'gold' : 'muted'}>{myPos[h.ticker] ? myPos[h.ticker] : '—'}</td>
                     <td><GradeBadge g={h.grade} label={h.grade_label} /></td>

@@ -57,6 +57,8 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/universe", a.universe)
 	mux.HandleFunc("/api/strategies", a.strategies)
 	mux.HandleFunc("/api/watchlist", a.watchlist)
+	mux.HandleFunc("/api/watchlist/star", a.watchStar)
+	mux.HandleFunc("/api/watchlist/custom", a.watchCustom)
 	mux.HandleFunc("/api/focus", a.focus)
 	mux.HandleFunc("/api/trend", a.trend)
 	mux.HandleFunc("/api/trend/tickers", a.trendTickers)
@@ -296,16 +298,18 @@ func (a *API) personalizeSnapshot(uid int64, raw json.RawMessage) json.RawMessag
 		}
 	}
 	var customTk []string
-	a.gdb.Raw(`SELECT ticker FROM watchlist WHERE user_id=? AND source='user'`, uid).Scan(&customTk)
+	a.gdb.Raw(`SELECT ticker FROM watchlist WHERE user_id=? AND custom=true`, uid).Scan(&customTk)
 	for _, tk := range customTk {
 		tk = strings.ToUpper(strings.TrimSpace(tk))
 		if tk == "" || held[tk] {
 			continue
 		}
-		if h := a.focusHolding(uid, tk, asof); h != nil {
+		if h := a.cachedFocus(uid, tk, asof); h != nil { // 只用缓存,不阻塞
 			holdings = append(holdings, h)
 			held[tk] = true
 			changed = true
+		} else {
+			go a.warmFocus(uid, tk, asof) // 缓存冷(如新交易日):后台预热,本次跳过
 		}
 	}
 
@@ -340,8 +344,14 @@ func (a *API) capital(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// focusHolding 取用户某股在 asof 的档位(缓存;无则跑 focus 并缓存)。sleeve=custom,不占仓位。
-func (a *API) focusHolding(uid int64, ticker, asof string) map[string]any {
+func (a *API) latestAsof() string {
+	var asof string
+	a.gdb.Raw(`SELECT asof::text FROM snapshots ORDER BY asof DESC LIMIT 1`).Row().Scan(&asof)
+	return asof
+}
+
+// cachedFocus 只读缓存的自定义股档位(无则返回 nil,不跑 focus,不阻塞)。
+func (a *API) cachedFocus(uid int64, ticker, asof string) map[string]any {
 	var cached string
 	a.gdb.Raw(`SELECT holding::text FROM focus_cache WHERE user_id=? AND ticker=? AND asof=?`, uid, ticker, asof).Row().Scan(&cached)
 	if cached != "" {
@@ -349,6 +359,15 @@ func (a *API) focusHolding(uid int64, ticker, asof string) map[string]any {
 		if json.Unmarshal([]byte(cached), &h) == nil {
 			return h
 		}
+	}
+	return nil
+}
+
+// warmFocus 计算并缓存某用户某股在 asof 的档位(阻塞~3秒;加自定义股/后台预热用)。
+// sleeve=custom,不占仓位。返回 holding(失败返回 nil)。
+func (a *API) warmFocus(uid int64, ticker, asof string) map[string]any {
+	if h := a.cachedFocus(uid, ticker, asof); h != nil {
+		return h
 	}
 	out, err := a.runner.RunFocus(ticker, asof, "4000")
 	if err != nil {
