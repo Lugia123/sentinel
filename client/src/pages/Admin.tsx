@@ -1,20 +1,28 @@
 import { useEffect, useState } from 'react'
 import {
-  adminListUsers, adminCreateUser, adminGetSMTP, adminSaveSMTP, adminTestEmail,
+  adminListUsers, adminCreateUser, adminDeleteUser, fetchMe, adminGetSMTP, adminSaveSMTP, adminTestEmail,
   type AuthUser, type SMTPConfig,
 } from '../auth'
 
 // 系统管理(仅管理员):用户管理 + 系统邮箱(SMTP)。参考 Tinia 的系统管理。
 export default function Admin() {
   const [users, setUsers] = useState<AuthUser[]>([])
+  const [meId, setMeId] = useState(0)
   const [nEmail, setNEmail] = useState(''); const [nPw, setNPw] = useState(''); const [nName, setNName] = useState(''); const [nRole, setNRole] = useState('user')
   const [uMsg, setUMsg] = useState(''); const [uErr, setUErr] = useState('')
   const load = () => adminListUsers().then(setUsers)
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); fetchMe().then((m) => setMeId(m?.id || 0)) }, [])
 
   const createUser = async () => {
     setUErr(''); setUMsg('')
     try { await adminCreateUser(nEmail, nPw, nRole, nName); setUMsg(`已开设用户 ${nEmail}`); setNEmail(''); setNPw(''); setNName(''); load() }
+    catch (e: any) { setUErr(String(e.message || e)) }
+  }
+
+  const delUser = async (u: AuthUser) => {
+    if (!confirm(`删除用户「${u.email}」?\n仅删除登录账号,其持仓/关注/AI讲解等数据会保留。`)) return
+    setUErr(''); setUMsg('')
+    try { await adminDeleteUser(u.id); setUMsg(`已删除用户 ${u.email}`); load() }
     catch (e: any) { setUErr(String(e.message || e)) }
   }
 
@@ -42,13 +50,16 @@ export default function Admin() {
         <h3>用户管理</h3>
         <div className="tbl-scroll">
           <table>
-            <thead><tr><th>ID</th><th>邮箱(账号)</th><th>角色</th><th>名称</th><th>创建时间</th></tr></thead>
+            <thead><tr><th>ID</th><th>邮箱(账号)</th><th>角色</th><th>名称</th><th>创建时间</th><th>操作</th></tr></thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u.id}>
                   <td>{u.id}</td><td><b>{u.email}</b></td>
                   <td><span className={u.role === 'admin' ? 'gold' : 'muted'}>{u.role === 'admin' ? '管理员' : '普通用户'}</span></td>
                   <td>{u.name || '—'}</td><td className="muted">{(u.created_at || '').slice(0, 10)}</td>
+                  <td>{u.id === meId
+                    ? <span className="muted" style={{ fontSize: 12 }}>当前账号</span>
+                    : <button className="link-danger" onClick={() => delUser(u)}>删除登录</button>}</td>
                 </tr>
               ))}
             </tbody>

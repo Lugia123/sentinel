@@ -64,6 +64,11 @@ export async function adminListUsers(): Promise<AuthUser[]> {
 export async function adminCreateUser(email: string, password: string, role: string, name: string) {
   return post('/api/admin/users', { email, password, role, name })
 }
+// 删除用户登录账号(保留其关联数据)
+export async function adminDeleteUser(id: number) {
+  const r = await fetch(`/api/admin/users?id=${id}`, { method: 'DELETE' })
+  const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || '删除失败')
+}
 export interface SMTPConfig { host: string; port: string; user: string; password: string; sender_name: string; use_tls: boolean }
 export async function adminGetSMTP(): Promise<{ smtp: SMTPConfig; enabled: boolean }> {
   const r = await fetch('/api/admin/settings/smtp')

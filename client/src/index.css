@@ -211,6 +211,8 @@ select.qsel { background: var(--surface-2); border: 1px solid var(--border); col
 .modal-x:hover { color: var(--down); }
 .modal-body { padding: 16px 18px; }
 button.primary { background: var(--gold); color: #1a140a; }
+.link-danger { background: none; border: 1px solid var(--down); color: var(--down); border-radius: 6px; padding: 2px 10px; font-size: 12px; cursor: pointer; transition: background .12s; }
+.link-danger:hover { background: rgba(207,111,93,.14); }
 .th-btn { background: var(--gold); color: #1a140a; border: 0; border-radius: 999px; padding: 3px 12px; font-size: 12px; font-weight: 700; margin-left: 8px; cursor: pointer; box-shadow: 0 1px 4px rgba(200,162,83,.35); transition: filter .12s, transform .12s; }
 .th-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .linkbtn { background: none; border: 0; color: var(--gold-hi); cursor: pointer; font-size: 12px; text-decoration: underline; padding: 0 4px; }

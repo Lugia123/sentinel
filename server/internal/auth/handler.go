@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 )
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -105,6 +106,13 @@ func (s *Service) hUsers(w http.ResponseWriter, r *http.Request) {
 		var b struct{ Email, Password, Role, Name string }
 		_ = json.NewDecoder(r.Body).Decode(&b)
 		if err := s.CreateUser(b.Email, b.Password, b.Role, b.Name); err != nil {
+			fail(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	case http.MethodDelete:
+		id, _ := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+		if err := s.DeleteUser(id, UserID(r)); err != nil {
 			fail(w, http.StatusBadRequest, err.Error())
 			return
 		}

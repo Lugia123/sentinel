@@ -127,6 +127,28 @@ func (s *Service) ListUsers() ([]User, error) {
 	return us, err
 }
 
+// DeleteUser 删除用户【登录账号】(仅 users 行),不动其关联数据
+// (positions/watchlist/explanations/focus_cache 按 user_id 保留,无外键不会连带删)。
+// 保护:不能删自己,不能删最后一个管理员。
+func (s *Service) DeleteUser(id, actingID int64) error {
+	if id == actingID {
+		return fmt.Errorf("不能删除当前登录的自己")
+	}
+	var role string
+	s.db.Raw(`SELECT role FROM users WHERE id=?`, id).Scan(&role)
+	if role == "" {
+		return fmt.Errorf("用户不存在")
+	}
+	if role == "admin" {
+		var n int64
+		s.db.Raw(`SELECT COUNT(*) FROM users WHERE role='admin'`).Scan(&n)
+		if n <= 1 {
+			return fmt.Errorf("不能删除最后一个管理员")
+		}
+	}
+	return s.db.Exec(`DELETE FROM users WHERE id=?`, id).Error
+}
+
 func (s *Service) ChangePassword(userID int64, cur, next string) error {
 	var hash string
 	s.db.Raw(`SELECT password_hash FROM users WHERE id=?`, userID).Scan(&hash)

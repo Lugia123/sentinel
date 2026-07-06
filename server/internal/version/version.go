@@ -10,14 +10,30 @@ import (
 
 var branchRe = regexp.MustCompile(`^feature/(v\d+\.\d+)`)
 
+// Injected 由编译时 ldflags 注入(生产二进制无 .git 时用):
+//   go build -ldflags "-X sentinel/internal/version.Injected=v1.6.42|abc1234|feature/v1.6"
+// 格式:version|commit|branch(| 分隔)。开发态本地有 git,留空即走 git 计算。
+var Injected string
+
 type Info struct {
 	Version string `json:"version"`
 	Branch  string `json:"branch"`
 	Commit  string `json:"commit"`
 }
 
-// Compute 在指定 repo 目录(server 上级=项目根)算版本。
+// Compute 在指定 repo 目录(server 上级=项目根)算版本;有 ldflags 注入则优先用注入值。
 func Compute(repoDir string) Info {
+	if Injected != "" {
+		p := strings.Split(Injected, "|")
+		info := Info{Version: p[0]}
+		if len(p) > 1 {
+			info.Commit = p[1]
+		}
+		if len(p) > 2 {
+			info.Branch = p[2]
+		}
+		return info
+	}
 	branch := git(repoDir, "rev-parse", "--abbrev-ref", "HEAD")
 	commit := git(repoDir, "rev-parse", "--short=7", "HEAD")
 	count := git(repoDir, "rev-list", "HEAD", "--count")
