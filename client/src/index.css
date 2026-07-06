@@ -164,6 +164,8 @@ select.qsel { background: var(--surface-2); border: 1px solid var(--border); col
 /* 走势页控制条 */
 .trend-ctl { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
 .ctl-lbl { font-size: 12px; color: var(--ink-mute); margin-bottom: 6px; }
+.trend-panel { margin-top: 10px; }
+.trend-panel + .trend-panel { border-top: 1px solid var(--border); padding-top: 6px; }
 /* 数据来源引用(强制标注)*/
 .src-cite { margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 12px; color: var(--ink-mute); line-height: 1.6; }
 .src-cite a { color: var(--gold-hi); }
