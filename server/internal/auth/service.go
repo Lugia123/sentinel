@@ -171,20 +171,26 @@ func (s *Service) setPasswordDirect(userID int64, next string) error {
 	return s.db.Exec(`UPDATE users SET password_hash=? WHERE id=?`, string(nh), userID).Error
 }
 
-// ── 用户资金池(每人独立)──
-func (s *Service) GetCapital(uid int64) float64 {
+// ── 用户资金池(用户×市场双隔离:美股$与A股¥各一个)──
+func (s *Service) GetCapital(uid int64, market string) float64 {
 	var c float64
-	s.db.Raw(`SELECT capital FROM users WHERE id=?`, uid).Scan(&c)
+	s.db.Raw(`SELECT capital FROM user_capital WHERE user_id=? AND market=?`, uid, market).Scan(&c)
 	if c <= 0 {
-		c = 4000
+		if market == "cn" {
+			c = 100000 // A股默认 ¥10万(与 cn 快照口径一致)
+		} else {
+			c = 4000 // 美股默认 $4000
+		}
 	}
 	return c
 }
-func (s *Service) SetCapital(uid int64, capital float64) error {
+func (s *Service) SetCapital(uid int64, market string, capital float64) error {
 	if capital < 1 || capital > 1e12 {
 		return fmt.Errorf("资金池数值不合理")
 	}
-	return s.db.Exec(`UPDATE users SET capital=? WHERE id=?`, capital, uid).Error
+	return s.db.Exec(`INSERT INTO user_capital(user_id,market,capital,updated_at) VALUES(?,?,?,now())
+		ON CONFLICT (user_id,market) DO UPDATE SET capital=EXCLUDED.capital, updated_at=now()`,
+		uid, market, capital).Error
 }
 
 // ── 系统设置(键值)──

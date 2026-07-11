@@ -274,7 +274,7 @@ func (a *API) personalizeSnapshot(uid int64, market string, raw json.RawMessage)
 	changed := false
 
 	// 1) 按用户资金池缩放
-	userCap := a.authSvc.GetCapital(uid)
+	userCap := a.authSvc.GetCapital(uid, market)
 	snapCap, _ := snap["capital"].(float64)
 	if userCap > 0 && snapCap > 0 && userCap != snapCap {
 		scale := userCap / snapCap
@@ -334,13 +334,13 @@ func (a *API) capital(w http.ResponseWriter, r *http.Request) {
 	uid := auth.UserID(r)
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, map[string]any{"capital": a.authSvc.GetCapital(uid)})
+		writeJSON(w, http.StatusOK, map[string]any{"capital": a.authSvc.GetCapital(uid, mktParam(r))})
 	case http.MethodPut:
 		var b struct {
 			Capital float64 `json:"capital"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&b)
-		if err := a.authSvc.SetCapital(uid, b.Capital); err != nil {
+		if err := a.authSvc.SetCapital(uid, mktParam(r), b.Capital); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
