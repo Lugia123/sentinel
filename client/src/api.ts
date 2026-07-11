@@ -1,8 +1,22 @@
 import type { Snapshot, Position, PnLResult, Version, HistPoint, Explanation } from './types'
 
+// ── v2.0 双市场:全局当前市场(切换器设置,各 fetch 自动带 market)──
+export type Market = 'us' | 'cn'
+let currentMarket: Market = ((typeof localStorage !== 'undefined' && localStorage.getItem('sentinel_market')) as Market) || 'us'
+export function getMarket(): Market { return currentMarket }
+export function setMarket(m: Market) {
+  currentMarket = m
+  if (typeof localStorage !== 'undefined') localStorage.setItem('sentinel_market', m)
+}
+// mq: 往已有 query 串(可空)追加 market=cn(us 省略,向后兼容)
+function mq(existing = ''): string {
+  if (currentMarket !== 'cn') return existing
+  return existing ? `${existing}&market=cn` : '?market=cn'
+}
+
 export async function fetchSnapshot(date?: string): Promise<Snapshot> {
   const q = date && date !== 'latest' ? `?date=${date}` : ''
-  const r = await fetch(`/api/snapshot${q}`)
+  const r = await fetch(`/api/snapshot${mq(q)}`)
   if (!r.ok) throw new Error((await r.json()).error || '读取快照失败')
   return r.json()
 }
@@ -13,7 +27,7 @@ export async function fetchVersion(): Promise<Version> {
 }
 
 export async function runEngine(withSY = true): Promise<string> {
-  const r = await fetch(`/api/run?sy=${withSY ? 1 : 0}`, { method: 'POST' })
+  const r = await fetch(`/api/run${mq(`?sy=${withSY ? 1 : 0}`)}`, { method: 'POST' })
   const j = await r.json()
   if (!r.ok) throw new Error(j.error || '引擎运行失败')
   return j.log || 'done'
@@ -21,7 +35,7 @@ export async function runEngine(withSY = true): Promise<string> {
 
 export async function fetchPnL(date?: string): Promise<PnLResult> {
   const q = date && date !== 'latest' ? `?date=${date}` : ''
-  const r = await fetch(`/api/positions${q}`)
+  const r = await fetch(`/api/positions${mq(q)}`)
   if (!r.ok) throw new Error((await r.json()).error || '读取持仓失败')
   return r.json()
 }
@@ -34,7 +48,7 @@ export async function savePositions(ps: Position[]): Promise<void> {
 }
 
 export async function fetchHistory(ticker: string, n = 120): Promise<HistPoint[]> {
-  const r = await fetch(`/api/history?ticker=${ticker}&n=${n}`)
+  const r = await fetch(`/api/history?ticker=${ticker}&n=${n}${currentMarket==='cn'?'&market=cn':''}`)
   if (!r.ok) return []
   return (await r.json()).history || []
 }
@@ -59,7 +73,7 @@ export async function removeCustom(ticker: string): Promise<void> {
 
 export interface TrendPoint { date: string; grade: number; price: number; median20: number | null }
 export async function fetchTrend(ticker: string, from?: string, to?: string): Promise<TrendPoint[]> {
-  const qs = new URLSearchParams({ ticker }); if (from) qs.set('from', from); if (to) qs.set('to', to)
+  const qs = new URLSearchParams({ ticker }); if (from) qs.set('from', from); if (to) qs.set('to', to); if (currentMarket==='cn') qs.set('market','cn')
   const r = await fetch(`/api/trend?${qs}`)
   return r.ok ? (await r.json()).points || [] : []
 }
@@ -71,7 +85,7 @@ export interface RichTrendPoint {
 }
 export async function fetchTrendRich(tickers: string[]): Promise<Record<string, RichTrendPoint[]>> {
   if (!tickers.length) return {}
-  const qs = new URLSearchParams({ tickers: tickers.join(',') })
+  const qs = new URLSearchParams({ tickers: tickers.join(',') }); if (currentMarket==='cn') qs.set('market','cn')
   const r = await fetch(`/api/trend?${qs}`)
   return r.ok ? (await r.json()).series || {} : {}
 }
@@ -83,7 +97,7 @@ export async function fetchTrendTickers(): Promise<{ ticker: string; n: number }
 
 import type { Holding } from './types'
 export async function fetchFocus(ticker: string): Promise<{ asof: string; ticker: string; holding: Holding }> {
-  const r = await fetch(`/api/focus?ticker=${ticker.toUpperCase()}`)
+  const r = await fetch(`/api/focus?ticker=${ticker.toUpperCase()}${currentMarket==='cn'?'&market=cn':''}`)
   const j = await r.json()
   if (!r.ok || j.error) throw new Error(j.error || '分析失败')
   return j
@@ -135,7 +149,7 @@ export async function saveCapital(capital: number): Promise<void> {
 
 export interface UniverseItem { ticker: string; cn?: string; sector?: string }
 export async function fetchUniverse(): Promise<UniverseItem[]> {
-  const r = await fetch('/api/universe')
+  const r = await fetch(`/api/universe${mq()}`)
   return r.ok ? (await r.json()).universe || [] : []
 }
 

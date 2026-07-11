@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchSnapshot, runEngine, fetchVersion, fetchMeta, fetchWatchlist, setStar, type TickerMeta } from './api'
+import { fetchSnapshot, runEngine, fetchVersion, fetchMeta, fetchWatchlist, setStar, getMarket, setMarket, type Market, type TickerMeta } from './api'
 import type { Snapshot, Holding } from './types'
 import Dashboard from './pages/Dashboard'
 import Positions from './pages/Positions'
@@ -35,7 +35,16 @@ export default function App() {
   const [watch, setWatch] = useState<Set<string>>(new Set())
   const [userMenu, setUserMenu] = useState(false)
   const [pwOpen, setPwOpen] = useState(false)
+  const [market, setMarketState] = useState<Market>(getMarket())
   const isAdmin = me?.role === 'admin'
+
+  // 切换市场:设全局市场 → 重载快照/关注(元数据 us 用中文名映射,cn 用快照内 name)
+  const switchMarket = async (m: Market) => {
+    if (m === market) return
+    setMarket(m); setMarketState(m); setSel(null); setSnap(null); setErr('')
+    try { setSnap(await fetchSnapshot()) } catch (e: any) { setErr(String(e.message || e)) }
+    loadWatch()
+  }
 
   // 启动:查当前登录用户
   useEffect(() => {
@@ -79,6 +88,10 @@ export default function App() {
       <div className="topbar">
         <div className="topbar-in">
           <div className="brand" onClick={() => goto('signals')}>SENTINEL<span className="ver">{ver}</span></div>
+          <div className="market-switch" title="切换市场:美股 / A股">
+            <button className={market === 'us' ? 'ms-on' : ''} onClick={() => switchMarket('us')}>🇺🇸 美股</button>
+            <button className={market === 'cn' ? 'ms-on' : ''} onClick={() => switchMarket('cn')}>🇨🇳 A股</button>
+          </div>
           <nav className="nav">
             {nav.map((n) => (
               <a key={n.key} className={!detailH && view === n.key ? 'active' : ''} onClick={() => goto(n.key)}>{n.label}</a>
@@ -107,7 +120,7 @@ export default function App() {
 
       <div className="wrap">
         <div className="sub" style={{ marginBottom: 14 }}>
-          {snap ? `数据截至 ${snap.asof} 收盘` : '美股策略决策支持'} · 研究工具，非投资建议
+          {market === 'cn' ? 'A股' : '美股'}{snap ? ` · 数据截至 ${snap.asof} 收盘` : '策略决策支持'} · 研究工具，非投资建议
         </div>
 
         {err && (

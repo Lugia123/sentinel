@@ -15,7 +15,8 @@ export interface Indicators {
 }
 export interface Holding {
   ticker: string
-  sleeve: 'momentum' | 'SY' | 'both' | 'custom' | 'focus'
+  name?: string  // A股中文名(cn 快照自带;us 走 meta 映射)
+  sleeve: 'momentum' | 'SY' | 'both' | 'custom' | 'focus' | 'smallcap' | 'event'
   price: number
   base_weight: number
   target_shares: number
@@ -36,6 +37,7 @@ export interface RiskLight {
   note: string
 }
 export interface Snapshot {
+  market?: 'us' | 'cn'  // v2.0 双市场(缺=us)
   asof: string
   generated_at: string
   capital: number

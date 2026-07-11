@@ -28,6 +28,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
   const removeCustomStock = async (tk: string) => { await removeCustom(tk); await onReload() }
   // 资金池(每用户可编辑;改后重算缩放的快照)
   const [capEdit, setCapEdit] = useState(false)
+  const CUR = snap.market === 'cn' ? '¥' : '$'
   const [capVal, setCapVal] = useState(String(snap.capital))
   const [capBusy, setCapBusy] = useState(false)
   const saveCap = async () => {
@@ -191,10 +192,10 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                     <td onClick={(e) => { e.stopPropagation(); onToggleWatch(h.ticker, !on) }} style={{ cursor: 'pointer', textAlign: 'center' }}>
                       <span className={on ? 'star on' : 'star'}>{on ? '★' : '☆'}</span>
                     </td>
-                    <td><b>{h.ticker}</b>{m && <span className="cn">{m.cn}</span>} <span className="go">›</span></td>
+                    <td><b>{h.ticker}</b>{(h.name || m?.cn) && <span className="cn">{h.name || m?.cn}</span>} <span className="go">›</span></td>
                     <td className="muted">{m?.sector || '—'}</td>
                     <td><SleeveBadge sleeve={h.sleeve} />{isCustom && <button className="rm-custom" title="从追踪移除" onClick={(e) => { e.stopPropagation(); removeCustomStock(h.ticker) }}>✕</button>}</td>
-                    <td>${h.price}</td>
+                    <td>{CUR}{h.price}</td>
                     <td className={myPos[h.ticker] ? 'gold' : 'muted'}>{myPos[h.ticker] ? myPos[h.ticker] : '—'}</td>
                     <td><GradeBadge g={h.grade} label={h.grade_label} /></td>
                     <td style={{ color: actionColor(h.action), fontWeight: 600 }}>{h.action}</td>

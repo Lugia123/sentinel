@@ -287,3 +287,9 @@ button.primary { background: var(--gold); color: #1a140a; }
 
 @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .card { animation: fadeUp .3s ease-out both; }
+
+/* v2.0 双市场切换器 */
+.market-switch { display: inline-flex; gap: 2px; margin-left: 14px; background: rgba(255,255,255,.05); border-radius: 8px; padding: 2px; }
+.market-switch button { background: transparent; border: none; color: var(--ink-mute, #8a93a6); font-size: 13px; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: all .15s; }
+.market-switch button:hover { color: var(--ink, #e8ecf3); }
+.market-switch button.ms-on { background: var(--gold, #c9a227); color: #1a1408; font-weight: 600; }
