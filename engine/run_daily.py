@@ -226,11 +226,25 @@ def write_snapshot(snap, pd_out, asof, also_latest=True):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--market", default="us", choices=["us", "cn"], help="市场:us(美股)/cn(A股)")
     ap.add_argument("--asof", default="latest")
     ap.add_argument("--capital", type=float, default=4000.0)
     ap.add_argument("--no-sy", action="store_true", help="跳过SY腿(快速demo)")
     ap.add_argument("--track", default="", help="自定义追踪股(逗号分隔),每天也算档位/概率")
     args = ap.parse_args()
+    # ── v2.0 双市场:A股走 cn_engine(复用 safna_jr_a 逻辑),美股走原路径 ──
+    if args.market == "cn":
+        import cn_engine
+        cap = args.capital if args.capital != 4000.0 else 100000.0   # A股默认10万
+        snap, _ = cn_engine.compute_snapshot_cn(args.asof, cap)
+        os.makedirs(OUT_DIR, exist_ok=True)
+        for fp in (os.path.join(OUT_DIR, f"snapshot_cn_{snap['asof']}.json"),
+                   os.path.join(OUT_DIR, "snapshot_cn_latest.json")):
+            json.dump(snap, open(fp, "w"), ensure_ascii=False, indent=2)
+        rl = snap["risk_light"]
+        print(f"[cn] 快照写入 snapshot_cn_{snap['asof']}.json | 持仓{len(snap['holdings'])} "
+              f"风险灯{rl['level']} exposure{rl['exposure']} | {rl['note']}", flush=True)
+        return
     print("装载数据 ...", flush=True)
     uni, spy, master, fp = load_all(with_sy=not args.no_sy)
     asof = resolve_asof(uni, args.asof)

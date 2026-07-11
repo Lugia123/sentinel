@@ -28,3 +28,8 @@ engine/data/
 # 构建产物 / 机器相关软链
 client/tsconfig.tsbuildinfo
 engine/data
+
+# v2.0 双市场:A股数据软链(机器相关,指向 safna_jr_a)
+engine/data_cn
+engine/data_cn_alt
+engine/data_cn_meta
