@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import { fetchHistory, fetchExplain, fetchInvestigate, fetchBlobHTML, fetchEarningsQuarters, fetchEarningsInterpret, type EarnQuarter } from '../api'
 import type { Holding, HistPoint } from '../types'
-import type { TickerMeta } from '../api'
+import type { TickerMeta, Market } from '../api'
 import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot } from '../ui'
 import Select, { type SelectOption } from '../components/Select'
 import EarningsChart from '../components/EarningsChart'
 import ProbBandChart from '../components/ProbBandChart'
 
-export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta }) {
+export default function StockDetail({ h, meta, market = 'us' }: { h: Holding; meta: TickerMeta; market?: Market }) {
   const m = meta[h.ticker]
+  const isCN = market === 'cn'
+  const cur = isCN ? '¥' : '$'
   const [tab, setTab] = useState<'overview' | 'bg' | 'earnings'>('overview')
   // 背景调查:取回 HTML 片段注入页面(不用 iframe,随整页滚)
   const [bgHtml, setBgHtml] = useState(''); const [bgLoading, setBgLoading] = useState(false); const [bgErr, setBgErr] = useState('')
@@ -64,7 +66,7 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
       tooltip: { trigger: 'axis', backgroundColor: '#1f1913', borderColor: '#2c2418', textStyle: { color: '#f1e9da' } },
       xAxis: { type: 'category', data: hist.map((p) => p.date?.slice(5)), axisLabel: { color: '#b0a488' }, axisLine: { lineStyle: { color: '#2c2418' } } },
       yAxis: { type: 'value', scale: true, axisLabel: { color: '#b0a488' }, splitLine: { lineStyle: { color: '#2c2418' } } },
-      series: [mk('close', '收盘', '#f1e9da', 2), mk('sma20', '20日线', '#6fae86'), mk('sma50', '50日线', '#c8a253'), mk('sma200', '200日线', '#cf6f5d')],
+      series: [mk('close', '收盘', '#f1e9da', 2), mk('sma20', '20日线', '#6fae86'), mk('sma_mid', isCN ? '60日线' : '50日线', '#c8a253'), mk('sma200', '200日线', '#cf6f5d')],
     })
     const onR = () => chart.resize(); window.addEventListener('resize', onR)
     return () => { window.removeEventListener('resize', onR); chart.dispose() }
@@ -76,8 +78,8 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
       <div className="card detail-head">
         <div>
           <span className="dh-tk">{h.ticker}</span>
-          {m && <span className="cn" style={{ fontSize: 15 }}>{m.cn} · {m.sector}</span>} <SleeveBadge sleeve={h.sleeve} />
-          <span className="dh-px">${h.price}</span>
+          {(h.name || m?.cn) && <span className="cn" style={{ fontSize: 15 }}>{h.name || m?.cn}{m?.sector ? ` · ${m.sector}` : ''}</span>} <SleeveBadge sleeve={h.sleeve} />
+          <span className="dh-px">{cur}{h.price}</span>
         </div>
         <div>
           <GradeBadge g={h.grade} label={h.grade_label} /> <span style={{ color: actionColor(h.action), fontWeight: 700, marginLeft: 8 }}>{h.action}</span>
@@ -101,7 +103,9 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
           {bgHtml && !bgLoading && (
             <div className="src-cite">
               📚 信息来源:AI(DeepSeek)依训练时掌握的公开资料综合生成,<b>非实时联网检索</b>,具体数字可能过时。
-              请以 <a href={`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${h.ticker}&type=10-K`} target="_blank" rel="noreferrer">SEC EDGAR 年报</a>、公司投资者关系官网为准核实。
+              {isCN
+                ? <>请以 <a href={`http://www.cninfo.com.cn/new/fulltextSearch?notautosubmit=&keyWord=${h.ticker.replace(/^\w+\./, '')}`} target="_blank" rel="noreferrer">巨潮资讯网公告/年报</a>、交易所披露平台为准核实。</>
+                : <>请以 <a href={`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${h.ticker}&type=10-K`} target="_blank" rel="noreferrer">SEC EDGAR 年报</a>、公司投资者关系官网为准核实。</>}
             </div>
           )}
         </div>
@@ -109,7 +113,7 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
 
       {tab === 'earnings' && (
         <div className="card ai-card">
-          <h3>📊 财报解读 <span className="muted" style={{ fontWeight: 400 }}>· SEC 官方数据 + AI 解读</span></h3>
+          <h3>📊 财报解读 <span className="muted" style={{ fontWeight: 400 }}>· {isCN ? '公开财报数据(单季差分)' : 'SEC 官方数据'} + AI 解读</span></h3>
           {earnErr && <div className="down" style={{ fontSize: 13, marginBottom: 8 }}>{earnErr}</div>}
           <div className="pos-add">
             {quarters.length === 0
@@ -125,8 +129,8 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
           </div>
           {quarters.length > 0 && (
             <div style={{ marginTop: 10 }}>
-              <div className="muted" style={{ marginBottom: 2 }}>营收 / 净利润 / 净利率(近8季 · SEC 官方数据)</div>
-              <EarningsChart quarters={quarters} />
+              <div className="muted" style={{ marginBottom: 2 }}>营收 / 净利润 / 净利率(近8季 · {isCN ? '新浪财经利润表,已差分成单季' : 'SEC 官方数据'})</div>
+              <EarningsChart quarters={quarters} unit={isCN ? '亿元' : '亿美元'} />
             </div>
           )}
           {earnLoading && <div className="muted">正在解读财报…（首次约 30 秒）</div>}
@@ -134,8 +138,10 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
           {!earnHtml && !earnLoading && quarters.length > 0 && <div className="muted">切换季度自动解读(解读过的会秒回)。</div>}
           {quarters.length > 0 && (
             <div className="src-cite">
-              📚 数据来源:<a href={`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${h.ticker}&type=10-Q`} target="_blank" rel="noreferrer">SEC EDGAR</a>
-              {' '}官方季度财报(us-gaap XBRL 概念:Revenues / NetIncomeLoss / OperatingIncomeLoss / GrossProfit / EPS)。图表为原始数据确定性绘制,非 AI 生成;解读文字为 AI 基于同一数据生成。
+              {isCN
+                ? <>📚 数据来源:新浪财经利润表(累计值已差分为单季)。请以 <a href={`http://www.cninfo.com.cn/new/fulltextSearch?notautosubmit=&keyWord=${h.ticker.replace(/^\w+\./, '')}`} target="_blank" rel="noreferrer">巨潮资讯网</a> 官方公告为准。图表为原始数据确定性绘制,非 AI 生成;解读文字为 AI 基于同一数据生成。</>
+                : <>📚 数据来源:<a href={`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=${h.ticker}&type=10-Q`} target="_blank" rel="noreferrer">SEC EDGAR</a>
+              {' '}官方季度财报(us-gaap XBRL 概念:Revenues / NetIncomeLoss / OperatingIncomeLoss / GrossProfit / EPS)。图表为原始数据确定性绘制,非 AI 生成;解读文字为 AI 基于同一数据生成。</>}
             </div>
           )}
         </div>
@@ -156,7 +162,7 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
 
       {/* 档位分解 */}
       {h.signals && <div className="card">
-        <h3>档位怎么算的 <InfoDot text="7个子信号,多=看多(+1),空=看空(-1),中=中性(0),求和后映射到 -3~+3。全好就是+3。" /></h3>
+        <h3>档位怎么算的 <InfoDot text={isCN ? "3个子信号(站上20/60/200日线),多=看多(+1),空=看空(-1),求和映射到 -3~+3。全好就是+3。" : "7个子信号,多=看多(+1),空=看空(-1),中=中性(0),求和后映射到 -3~+3。全好就是+3。"} /></h3>
         <div className="sig-grid">
           {h.signals.map((s, i) => (
             <div key={i} className="sig">
@@ -165,19 +171,25 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
             </div>
           ))}
         </div>
-        <div className="muted" style={{ marginTop: 8 }}>当前档位 <GradeBadge g={h.grade} label={h.grade_label} /> → 动作「{h.action}」（只减不追涨）</div>
+        <div className="muted" style={{ marginTop: 8 }}>当前档位 <GradeBadge g={h.grade} label={h.grade_label} /> → 动作「{h.action}」{isCN ? '（A股逐票不减仓，风险由市场级风险灯统一管）' : '（只减不追涨）'}</div>
       </div>}
 
       {/* 关键指标 */}
       {ind && <div className="card">
         <h3>关键指标（原值，不藏）</h3>
         <div className="kv-grid">
-          <div className="kv"><span>近半年动量</span><b>{ind.mom126 != null ? pct2(ind.mom126) : '—'}</b></div>
-          <div className="kv"><span>近21日动量</span><b>{ind.mom21 != null ? pct2(ind.mom21) : '—'}</b></div>
-          <div className="kv"><span>年化波动</span><b>{ind.vol_annual != null ? (ind.vol_annual * 100).toFixed(0) + '%' : '—'}</b></div>
-          <div className="kv"><span>距52周高</span><b>{pct2(ind.pct_from_high)}</b></div>
-          <div className="kv"><span>20/50/200日线</span><b>{ind.sma20}/{ind.sma50}/{ind.sma200}</b></div>
-          {ind.sy_yield != null && <div className="kv"><span>股东收益率</span><b>{(ind.sy_yield * 100).toFixed(1)}%</b></div>}
+          {isCN ? (<>
+            <div className="kv"><span>流通市值</span><b>{ind.float_mktcap_yi != null ? ind.float_mktcap_yi.toFixed(1) + ' 亿' : '—'}</b></div>
+            <div className="kv"><span>20日均换手</span><b>{ind.turn20 != null ? ind.turn20.toFixed(2) + '%' : '—'}</b></div>
+            {ind.event_score != null && <div className="kv"><span>事件分(rev+PEAD)</span><b>{ind.event_score.toFixed(3)}</b></div>}
+          </>) : (<>
+            <div className="kv"><span>近半年动量</span><b>{ind.mom126 != null ? pct2(ind.mom126) : '—'}</b></div>
+            <div className="kv"><span>近21日动量</span><b>{ind.mom21 != null ? pct2(ind.mom21) : '—'}</b></div>
+            <div className="kv"><span>年化波动</span><b>{ind.vol_annual != null ? (ind.vol_annual * 100).toFixed(0) + '%' : '—'}</b></div>
+            <div className="kv"><span>距52周高</span><b>{ind.pct_from_high != null ? pct2(ind.pct_from_high) : '—'}</b></div>
+            <div className="kv"><span>20/50/200日线</span><b>{ind.sma20}/{ind.sma50}/{ind.sma200}</b></div>
+            {ind.sy_yield != null && <div className="kv"><span>股东收益率</span><b>{(ind.sy_yield * 100).toFixed(1)}%</b></div>}
+          </>)}
         </div>
       </div>}
 
@@ -186,7 +198,7 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
 
       {/* 概率带 5/20/60 */}
       <div className="card">
-        <h3>到价概率带 <InfoDot text="不同时间跨度下,未来收益的70%概率范围 + 参考止损/目标。波动范围估计,非涨跌预测。" /></h3>
+        <h3>到价概率带 <InfoDot text={isCN ? "未来20日收益的70%概率范围 + 参考止损/目标(A股目前只算20日跨度)。波动范围估计,非涨跌预测。" : "不同时间跨度下,未来收益的70%概率范围 + 参考止损/目标。波动范围估计,非涨跌预测。"} /></h3>
         <ProbBandChart prob={h.prob} />
         <div className="tbl-scroll">
           <table>
@@ -199,7 +211,7 @@ export default function StockDetail({ h, meta }: { h: Holding; meta: TickerMeta 
                   <td><b>{label}</b></td>
                   <td className={b.median >= 0 ? 'up' : 'down'}>{pct2(b.median)}</td>
                   <td className="muted">{pct2(b.band70[0])} ~ {pct2(b.band70[1])}</td>
-                  <td>${b.stop}</td><td>${b.target}</td>
+                  <td>{cur}{b.stop}</td><td>{cur}{b.target}</td>
                   <td>{(b.p_hit_target * 100).toFixed(0)}%</td>
                 </tr>
               })}

@@ -35,22 +35,22 @@ type Store struct{ gdb *gorm.DB }
 
 func New(gdb *gorm.DB) *Store { return &Store{gdb: gdb} }
 
-// Get 读某用户的持仓(隔离)。
-func (s *Store) Get(uid int64) ([]db.Position, error) {
+// Get 读某用户某市场的持仓(用户+市场双隔离)。
+func (s *Store) Get(uid int64, market string) ([]db.Position, error) {
 	var ps []db.Position
-	err := s.gdb.Where("user_id = ?", uid).Order("ticker").Find(&ps).Error
+	err := s.gdb.Where("user_id = ? AND market = ?", uid, market).Order("ticker").Find(&ps).Error
 	return ps, err
 }
 
-// Save 整体替换某用户的持仓(事务:清空 + 批量插)。
-func (s *Store) Save(uid int64, in []Input) error {
+// Save 整体替换某用户【当前市场】的持仓(事务:清空该市场 + 批量插;不动另一市场)。
+func (s *Store) Save(uid int64, market string, in []Input) error {
 	return s.gdb.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec(`DELETE FROM positions WHERE user_id=?`, uid).Error; err != nil {
+		if err := tx.Exec(`DELETE FROM positions WHERE user_id=? AND market=?`, uid, market).Error; err != nil {
 			return err
 		}
 		for _, p := range in {
-			if err := tx.Exec(`INSERT INTO positions(user_id,ticker,shares,cost,opened_at,note,created_at,updated_at)
-				VALUES (?,?,?,?,?,?,now(),now())`, uid, p.Ticker, p.Shares, p.Cost, p.OpenedAt, p.Note).Error; err != nil {
+			if err := tx.Exec(`INSERT INTO positions(user_id,market,ticker,shares,cost,opened_at,note,created_at,updated_at)
+				VALUES (?,?,?,?,?,?,?,now(),now())`, uid, market, p.Ticker, p.Shares, p.Cost, p.OpenedAt, p.Note).Error; err != nil {
 				return err
 			}
 		}
@@ -58,26 +58,26 @@ func (s *Store) Save(uid int64, in []Input) error {
 	})
 }
 
-// Compute 按 as-of 价格(date 空=最新快照日)算某用户每笔盈亏 + 组合汇总。
-func (s *Store) Compute(uid int64, date string) (map[string]any, error) {
+// Compute 按 as-of 价格(date 空=该市场最新快照日)算某用户每笔盈亏 + 组合汇总。
+func (s *Store) Compute(uid int64, market, date string) (map[string]any, error) {
 	asof := date
 	if asof == "" || asof == "latest" {
-		if err := s.gdb.Raw(`SELECT asof::text FROM snapshots ORDER BY asof DESC LIMIT 1`).Row().Scan(&asof); err != nil || asof == "" {
-			// 无快照则退到最新价格日
-			s.gdb.Raw(`SELECT max(date)::text FROM prices`).Row().Scan(&asof)
+		if err := s.gdb.Raw(`SELECT asof::text FROM snapshots WHERE market=? ORDER BY asof DESC LIMIT 1`, market).Row().Scan(&asof); err != nil || asof == "" {
+			// 无快照则退到该市场最新价格日
+			s.gdb.Raw(`SELECT max(date)::text FROM prices WHERE market=?`, market).Row().Scan(&asof)
 		}
 	}
 	if asof == "" {
 		return nil, fmt.Errorf("无价格数据(先 POST /api/run 生成)")
 	}
-	ps, err := s.Get(uid)
+	ps, err := s.Get(uid, market)
 	if err != nil {
 		return nil, err
 	}
 	// 该 as-of 的价格
 	prices := map[string]float64{}
 	var prows []db.Price
-	s.gdb.Raw(`SELECT ticker, close FROM prices WHERE date = ?`, asof).Scan(&prows)
+	s.gdb.Raw(`SELECT ticker, close FROM prices WHERE market=? AND date = ?`, market, asof).Scan(&prows)
 	for _, r := range prows {
 		prices[r.Ticker] = r.Close
 	}

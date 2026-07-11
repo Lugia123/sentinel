@@ -41,7 +41,7 @@ export async function fetchPnL(date?: string): Promise<PnLResult> {
 }
 
 export async function savePositions(ps: Position[]): Promise<void> {
-  const r = await fetch('/api/positions', {
+  const r = await fetch(`/api/positions${mq()}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ps),
   })
   if (!r.ok) throw new Error((await r.json()).error || '保存持仓失败')
@@ -55,20 +55,20 @@ export async function fetchHistory(ticker: string, n = 120): Promise<HistPoint[]
 
 export interface WatchItem { ticker: string; starred: boolean; custom: boolean }
 export async function fetchWatchlist(): Promise<WatchItem[]> {
-  const r = await fetch('/api/watchlist')
+  const r = await fetch(`/api/watchlist${mq()}`)
   return r.ok ? (await r.json()).watchlist || [] : []
 }
 // 关注★(独立于自定义追踪)
 export async function setStar(ticker: string, on: boolean): Promise<void> {
-  await fetch(`/api/watchlist/star?ticker=${ticker}&on=${on ? 1 : 0}`, { method: 'POST' })
+  await fetch(`/api/watchlist/star${mq(`?ticker=${ticker}&on=${on ? 1 : 0}`)}`, { method: 'POST' })
 }
 // 加自定义追踪股(不关注;后端同步预热档位,约3秒)
 export async function addCustom(ticker: string): Promise<void> {
-  const r = await fetch(`/api/watchlist/custom?ticker=${ticker}`, { method: 'POST' })
+  const r = await fetch(`/api/watchlist/custom${mq(`?ticker=${ticker}`)}`, { method: 'POST' })
   const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || '添加失败')
 }
 export async function removeCustom(ticker: string): Promise<void> {
-  await fetch(`/api/watchlist/custom?ticker=${ticker}`, { method: 'DELETE' })
+  await fetch(`/api/watchlist/custom${mq(`?ticker=${ticker}`)}`, { method: 'DELETE' })
 }
 
 export interface TrendPoint { date: string; grade: number; price: number; median20: number | null }
@@ -89,9 +89,9 @@ export async function fetchTrendRich(tickers: string[]): Promise<Record<string, 
   const r = await fetch(`/api/trend?${qs}`)
   return r.ok ? (await r.json()).series || {} : {}
 }
-// 有档位历史的可选股票(供多选下拉)
-export async function fetchTrendTickers(): Promise<{ ticker: string; n: number }[]> {
-  const r = await fetch('/api/trend/tickers')
+// 有档位历史的可选股票(供多选下拉;A股带 name 中文名,美股走 meta 映射)
+export async function fetchTrendTickers(): Promise<{ ticker: string; n: number; name?: string }[]> {
+  const r = await fetch(`/api/trend/tickers${mq()}`)
   return r.ok ? (await r.json()).tickers || [] : []
 }
 
@@ -104,7 +104,7 @@ export async function fetchFocus(ticker: string): Promise<{ asof: string; ticker
 }
 
 export async function fetchInvestigate(ticker: string, force = false): Promise<{ ticker: string; key: string; cached: boolean }> {
-  const r = await fetch(`/api/investigate?ticker=${ticker}${force ? '&force=1' : ''}`)
+  const r = await fetch(`/api/investigate${mq(`?ticker=${ticker}${force ? '&force=1' : ''}`)}`)
   const j = await r.json()
   if (!r.ok || j.error) throw new Error(j.error || '背景调查失败')
   return j
@@ -115,13 +115,13 @@ export async function fetchBlobHTML(key: string): Promise<string> {
 }
 export interface EarnQuarter { period: string; revenue: number | null; net_income: number | null; operating_income: number | null; gross_profit: number | null; eps: number | null; cached?: boolean }
 export async function fetchEarningsQuarters(ticker: string): Promise<EarnQuarter[]> {
-  const r = await fetch(`/api/earnings/quarters?ticker=${ticker}`)
+  const r = await fetch(`/api/earnings/quarters${mq(`?ticker=${ticker}`)}`)
   const j = await r.json()
   if (!r.ok || j.error) throw new Error(j.error || '取财报失败')
   return j.quarters || []
 }
 export async function fetchEarningsInterpret(ticker: string, period: string, force = false): Promise<{ key: string; cached: boolean }> {
-  const r = await fetch(`/api/earnings?ticker=${ticker}&period=${period}${force ? '&force=1' : ''}`)
+  const r = await fetch(`/api/earnings${mq(`?ticker=${ticker}&period=${period}${force ? '&force=1' : ''}`)}`)
   const j = await r.json()
   if (!r.ok || j.error) throw new Error(j.error || '财报解读失败')
   return j
@@ -130,7 +130,7 @@ export async function fetchEarningsInterpret(ticker: string, period: string, for
 export interface AllocItem { ticker: string; weight: number; shares: number; value: number; reason: string }
 export interface AllocResult { mode: string; capital: number; allocations: AllocItem[]; cash_pct: number; note: string }
 export async function fetchAIAllocate(tickers: string[], capital: number): Promise<AllocResult> {
-  const r = await fetch('/api/allocate', {
+  const r = await fetch(`/api/allocate${mq()}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tickers, capital }),
   })
   const j = await r.json()
@@ -160,7 +160,7 @@ export async function fetchMeta(): Promise<TickerMeta> {
 }
 
 export async function fetchExplain(ticker: string, force = false): Promise<Explanation> {
-  const r = await fetch(`/api/explain?ticker=${ticker}${force ? '&force=1' : ''}`)
+  const r = await fetch(`/api/explain${mq(`?ticker=${ticker}${force ? '&force=1' : ''}`)}`)
   const j = await r.json()
   if (!r.ok) throw new Error(j.error || 'AI 讲解失败')
   return j

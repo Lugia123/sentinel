@@ -97,7 +97,7 @@ func (a *API) earningsQuarters(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
 		return
 	}
-	qs, err := a.earn.QuartersWithStatus(r.Context(), auth.UserID(r), tk)
+	qs, err := a.earn.QuartersWithStatus(r.Context(), auth.UserID(r), mktParam(r), normTicker(mktParam(r), tk))
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 		return
@@ -113,7 +113,7 @@ func (a *API) earningsInterpret(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker 或 period"})
 		return
 	}
-	res, err := a.earn.Interpret(r.Context(), auth.UserID(r), tk, period, r.URL.Query().Get("force") == "1")
+	res, err := a.earn.Interpret(r.Context(), auth.UserID(r), mktParam(r), normTicker(mktParam(r), tk), period, r.URL.Query().Get("force") == "1")
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 		return
@@ -128,7 +128,7 @@ func (a *API) investigate(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
 		return
 	}
-	res, err := a.invest.Investigate(r.Context(), auth.UserID(r), tk, r.URL.Query().Get("force") == "1")
+	res, err := a.invest.Investigate(r.Context(), auth.UserID(r), mktParam(r), normTicker(mktParam(r), tk), r.URL.Query().Get("force") == "1")
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 		return
@@ -136,14 +136,15 @@ func (a *API) investigate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
-// focus 单股观察:任意 ticker 用同规则分析(资金池=这一只)。?ticker=X
+// focus 单股观察:任意 ticker 用同规则分析(资金池=这一只)。?ticker=X&market=cn
 func (a *API) focus(w http.ResponseWriter, r *http.Request) {
-	tk := r.URL.Query().Get("ticker")
+	mkt := mktParam(r)
+	tk := normTicker(mkt, r.URL.Query().Get("ticker"))
 	if tk == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
 		return
 	}
-	out, err := a.runner.RunFocus(tk, q(r, "asof", "latest"), q(r, "capital", "4000"))
+	out, err := a.runner.RunFocus(mkt, tk, q(r, "asof", "latest"), q(r, "capital", "4000"))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -194,7 +195,7 @@ func (a *API) explainHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
 		return
 	}
-	res, err := a.explain.Explain(r.Context(), auth.UserID(r), ticker, r.URL.Query().Get("date"), r.URL.Query().Get("force") == "1")
+	res, err := a.explain.Explain(r.Context(), auth.UserID(r), mktParam(r), ticker, r.URL.Query().Get("date"), r.URL.Query().Get("force") == "1")
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 		return
@@ -251,7 +252,7 @@ func (a *API) snapshot(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "无快照,请先 POST /api/run 生成", "detail": err.Error()})
 		return
 	}
-	raw = a.personalizeSnapshot(auth.UserID(r), raw) // 按用户资金池缩放 + 合并其自定义股(隔离)
+	raw = a.personalizeSnapshot(auth.UserID(r), market, raw) // 按用户资金池缩放 + 合并其自定义股(隔离,分市场)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(raw)
@@ -260,7 +261,7 @@ func (a *API) snapshot(w http.ResponseWriter, r *http.Request) {
 // personalizeSnapshot 把共享快照个性化为当前用户视图:
 //  1) 按该用户的资金池线性缩放 target_shares/target_value(资金池只是线性因子,不用重跑引擎)
 //  2) 并入该用户的自定义追踪股(watchlist source=user,sleeve=custom股数0,隔离)
-func (a *API) personalizeSnapshot(uid int64, raw json.RawMessage) json.RawMessage {
+func (a *API) personalizeSnapshot(uid int64, market string, raw json.RawMessage) json.RawMessage {
 	if uid == 0 {
 		return raw
 	}
@@ -303,18 +304,18 @@ func (a *API) personalizeSnapshot(uid int64, raw json.RawMessage) json.RawMessag
 		}
 	}
 	var customTk []string
-	a.gdb.Raw(`SELECT ticker FROM watchlist WHERE user_id=? AND custom=true`, uid).Scan(&customTk)
+	a.gdb.Raw(`SELECT ticker FROM watchlist WHERE user_id=? AND market=? AND custom=true`, uid, market).Scan(&customTk)
 	for _, tk := range customTk {
-		tk = strings.ToUpper(strings.TrimSpace(tk))
-		if tk == "" || held[tk] {
+		tk = normTicker(market, tk)
+		if tk == "" || held[strings.ToUpper(tk)] {
 			continue
 		}
-		if h := a.cachedFocus(uid, tk, asof); h != nil { // 只用缓存,不阻塞
+		if h := a.cachedFocus(uid, market, tk, asof); h != nil { // 只用缓存,不阻塞
 			holdings = append(holdings, h)
-			held[tk] = true
+			held[strings.ToUpper(tk)] = true
 			changed = true
 		} else {
-			go a.warmFocus(uid, tk, asof) // 缓存冷(如新交易日):后台预热,本次跳过
+			go a.warmFocus(uid, market, tk, asof) // 缓存冷(如新交易日):后台预热,本次跳过
 		}
 	}
 
@@ -349,16 +350,16 @@ func (a *API) capital(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *API) latestAsof() string {
+func (a *API) latestAsof(market string) string {
 	var asof string
-	a.gdb.Raw(`SELECT asof::text FROM snapshots ORDER BY asof DESC LIMIT 1`).Row().Scan(&asof)
+	a.gdb.Raw(`SELECT asof::text FROM snapshots WHERE market=? ORDER BY asof DESC LIMIT 1`, market).Row().Scan(&asof)
 	return asof
 }
 
 // cachedFocus 只读缓存的自定义股档位(无则返回 nil,不跑 focus,不阻塞)。
-func (a *API) cachedFocus(uid int64, ticker, asof string) map[string]any {
+func (a *API) cachedFocus(uid int64, market, ticker, asof string) map[string]any {
 	var cached string
-	a.gdb.Raw(`SELECT holding::text FROM focus_cache WHERE user_id=? AND ticker=? AND asof=?`, uid, ticker, asof).Row().Scan(&cached)
+	a.gdb.Raw(`SELECT holding::text FROM focus_cache WHERE user_id=? AND market=? AND ticker=? AND asof=?`, uid, market, ticker, asof).Row().Scan(&cached)
 	if cached != "" {
 		var h map[string]any
 		if json.Unmarshal([]byte(cached), &h) == nil {
@@ -370,11 +371,11 @@ func (a *API) cachedFocus(uid int64, ticker, asof string) map[string]any {
 
 // warmFocus 计算并缓存某用户某股在 asof 的档位(阻塞~3秒;加自定义股/后台预热用)。
 // sleeve=custom,不占仓位。返回 holding(失败返回 nil)。
-func (a *API) warmFocus(uid int64, ticker, asof string) map[string]any {
-	if h := a.cachedFocus(uid, ticker, asof); h != nil {
+func (a *API) warmFocus(uid int64, market, ticker, asof string) map[string]any {
+	if h := a.cachedFocus(uid, market, ticker, asof); h != nil {
 		return h
 	}
-	out, err := a.runner.RunFocus(ticker, asof, "4000")
+	out, err := a.runner.RunFocus(market, ticker, asof, "4000")
 	if err != nil {
 		return nil
 	}
@@ -390,8 +391,8 @@ func (a *API) warmFocus(uid int64, ticker, asof string) map[string]any {
 	fr.Holding["base_weight"] = 0.0
 	fr.Holding["reason"] = "用户自定义 · 每日追踪(不占策略仓位)"
 	if hb, e := json.Marshal(fr.Holding); e == nil {
-		a.gdb.Exec(`INSERT INTO focus_cache(user_id,ticker,asof,holding) VALUES(?,?,?,?::jsonb)
-			ON CONFLICT (user_id,ticker,asof) DO UPDATE SET holding=EXCLUDED.holding`, uid, ticker, asof, string(hb))
+		a.gdb.Exec(`INSERT INTO focus_cache(user_id,market,ticker,asof,holding) VALUES(?,?,?,?,?::jsonb)
+			ON CONFLICT (user_id,market,ticker,asof) DO UPDATE SET holding=EXCLUDED.holding`, uid, market, ticker, asof, string(hb))
 	}
 	return fr.Holding
 }
@@ -423,7 +424,7 @@ func (a *API) run(w http.ResponseWriter, r *http.Request) {
 func (a *API) positions(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		res, err := a.port.Compute(auth.UserID(r), r.URL.Query().Get("date"))
+		res, err := a.port.Compute(auth.UserID(r), mktParam(r), r.URL.Query().Get("date"))
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
@@ -435,7 +436,11 @@ func (a *API) positions(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "body 应为持仓数组: " + err.Error()})
 			return
 		}
-		if err := a.port.Save(auth.UserID(r), ps); err != nil {
+		mkt := mktParam(r)
+		for i := range ps {
+			ps[i].Ticker = normTicker(mkt, ps[i].Ticker)
+		}
+		if err := a.port.Save(auth.UserID(r), mkt, ps); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}

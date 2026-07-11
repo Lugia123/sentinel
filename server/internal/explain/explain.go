@@ -24,6 +24,17 @@ const RULES = `Sentinel 策略规则(严格据此解释,不得编造额外理由
 【风险灯】按SPY已实现波动做仓位闸(波动高=降总仓)。
 【诚实边界】方向不可预测(已被严格回测证实);本系统是决策支持,不预测涨跌,只给趋势状态+校准的概率范围+风险提示。`
 
+// RULES_CN A股策略规则(与美股不同的一套,严格据此解释)。
+const RULES_CN = `Sentinel A股策略规则(严格据此解释,不得编造额外理由;与美股是两套独立策略):
+【选股】两条腿:
+  - 头号腿(主力,50只):全市场剔ST、只留可正常交易的,取流通市值最小约20%,再按20日均换手率从低到高取前50。多轮回测证实A股长期稳定有效的几乎只有"小市值"一个维度,低换手是干净代理。
+  - 事件腿(20只,容量友好):分析师评级上修 + 业绩预告惊喜(rev+PEAD),做流通市值中性合成后取前20。
+【档位】-3到+3,由3个趋势子信号(站上20/60/200日线)求和。★A股逐票【只看不减】:档位仅展示趋势状态,每只动作恒为"持有"——A股是反转市,像美股那样对单只逐步减仓长期有害(回测证实),单票风险统一交给市场级风险灯管。
+【风险灯(市场级Gate)】宽度(基准成分站上60日线比例)∧微盘拥挤度∧成交额未枯竭∧非小盘背离 → 满仓/半仓/空仓三档,管的是总仓位。
+【概率带】未来20日收益分布,波动缩放经验分布(区间校准,非方向预测)。
+【调仓】双周。全市场约5000只,剔ST/停牌僵尸股;只含存活股票,存在幸存者偏差。
+【诚实边界】方向不可预测;本系统是决策支持,不预测涨跌,只给趋势状态+校准的概率范围+风险提示。`
+
 const SYSTEM = `你是资深量化投资顾问,要让【完全不懂这只股票的小白】和【专业投资者】读了都觉得有收获。基于给定的【策略规则】和【这只股票的计算结果】,解读它此刻在策略眼中的处境。
 
 【铁律:不要复述页面上已有的数字】。页面别处已经列了排名、动量百分比、7 个子信号、概率带表格——把它们再念一遍毫无价值。你的任务是解释这些结果【意味着什么】,数字只在支撑某个判断时一笔带过,绝不堆砌。
@@ -31,7 +42,7 @@ const SYSTEM = `你是资深量化投资顾问,要让【完全不懂这只股票
 四段各有分工:
 ① 这是什么 —— 先用一句话讲清这家公司大致是做什么的(用你的常识;若真不确定它的主营就跳过,绝不编造),让没听过的人知道在看什么;再用一句白话给出此刻对它的总结论。这段给小白看。
 ② 为什么会看它 —— 分两种情况(看下方选股理由):
-  · 若是【策略选中】(选股依据=动量/股东回报/双腿):讲逻辑不讲排名,"相对大盘更强"和"股东回报高"对外行意味着什么?两条腿同时命中 vs 一条腿命中的区别。
+  · 若是【策略选中】(选股依据=策略的腿,美股:动量/股东回报/双腿;A股:头号腿/事件腿/双腿):讲逻辑不讲排名,这条腿背后的机制对外行意味着什么?两条腿同时命中 vs 一条腿命中的区别。
   · 若是【用户自定义追踪股】(选股理由含"用户自定义"):说明白——这是你自己加进来追踪的,策略并没主动选它、也不占策略仓位;这一栏就讲"用同一套档位/趋势规则看,它现在够不够格、离被策略选中还差什么"。
 ③ 现在强在哪、弱在哪 —— 给专业读者的洞察:当前趋势结构强在哪、最脆弱的一环在哪、风险点是什么。要有判断,不是把 7 个信号列出来。
 ④ 接下来盯什么 —— 1 到 2 个具体、可观察的触发点(例如跌破哪条均线档位会掉、哪个指标若反转要警惕)。
@@ -62,9 +73,12 @@ type holding struct {
 	Prob       json.RawMessage `json:"prob"`
 }
 
-// Explain 返回某股白话讲解(按用户缓存;force=true 强制重算)。
-func (s *Service) Explain(ctx context.Context, userID int64, ticker, date string, force bool) (map[string]any, error) {
-	raw, err := s.snapshot(date)
+// Explain 返回某股白话讲解(按用户缓存;force=true 强制重算)。market: us/cn(取对应市场快照与规则)。
+func (s *Service) Explain(ctx context.Context, userID int64, market, ticker, date string, force bool) (map[string]any, error) {
+	if market != "cn" {
+		market = "us"
+	}
+	raw, err := s.snapshot(market, date)
 	if err != nil {
 		return nil, err
 	}
@@ -84,9 +98,13 @@ func (s *Service) Explain(ctx context.Context, userID int64, ticker, date string
 	}
 	if h == nil {
 		// 自定义追踪股不在共享快照里,回退查该用户的 focus 缓存(每日追踪档位)
+		tk := strings.ToUpper(ticker)
+		if market == "cn" {
+			tk = strings.ToLower(ticker) // A股代码存小写(sh.600000)
+		}
 		var raw2 string
-		s.gdb.Raw(`SELECT holding::text FROM focus_cache WHERE user_id=? AND ticker=? AND asof=?`,
-			userID, strings.ToUpper(ticker), snap.Asof).Row().Scan(&raw2)
+		s.gdb.Raw(`SELECT holding::text FROM focus_cache WHERE user_id=? AND market=? AND ticker=? AND asof=?`,
+			userID, market, tk, snap.Asof).Row().Scan(&raw2)
 		if raw2 != "" {
 			var ch holding
 			if json.Unmarshal([]byte(raw2), &ch) == nil {
@@ -109,8 +127,12 @@ func (s *Service) Explain(ctx context.Context, userID int64, ticker, date string
 		return nil, fmt.Errorf("未配置 DeepSeek(server/.env 的 SENTINEL_DEEPSEEK_KEY);其余功能不受影响")
 	}
 
+	rules := RULES
+	if market == "cn" {
+		rules = RULES_CN
+	}
 	user := fmt.Sprintf("%s\n\n【这只股票 %s 的计算结果】\n档位:%d(%s)→ 动作:%s\n选股理由:%s\n档位子信号:%s\n关键指标:%s\n概率带:%s",
-		RULES, h.Ticker, h.Grade, h.GradeLabel, h.Action, h.Reason, string(h.Signals), string(h.Indicators), string(h.Prob))
+		rules, h.Ticker, h.Grade, h.GradeLabel, h.Action, h.Reason, string(h.Signals), string(h.Indicators), string(h.Prob))
 	content, err := s.ai.Chat(ctx, SYSTEM, user)
 	if err != nil {
 		return nil, err
@@ -128,9 +150,9 @@ func (s *Service) Explain(ctx context.Context, userID int64, ticker, date string
 	return map[string]any{"ticker": h.Ticker, "asof": snap.Asof, "content": content, "cached": false}, nil
 }
 
-func (s *Service) snapshot(date string) ([]byte, error) {
+func (s *Service) snapshot(market, date string) ([]byte, error) {
 	if date == "" || date == "latest" {
-		return s.store.Latest("us")
+		return s.store.Latest(market)
 	}
-	return s.store.ByDate("us", date)
+	return s.store.ByDate(market, date)
 }

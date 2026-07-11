@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import type { Snapshot, Holding } from '../types'
 import type { TickerMeta } from '../api'
-import { pct, pct2, usd, InfoDot, GradeBadge, SleeveBadge, actionColor } from '../ui'
+import { pct, pct2, InfoDot, GradeBadge, SleeveBadge, actionColor } from '../ui'
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
 import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, type UniverseItem } from '../api'
@@ -28,7 +28,9 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
   const removeCustomStock = async (tk: string) => { await removeCustom(tk); await onReload() }
   // 资金池(每用户可编辑;改后重算缩放的快照)
   const [capEdit, setCapEdit] = useState(false)
-  const CUR = snap.market === 'cn' ? '¥' : '$'
+  const isCN = snap.market === 'cn'
+  const CUR = isCN ? '¥' : '$'
+  const money = (x: number) => `${CUR}${x.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
   const [capVal, setCapVal] = useState(String(snap.capital))
   const [capBusy, setCapBusy] = useState(false)
   const saveCap = async () => {
@@ -53,7 +55,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
   const rows = [...snap.holdings].sort((a, b) => (watch.has(b.ticker) ? 1 : 0) - (watch.has(a.ticker) ? 1 : 0))
   // 可添加的自定义股 = 全部可分析股(数据池1393只)里尚未在列表的(不再只限98大盘股)
   const [universe, setUniverse] = useState<UniverseItem[]>([])
-  useEffect(() => { fetchUniverse().then(setUniverse) }, [])
+  useEffect(() => { fetchUniverse().then(setUniverse) }, [snap.market]) // 切市场重拉对应池
   const heldSet = new Set(snap.holdings.map((h) => h.ticker))
   const addable: SearchOption[] = universe
     .filter((u) => !heldSet.has(u.ticker))
@@ -64,10 +66,11 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
   useEffect(() => {
     if (!chartRef.current) return
     const chart = echarts.init(chartRef.current)
-    // 排序:档位高的在上,同档位按中位收益降序
-    const hs = [...snap.holdings].sort((a, b) => b.grade - a.grade || b.prob['h20'].median - a.prob['h20'].median)
+    // 排序:档位高的在上,同档位按中位收益降序(prob 可能缺 h20,如 A股新股数据不足)
+    const med = (h: Holding) => h.prob?.['h20']?.median ?? 0
+    const hs = [...snap.holdings].filter((h) => h.prob?.['h20']).sort((a, b) => b.grade - a.grade || med(b) - med(a))
     const bands = hs.map((h, i) => ({ value: [i, h.prob['h20'].band70[0] * 100, h.prob['h20'].band70[1] * 100, h.prob['h20'].median * 100], grade: h.grade }))
-    const label = (i: number) => hs[i].ticker + (meta[hs[i].ticker] ? ' ' + meta[hs[i].ticker].cn : '')
+    const label = (i: number) => hs[i].ticker + ((hs[i].name || meta[hs[i].ticker]?.cn) ? ' ' + (hs[i].name || meta[hs[i].ticker]?.cn) : '')
     // 左轴宽度自适应:按最长标签估算像素(中文≈13px,其余≈7.5px @12px字号),避免长名被遮挡
     const labelPx = (s: string) => [...s].reduce((w, c) => w + (/[一-鿿]/.test(c) ? 13 : 7.5), 0)
     const gridLeft = Math.min(200, Math.max(90, Math.ceil(Math.max(...hs.map((_, i) => labelPx(label(i))))) + 18))
@@ -132,7 +135,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
           <div className="muted">我的资金池 <InfoDot text="你的可投金额。建议股数按它×风险平价算,改了会立刻按比例重算(每个用户独立)。" /></div>
           {!capEdit ? (
             <>
-              <div className="big">{usd(snap.capital)}</div>
+              <div className="big">{money(snap.capital)}</div>
               <button className="ghost mini" onClick={() => { setCapVal(String(snap.capital)); setCapEdit(true) }}>✎ 编辑</button>
             </>
           ) : (
@@ -168,11 +171,11 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                 <th></th>
                 <th>标的</th>
                 <th>板块</th>
-                <th>选股依据 <InfoDot text="动量=趋势强涨得比大盘好；股东回报=回购分红多；双腿=两者都占。" /></th>
+                <th>选股依据 <InfoDot text={isCN ? "头号腿=小市值×低换手(A股长期最稳的维度)；事件腿=分析师上修+业绩预告惊喜；双腿=两者都占。" : "动量=趋势强涨得比大盘好；股东回报=回购分红多；双腿=两者都占。"} /></th>
                 <th>现价</th>
                 <th>我的持仓 <InfoDot text="你在「我的持仓」里录入的实际股数(和持仓页联动)。未持有显示 —。想算该买多少,用上方「⚖ 分配计算」。" /></th>
-                <th>档位 <InfoDot text="趋势健康度 -3到+3,由7个信号(站上均线/动量/排列等)合成。+1及以上=持有,往下=逐步减仓。" /></th>
-                <th>动作 <InfoDot text="档位对应的操作。只减不追涨:走弱才逐档减仓,趋势好就拿住。" /></th>
+                <th>档位 <InfoDot text={isCN ? "趋势健康度 -3到+3,由3个信号(站上20/60/200日线)合成。A股逐票只看不减,档位仅展示趋势状态。" : "趋势健康度 -3到+3,由7个信号(站上均线/动量/排列等)合成。+1及以上=持有,往下=逐步减仓。"} /></th>
+                <th>动作 <InfoDot text={isCN ? "A股逐票不减仓(反转市,逐票减仓有害),动作恒为「持有」;单票风险由市场级风险灯统一管总仓。" : "档位对应的操作。只减不追涨:走弱才逐档减仓,趋势好就拿住。"} /></th>
                 <th>未来20日区间 <InfoDot text="未来20天收益的70%概率范围(15%~85%分位)。这是波动范围估计,不是涨跌预测。" /></th>
               </tr>
             </thead>
@@ -185,7 +188,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                 </tr>
               ))}
               {rows.map((h: Holding) => {
-                const b = h.prob['h20']
+                const b = h.prob?.['h20']
                 const on = watch.has(h.ticker)
                 const m = meta[h.ticker]
                 const isCustom = h.sleeve === 'custom'
@@ -198,10 +201,10 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                     <td className="muted">{m?.sector || '—'}</td>
                     <td><SleeveBadge sleeve={h.sleeve} />{isCustom && <button className="rm-custom" title="从追踪移除" onClick={(e) => { e.stopPropagation(); removeCustomStock(h.ticker) }}>✕</button>}</td>
                     <td>{CUR}{h.price}</td>
-                    <td className={myPos[h.ticker] ? 'gold' : 'muted'}>{myPos[h.ticker] ? myPos[h.ticker] : '—'}</td>
+                    <td className={myPos[h.ticker.toUpperCase()] ? 'gold' : 'muted'}>{myPos[h.ticker.toUpperCase()] || '—'}</td>
                     <td><GradeBadge g={h.grade} label={h.grade_label} /></td>
                     <td style={{ color: actionColor(h.action), fontWeight: 600 }}>{h.action}</td>
-                    <td className="muted">{pct2(b.band70[0])} ~ {pct2(b.band70[1])}</td>
+                    <td className="muted">{b ? <>{pct2(b.band70[0])} ~ {pct2(b.band70[1])}</> : '—'}</td>
                   </tr>
                 )
               })}

@@ -19,7 +19,7 @@ func (a *API) allocateHandler(w http.ResponseWriter, r *http.Request) {
 		Capital float64  `json:"capital"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
-	res, err := a.alloc.AIAllocate(r.Context(), auth.UserID(r), body.Tickers, body.Capital)
+	res, err := a.alloc.AIAllocate(r.Context(), auth.UserID(r), mktParam(r), body.Tickers, body.Capital)
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 		return

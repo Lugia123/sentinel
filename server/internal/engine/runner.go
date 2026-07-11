@@ -66,11 +66,15 @@ func (r *Runner) RunDaily(market string, asof string, capital string, withSY boo
 	return out.String(), nil
 }
 
-// RunFocus 单股观察:跑 focus.py TICKER,返回 stdout 最后一行 JSON。
-func (r *Runner) RunFocus(ticker, asof, capital string) (string, error) {
+// RunFocus 单股观察:按市场跑 focus.py / focus_cn.py TICKER,返回 stdout 最后一行 JSON。
+func (r *Runner) RunFocus(market, ticker, asof, capital string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, "focus.py"),
+	script := "focus.py"
+	if market == "cn" {
+		script = "focus_cn.py"
+	}
+	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, script),
 		ticker, "--asof", asof, "--capital", capital)
 	cmd.Dir = r.engineDir
 	var out, errb bytes.Buffer
@@ -82,11 +86,15 @@ func (r *Runner) RunFocus(ticker, asof, capital string) (string, error) {
 	return lastJSON(out.String(), "focus")
 }
 
-// RunEarnings 跑 earnings.py TICKER,返回季度财报 JSON。
-func (r *Runner) RunEarnings(ticker string) (string, error) {
+// RunEarnings 按市场跑 earnings.py(美股 SEC)/ earnings_cn.py(A股新浪)TICKER,返回季度财报 JSON。
+func (r *Runner) RunEarnings(market, ticker string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, "earnings.py"), ticker)
+	script := "earnings.py"
+	if market == "cn" {
+		script = "earnings_cn.py"
+	}
+	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, script), ticker)
 	cmd.Dir = r.engineDir
 	var out, errb bytes.Buffer
 	cmd.Stdout = &out

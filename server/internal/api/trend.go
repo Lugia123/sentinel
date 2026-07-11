@@ -12,15 +12,16 @@ import (
 func (a *API) trend(w http.ResponseWriter, r *http.Request) {
 	from := q(r, "from", "2000-01-01")
 	to := q(r, "to", "2100-01-01")
+	market := mktParam(r)
 
 	var tickers []string
 	if multi := r.URL.Query().Get("tickers"); multi != "" {
 		for _, tk := range strings.Split(multi, ",") {
-			if tk = strings.TrimSpace(strings.ToUpper(tk)); tk != "" {
+			if tk = normTicker(market, tk); tk != "" {
 				tickers = append(tickers, tk)
 			}
 		}
-	} else if tk := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("ticker"))); tk != "" {
+	} else if tk := normTicker(market, r.URL.Query().Get("ticker")); tk != "" {
 		tickers = append(tickers, tk)
 	}
 	if len(tickers) == 0 {
@@ -30,7 +31,7 @@ func (a *API) trend(w http.ResponseWriter, r *http.Request) {
 
 	series := map[string]any{}
 	for _, tk := range tickers {
-		series[tk] = a.richSeries(tk, from, to)
+		series[tk] = a.richSeries(market, tk, from, to)
 	}
 	out := map[string]any{"series": series}
 	if len(tickers) == 1 { // 兼容旧单股调用
@@ -41,7 +42,7 @@ func (a *API) trend(w http.ResponseWriter, r *http.Request) {
 }
 
 // richSeries 从 snapshots.raw 的 holdings 数组里,按 ticker 抽取每个交易日的多维指标。
-func (a *API) richSeries(tk, from, to string) []map[string]any {
+func (a *API) richSeries(market, tk, from, to string) []map[string]any {
 	type row struct {
 		Date        string   `json:"date"`
 		Grade       *int     `json:"grade"`
@@ -72,8 +73,8 @@ func (a *API) richSeries(tk, from, to string) []map[string]any {
 		       (elem->'indicators'->>'sma50')::float                   AS sma50,
 		       (elem->'indicators'->>'sy_yield')::float                AS sy
 		FROM snapshots s, jsonb_array_elements(s.raw->'holdings') elem
-		WHERE elem->>'ticker' = ? AND s.asof BETWEEN ?::date AND ?::date
-		ORDER BY s.asof`, tk, from, to).Scan(&rows)
+		WHERE s.market = ? AND elem->>'ticker' = ? AND s.asof BETWEEN ?::date AND ?::date
+		ORDER BY s.asof`, market, tk, from, to).Scan(&rows)
 	out := make([]map[string]any, len(rows))
 	for i, r := range rows {
 		out[i] = map[string]any{
@@ -86,19 +87,29 @@ func (a *API) richSeries(tk, from, to string) []map[string]any {
 	return out
 }
 
-// trendTickers 列出所有【有档位历史】的股票(供走势页多选下拉),带中文名+样本数。
+// trendTickers 列出当前市场所有【有档位历史】的股票(供走势页多选下拉),带中文名+样本数。
+// A股中文名从 universe.csv 取(name 字段);美股前端自查 ticker_meta 映射。
 func (a *API) trendTickers(w http.ResponseWriter, r *http.Request) {
+	market := mktParam(r)
 	type trow struct {
 		Ticker string `json:"ticker"`
 		N      int    `json:"n"`
 	}
 	var rows []trow
 	a.gdb.Raw(`
-		SELECT ticker, COUNT(*) AS n FROM holdings
-		GROUP BY ticker ORDER BY n DESC, ticker`).Scan(&rows)
+		SELECT ticker, COUNT(*) AS n FROM holdings WHERE market = ?
+		GROUP BY ticker ORDER BY n DESC, ticker`, market).Scan(&rows)
+	var names map[string]string
+	if market == "cn" {
+		names = a.cnNameMap()
+	}
 	out := make([]map[string]any, len(rows))
 	for i, r := range rows {
-		out[i] = map[string]any{"ticker": r.Ticker, "n": r.N}
+		item := map[string]any{"ticker": r.Ticker, "n": r.N}
+		if nm := names[r.Ticker]; nm != "" {
+			item["name"] = nm
+		}
+		out[i] = item
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"tickers": out})
 }

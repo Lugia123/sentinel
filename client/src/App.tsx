@@ -136,11 +136,11 @@ export default function App() {
           </div>
         )}
 
-        {detailH && <StockDetail h={detailH} meta={meta} />}
+        {detailH && <StockDetail h={detailH} meta={meta} market={market} />}
         {!detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onReload={load} />}
-        {!detailH && view === 'positions' && <Positions />}
-        {!detailH && view === 'trends' && <Trends meta={meta} watch={watch} />}
-        {!detailH && view === 'help' && <Help />}
+        {!detailH && view === 'positions' && <Positions market={market} />}
+        {!detailH && view === 'trends' && <Trends meta={meta} watch={watch} market={market} />}
+        {!detailH && view === 'help' && <Help market={market} />}
         {!detailH && view === 'admin' && isAdmin && <Admin />}
         {!detailH && view === 'signals' && !snap && !err && <div className="card">加载中…</div>}
 

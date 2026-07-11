@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as echarts from 'echarts'
-import type { RichTrendPoint, TickerMeta } from '../api'
+import type { RichTrendPoint } from '../api'
 
 const C = ['#c8a253', '#6fae86', '#cf6f5d', '#9a8ec4', '#7ba7b0', '#e6c878', '#d19a66', '#84b6c4']
 
@@ -10,10 +10,12 @@ export interface MetricDef { key: string; label: string; pct: boolean; fixed: bo
 // 单维度走势图:主指标(每股一条)。
 // 单选1只股 → 深度模式:叠加该维度相关的辅助指标(如档位图叠 收盘价+20日线;动量图叠另一动量)。
 // 多选 → 对比模式:只显示主指标,避免堆成一团。
-export default function TrendChart({ m, series, meta }: {
+// names: ticker→中文名;cur: 价格轴货币符(美股$ / A股¥)。
+export default function TrendChart({ m, series, names = {}, cur = '$' }: {
   m: MetricDef
   series: Record<string, RichTrendPoint[]>
-  meta: TickerMeta
+  names?: Record<string, string>
+  cur?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -32,12 +34,12 @@ export default function TrendChart({ m, series, meta }: {
       splitLine: { lineStyle: { color: '#241d15' } },
     }]
     if (hasDollarAux) {
-      yAxes.push({ type: 'value', name: '$', position: 'right', scale: true,
+      yAxes.push({ type: 'value', name: cur, position: 'right', scale: true,
         axisLabel: { color: '#7ba7b0' }, splitLine: { show: false } })
     }
 
     const mainSeries = keys.map((k, i) => ({
-      name: k + (meta[k] ? ' ' + meta[k].cn : ''), type: 'line', step: m.key === 'grade' ? 'end' : false,
+      name: k + (names[k] ? ' ' + names[k] : ''), type: 'line', step: m.key === 'grade' ? 'end' : false,
       showSymbol: false, connectNulls: false, z: 3,
       lineStyle: { color: C[i % C.length], width: 2 }, itemStyle: { color: C[i % C.length] },
       data: (series[k] || []).map((p) => [p.date, (p as any)[m.key]]),
@@ -65,6 +67,6 @@ export default function TrendChart({ m, series, meta }: {
     })
     const onR = () => chart.resize(); window.addEventListener('resize', onR)
     return () => { window.removeEventListener('resize', onR); chart.dispose() }
-  }, [series, m, meta])
+  }, [series, m, names, cur])
   return <div ref={ref} style={{ height: 340 }} />
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchTrendRich, fetchTrendTickers, type RichTrendPoint } from '../api'
-import type { TickerMeta } from '../api'
+import type { TickerMeta, Market } from '../api'
 import MultiSelect from '../components/MultiSelect'
 import TrendChart, { type MetricDef } from '../components/TrendChart'
 import type { SearchOption } from '../components/SearchSelect'
@@ -23,22 +23,27 @@ const METRICS: MetricDef[] = [
 ]
 const METRIC_OPTS: SearchOption[] = METRICS.map((m) => ({ value: m.key, label: m.label }))
 
-export default function Trends({ meta }: { meta: TickerMeta; watch: Set<string> }) {
+export default function Trends({ meta, market = 'us' }: { meta: TickerMeta; watch: Set<string>; market?: Market }) {
   const [avail, setAvail] = useState<SearchOption[]>([])
+  const [names, setNames] = useState<Record<string, string>>({}) // ticker→中文名(A股来自后端;美股来自 meta)
   const [sel, setSel] = useState<string[]>([]) // 无默认股票
   const [metrics, setMetrics] = useState<string[]>([]) // 无默认维度
   const [series, setSeries] = useState<Record<string, RichTrendPoint[]>>({})
 
-  // 只拉可选股票清单(有档位历史),不预选任何股票/维度——由用户自己挑
+  // 只拉可选股票清单(有档位历史),不预选任何股票/维度——由用户自己挑;切市场重拉并清空已选
   useEffect(() => {
+    setSel([]); setSeries({})
     fetchTrendTickers().then((ts) => {
+      const nm: Record<string, string> = {}
+      ts.forEach((t) => { const n = t.name || meta[t.ticker]?.cn; if (n) nm[t.ticker] = n })
+      setNames(nm)
       setAvail(ts.map((t): SearchOption => ({
         value: t.ticker, label: t.ticker,
-        sub: (meta[t.ticker]?.cn || '') + ` · ${t.n}天`, keywords: meta[t.ticker]?.cn,
+        sub: (nm[t.ticker] || '') + ` · ${t.n}天`, keywords: nm[t.ticker],
       })))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meta])
+  }, [meta, market])
 
   useEffect(() => { fetchTrendRich(sel).then(setSeries) }, [sel])
 
@@ -49,6 +54,7 @@ export default function Trends({ meta }: { meta: TickerMeta; watch: Set<string> 
       <div className="hint">
         📈 挑股票 + 选<b>分析维度</b>(每个维度一张图)。<b>只选 1 只</b>=深度模式,图上会叠加相关<b>辅助指标</b>(如档位图配 收盘价+20日线);<b>选多只</b>=对比模式,只画主指标。
         <b>注意</b>:只有「被策略选中过」的交易日才有数据,常被选的股曲线连续,偶尔选中的会有断点。
+        {market === 'cn' && <><br /><b>A股提示</b>:A股快照目前只记录档位/价格/概率带,动量·波动·距高等维度暂无数据,建议选「档位」维度。</>}
       </div>
       <div className="card">
         <div className="trend-ctl">
@@ -69,7 +75,7 @@ export default function Trends({ meta }: { meta: TickerMeta; watch: Set<string> 
         )}
         {sel.length > 0 && shownMetrics.map((m) => (
           <div key={m.key} className="trend-panel">
-            <TrendChart m={m} series={series} meta={meta} />
+            <TrendChart m={m} series={series} names={names} cur={market === 'cn' ? '¥' : '$'} />
           </div>
         ))}
       </div>

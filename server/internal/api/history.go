@@ -6,11 +6,15 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
-// history 返回某 ticker 最近 N 日 {date,close,sma20,sma50,sma200}(均线由收盘价算,原CSV只有OHLCV)。
+// history 返回某 ticker 最近 N 日收盘+均线(均线由收盘价算,原CSV只有OHLCV)。
+// 美股:engine/data/<TK>.csv,均线 20/50/200;A股(?market=cn):engine/data_cn/<sh_600000>.csv,均线 20/60/200(与A股档位口径一致)。
+// 中间那条均线统一放 sma_mid(美股=50日,A股=60日),mid_window 告知窗口。
 func (a *API) history(w http.ResponseWriter, r *http.Request) {
-	ticker := r.URL.Query().Get("ticker")
+	market := mktParam(r)
+	ticker := normTicker(market, r.URL.Query().Get("ticker"))
 	if ticker == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
 		return
@@ -21,7 +25,13 @@ func (a *API) history(w http.ResponseWriter, r *http.Request) {
 			n = x
 		}
 	}
-	f, err := os.Open(filepath.Join(a.engineDir, "data", ticker+".csv"))
+	path := filepath.Join(a.engineDir, "data", ticker+".csv")
+	midWin := 50
+	if market == "cn" {
+		path = filepath.Join(a.engineDir, "data_cn", strings.ReplaceAll(ticker, ".", "_")+".csv")
+		midWin = 60
+	}
+	f, err := os.Open(path)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": ticker + " 无历史数据"})
 		return
@@ -65,7 +75,7 @@ func (a *API) history(w http.ResponseWriter, r *http.Request) {
 		Date   string   `json:"date"`
 		Close  float64  `json:"close"`
 		Sma20  *float64 `json:"sma20"`
-		Sma50  *float64 `json:"sma50"`
+		SmaMid *float64 `json:"sma_mid"`
 		Sma200 *float64 `json:"sma200"`
 	}
 	start := 0
@@ -74,7 +84,7 @@ func (a *API) history(w http.ResponseWriter, r *http.Request) {
 	}
 	var out []pt
 	for i := start; i < len(closes); i++ {
-		out = append(out, pt{Date: dates[i], Close: closes[i], Sma20: sma(i, 20), Sma50: sma(i, 50), Sma200: sma(i, 200)})
+		out = append(out, pt{Date: dates[i], Close: closes[i], Sma20: sma(i, 20), SmaMid: sma(i, midWin), Sma200: sma(i, 200)})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ticker": ticker, "history": out})
+	writeJSON(w, http.StatusOK, map[string]any{"ticker": ticker, "mid_window": midWin, "history": out})
 }

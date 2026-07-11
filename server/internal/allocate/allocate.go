@@ -52,11 +52,15 @@ type Alloc struct {
 }
 
 // AIAllocate 让 DeepSeek 在候选股上分配比例。tickers 为空则用全部持仓。含用户自定义追踪股(从 focus 缓存补)。
-func (s *Service) AIAllocate(ctx context.Context, userID int64, tickers []string, capital float64) (map[string]any, error) {
+// market: us/cn(取对应市场快照;A股股数按一手=100股取整、¥ 计价)。
+func (s *Service) AIAllocate(ctx context.Context, userID int64, market string, tickers []string, capital float64) (map[string]any, error) {
 	if !s.ai.Enabled() {
 		return nil, fmt.Errorf("未配置 DeepSeek,AI 分配不可用(可用均分/风险平价)")
 	}
-	raw, err := s.st.Latest("us")
+	if market != "cn" {
+		market = "us"
+	}
+	raw, err := s.st.Latest(market)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +94,12 @@ func (s *Service) AIAllocate(ctx context.Context, userID int64, tickers []string
 			if inCand[tk] {
 				continue
 			}
+			qtk := tk
+			if market == "cn" {
+				qtk = strings.ToLower(tk) // A股代码存小写(sh.600000)
+			}
 			var raw2 string
-			s.gdb.Raw(`SELECT holding::text FROM focus_cache WHERE user_id=? AND ticker=? AND asof=?`, userID, tk, snap.Asof).Row().Scan(&raw2)
+			s.gdb.Raw(`SELECT holding::text FROM focus_cache WHERE user_id=? AND market=? AND ticker=? AND asof=?`, userID, market, qtk, snap.Asof).Row().Scan(&raw2)
 			if raw2 != "" {
 				var ch holding
 				if json.Unmarshal([]byte(raw2), &ch) == nil && ch.Ticker != "" {
@@ -106,11 +114,17 @@ func (s *Service) AIAllocate(ctx context.Context, userID int64, tickers []string
 	}
 
 	// 候选清单喂给 AI(带决策相关信息)
+	cur := "$"
+	if market == "cn" {
+		cur = "¥"
+	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "资金池:$%.0f\n风险灯:%s(%s)\n候选股(%d只):\n", capital, snap.RiskLight.Note, snap.RiskLight.Level, len(cands))
+	fmt.Fprintf(&b, "资金池:%s%.0f\n风险灯:%s(%s)\n候选股(%d只):\n", cur, capital, snap.RiskLight.Note, snap.RiskLight.Level, len(cands))
 	priceOf := map[string]float64{}
+	nameOf := map[string]string{}
 	for _, h := range cands {
 		priceOf[strings.ToUpper(h.Ticker)] = h.Price
+		nameOf[strings.ToUpper(h.Ticker)] = h.Ticker
 		vol := "—"
 		if h.Indicators.Vol != nil {
 			vol = fmt.Sprintf("%.0f%%", *h.Indicators.Vol*100)
@@ -121,10 +135,14 @@ func (s *Service) AIAllocate(ctx context.Context, userID int64, tickers []string
 		}
 		_ = json.Unmarshal(h.Prob, &pp)
 		med = pp.H20.Median
-		fmt.Fprintf(&b, "- %s 档位%d(%s) 动作:%s 现价$%.2f 年化波动%s 未来20日中位%.1f%% | %s\n",
-			h.Ticker, h.Grade, h.GradeLabel, h.Action, h.Price, vol, med*100, h.Reason)
+		fmt.Fprintf(&b, "- %s 档位%d(%s) 动作:%s 现价%s%.2f 年化波动%s 未来20日中位%.1f%% | %s\n",
+			h.Ticker, h.Grade, h.GradeLabel, h.Action, cur, h.Price, vol, med*100, h.Reason)
 	}
-	b.WriteString("\n请分配购买比例(做取舍,不必全买)。")
+	if market == "cn" {
+		b.WriteString("\n请分配购买比例(做取舍,不必全买)。注意这是A股:买入以一手=100股为单位。")
+	} else {
+		b.WriteString("\n请分配购买比例(做取舍,不必全买)。")
+	}
 
 	content, err := s.ai.Chat(ctx, SYSTEM, b.String())
 	if err != nil {
@@ -158,15 +176,24 @@ func (s *Service) AIAllocate(ctx context.Context, userID int64, tickers []string
 	out := []Alloc{}
 	invested := 0.0
 	for _, a := range parsed.Allocations {
-		tk := strings.ToUpper(a.Ticker)
-		px := priceOf[tk]
+		key := strings.ToUpper(a.Ticker)
+		px := priceOf[key]
 		if px <= 0 || a.WeightPct <= 0 {
 			continue
 		}
 		w := a.WeightPct * scale / 100
 		val := capital * w
+		shares := round3(val / px)
+		if market == "cn" { // A股一手=100股,向下取整手;金额随实际股数重算
+			shares = float64(int(val/px/100)) * 100
+			if shares <= 0 {
+				continue
+			}
+			val = shares * px
+			w = val / capital
+		}
 		out = append(out, Alloc{
-			Ticker: tk, Weight: round4(w), Shares: round3(val / px), Value: round2(val), Reason: a.Reason,
+			Ticker: nameOf[key], Weight: round4(w), Shares: shares, Value: round2(val), Reason: a.Reason,
 		})
 		invested += val
 	}

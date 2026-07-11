@@ -9,9 +9,12 @@ export interface ProbBand {
 }
 export interface Signal { name: string; detail: string; verdict: '多' | '空' | '中' }
 export interface Indicators {
-  mom126: number | null; mom21: number | null; vol_annual: number | null
-  sma20: number; sma50: number; sma200: number
-  pct_from_high: number; sy_yield: number | null
+  // 美股(us 快照)
+  mom126?: number | null; mom21?: number | null; vol_annual?: number | null
+  sma20?: number; sma50?: number; sma200?: number
+  pct_from_high?: number; sy_yield?: number | null
+  // A股(cn 快照:头号腿/事件腿指标)
+  float_mktcap_yi?: number | null; turn20?: number | null; event_score?: number | null
 }
 export interface Holding {
   ticker: string
@@ -58,5 +61,6 @@ export interface PnLResult {
   summary: { market_value: number; cost_value: number; pnl: number; pnl_pct: number }
 }
 export interface Version { version: string; branch: string; commit: string }
-export interface HistPoint { date: string; close: number | null; sma20: number | null; sma50: number | null; sma200: number | null }
+// sma_mid:美股=50日线,A股=60日线(后端 /api/history 的 mid_window 指明窗口)
+export interface HistPoint { date: string; close: number | null; sma20: number | null; sma_mid: number | null; sma200: number | null }
 export interface Explanation { ticker: string; asof: string; content: string; cached: boolean }

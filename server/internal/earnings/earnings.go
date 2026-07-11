@@ -16,6 +16,11 @@ const SYSTEM = `你是面向中国散户的财报解读助手。给你某美股�
 分区:①本季概况(营收/利润多少,通俗)②环比/同比变化(增长还是下滑,幅度)③利润率与质量 ④亮点与隐忧。数字换算成"亿美元"更好懂。
 【HTML 格式硬要求】只输出片段,绝不要 <!doctype>/<html>/<head>/<body>/<style>/代码围栏。用 <h4> + <p> + <ul><li>,关键词 <b>,不写任何 CSS。中文。结尾 <p class="disc">AI 基于 SEC 公开财报数据解读,仅供参考,非投资建议。</p>。`
 
+// SYSTEM_CN A股版(数据来自新浪财经利润表,已差分成单季;单位换算成亿元)。
+const SYSTEM_CN = `你是面向中国散户的财报解读助手。给你某A股上市公司某季度的关键财务数字(营收/净利/营业利润/毛利/EPS,已换算为单季值)及对比,请解读成一段【HTML 片段】(会被注入到已有暗色页面,随整页滚动)。
+分区:①本季概况(营收/利润多少,通俗)②环比/同比变化(增长还是下滑,幅度;注意A股季节性,同比比环比更有参考性)③利润率与质量 ④亮点与隐忧。数字换算成"亿元"更好懂。
+【HTML 格式硬要求】只输出片段,绝不要 <!doctype>/<html>/<head>/<body>/<style>/代码围栏。用 <h4> + <p> + <ul><li>,关键词 <b>,不写任何 CSS。中文。结尾 <p class="disc">AI 基于公开财报数据(新浪财经利润表)解读,仅供参考,非投资建议;请以巨潮资讯/交易所公告为准核实。</p>。`
+
 type Quarter struct {
 	Period          string   `json:"period"`
 	Revenue         *float64 `json:"revenue"`
@@ -41,9 +46,9 @@ func New(rn *engine.Runner, aic *ai.Client, bs *blob.Store) *Service {
 	return &Service{runner: rn, ai: aic, blob: bs}
 }
 
-// Quarters 返回可解读的季度列表。
-func (s *Service) Quarters(ticker string) ([]Quarter, error) {
-	raw, err := s.runner.RunEarnings(ticker)
+// Quarters 返回可解读的季度列表。market: us(SEC)/ cn(新浪,单季差分)。
+func (s *Service) Quarters(market, ticker string) ([]Quarter, error) {
+	raw, err := s.runner.RunEarnings(market, ticker)
 	if err != nil {
 		return nil, err
 	}
@@ -61,8 +66,8 @@ func (s *Service) Quarters(ticker string) ([]Quarter, error) {
 }
 
 // QuartersWithStatus 在季度列表上标注每季是否已解读(下拉框区分已/未解读)。
-func (s *Service) QuartersWithStatus(ctx context.Context, userID int64, ticker string) ([]Quarter, error) {
-	qs, err := s.Quarters(ticker)
+func (s *Service) QuartersWithStatus(ctx context.Context, userID int64, market, ticker string) ([]Quarter, error) {
+	qs, err := s.Quarters(market, ticker)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +80,7 @@ func (s *Service) QuartersWithStatus(ctx context.Context, userID int64, ticker s
 }
 
 // Interpret 解读指定季度(→HTML→MinIO,返回 key)。
-func (s *Service) Interpret(ctx context.Context, userID int64, ticker, period string, force bool) (map[string]any, error) {
+func (s *Service) Interpret(ctx context.Context, userID int64, market, ticker, period string, force bool) (map[string]any, error) {
 	if s.blob == nil || !s.blob.Enabled() {
 		return nil, fmt.Errorf("MinIO 未配置")
 	}
@@ -86,7 +91,7 @@ func (s *Service) Interpret(ctx context.Context, userID int64, ticker, period st
 	if !s.ai.Enabled() {
 		return nil, fmt.Errorf("未配置 DeepSeek")
 	}
-	qs, err := s.Quarters(ticker)
+	qs, err := s.Quarters(market, ticker)
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +110,13 @@ func (s *Service) Interpret(ctx context.Context, userID int64, ticker, period st
 	if cur == nil {
 		return nil, fmt.Errorf("无 %s 季度数据", period)
 	}
+	system := SYSTEM
+	if market == "cn" {
+		system = SYSTEM_CN
+	}
 	user := fmt.Sprintf("公司:%s\n本季(%s):%s\n上一季:%s\n去年同期:%s\n请解读本季财报。",
 		ticker, period, fmtQ(cur), fmtQ(prev), fmtQ(yoy))
-	html, err := s.ai.Chat(ctx, SYSTEM, user)
+	html, err := s.ai.Chat(ctx, system, user)
 	if err != nil {
 		return nil, err
 	}
