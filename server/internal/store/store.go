@@ -15,6 +15,18 @@ type Store struct{ gdb *gorm.DB }
 
 func New(gdb *gorm.DB) *Store { return &Store{gdb: gdb} }
 
+// GetSetting 读 settings 表某键(不存在返回空)。
+func (s *Store) GetSetting(key string) string {
+	var v string
+	s.gdb.Raw(`SELECT value FROM settings WHERE key=?`, key).Scan(&v)
+	return v
+}
+
+// SetSetting 写 settings 表(upsert)。
+func (s *Store) SetSetting(key, value string) error {
+	return s.gdb.Exec(`INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value`, key, value).Error
+}
+
 // TrackedTickers 用户"添加自定义股票"的追踪清单(watchlist source='user'),
 // 供每日引擎把它们也算档位/概率(纳入每日分析)。
 func (s *Store) TrackedTickers() []string {

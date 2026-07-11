@@ -43,7 +43,7 @@ func Load() Config {
 		PythonBin: envOr("SENTINEL_PYTHON", "/Users/lugia/lugia_fc/TradingAgents/.venv/bin/python"),
 		DBDSN:     envOr("SENTINEL_DB_DSN", "host=localhost port=5433 user=bestfunc dbname=sentinel sslmode=disable"),
 		Capital:   envOr("SENTINEL_CAPITAL", "4000"),
-		Schedule:  envOr("SENTINEL_SCHEDULE", "05:30"),
+		Schedule:  envOr("SENTINEL_SCHEDULE", "4"), // 默认间隔小时(每4h跑双市场;管理员可在设置里改,存 settings.schedule_interval_hours)
 		DeepSeek: DeepSeekConfig{
 			Key:   os.Getenv("SENTINEL_DEEPSEEK_KEY"),
 			Base:  envOr("SENTINEL_DEEPSEEK_BASE", "https://api.deepseek.com"),

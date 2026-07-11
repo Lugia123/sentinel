@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  adminListUsers, adminCreateUser, adminDeleteUser, fetchMe, adminGetSMTP, adminSaveSMTP, adminTestEmail,
+  adminListUsers, adminCreateUser, adminDeleteUser, fetchMe, adminGetSMTP, adminSaveSMTP, adminTestEmail, adminGetSchedule, adminSaveSchedule,
   type AuthUser, type SMTPConfig,
 } from '../auth'
 
@@ -31,6 +31,13 @@ export default function Admin() {
   const [smtpEnabled, setSmtpEnabled] = useState(false)
   const [testTo, setTestTo] = useState(''); const [sMsg, setSMsg] = useState(''); const [sErr, setSErr] = useState('')
   useEffect(() => { adminGetSMTP().then((r) => { setSmtp({ ...r.smtp, password: '' }); setSmtpEnabled(r.enabled) }) }, [])
+  // 调度间隔
+  const [schedH, setSchedH] = useState(4); const [schedNote, setSchedNote] = useState(''); const [schMsg, setSchMsg] = useState(''); const [schErr, setSchErr] = useState('')
+  useEffect(() => { adminGetSchedule().then((r) => { setSchedH(r.interval_hours); setSchedNote(r.note) }) }, [])
+  const saveSched = async () => {
+    setSchMsg(''); setSchErr('')
+    try { const r = await adminSaveSchedule(schedH); setSchMsg('已保存,下个周期生效'); setSchedNote(r.note) } catch (e: any) { setSchErr(String(e.message || e)) }
+  }
   const saveSmtp = async () => {
     setSErr(''); setSMsg('')
     try { await adminSaveSMTP(smtp); setSMsg('已保存系统邮箱配置'); const r = await adminGetSMTP(); setSmtpEnabled(r.enabled) }
@@ -99,6 +106,20 @@ export default function Admin() {
         </div>
         {sErr && <div className="down" style={{ fontSize: 13, marginTop: 6 }}>{sErr}</div>}
         {sMsg && <div className="up" style={{ fontSize: 13, marginTop: 6 }}>{sMsg}</div>}
+      </div>
+      <div className="admin-card">
+        <h3>自动运行调度</h3>
+        <div className="muted" style={{ marginBottom: 10 }}>每隔 N 小时自动「刷新数据 + 跑双市场(美股+A股)引擎」。EOD 数据每天更新一次,多跑=兜底重试(确保可靠抓到当天收盘)。改后下个周期生效。</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label>每
+            <input type="number" min={1} max={24} value={schedH} onChange={(e) => setSchedH(Math.max(1, Math.min(24, parseInt(e.target.value) || 4)))} style={{ width: 64, margin: '0 6px' }} />
+            小时跑一次
+          </label>
+          <button className="primary" onClick={saveSched}>保存</button>
+        </div>
+        {schedNote && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>{schedNote}</div>}
+        {schErr && <div className="down" style={{ fontSize: 13, marginTop: 6 }}>{schErr}</div>}
+        {schMsg && <div className="up" style={{ fontSize: 13, marginTop: 6 }}>{schMsg}</div>}
       </div>
     </>
   )

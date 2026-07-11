@@ -20,6 +20,25 @@ func New(pythonBin, engineDir string) *Runner {
 	return &Runner{pythonBin: pythonBin, engineDir: engineDir}
 }
 
+// EngineDir 引擎目录(供调度器定位 refresh_data.py 等)。
+func (r *Runner) EngineDir() string { return r.engineDir }
+
+// RunPython 跑任意引擎脚本(供数据刷新);返回 stdout,超时 timeout。
+func (r *Runner) RunPython(script string, args []string, timeout time.Duration) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	full := append([]string{script}, args...)
+	cmd := exec.CommandContext(ctx, r.pythonBin, full...)
+	cmd.Dir = r.engineDir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		return out.String(), fmt.Errorf("%v | stderr: %s", err, errb.String())
+	}
+	return out.String(), nil
+}
+
 // RunDaily 跑 run_daily.py 产出/刷新快照。asof="latest" 或 YYYY-MM-DD。
 // 返回引擎 stdout(便于前端显示日志);超时 10 分钟(SY 腿较慢)。
 func (r *Runner) RunDaily(market string, asof string, capital string, withSY bool, track []string) (string, error) {

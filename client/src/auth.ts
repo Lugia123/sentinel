@@ -81,3 +81,12 @@ export async function adminSaveSMTP(c: SMTPConfig) {
 export async function adminTestEmail(to: string) {
   return post('/api/admin/settings/smtp/test', { to })
 }
+// 调度间隔(小时)——管理员维护自动跑数据+双市场的频率
+export async function adminGetSchedule(): Promise<{ interval_hours: number; markets: string[]; note: string }> {
+  const r = await fetch('/api/admin/settings/schedule')
+  return r.ok ? r.json() : { interval_hours: 4, markets: ['us', 'cn'], note: '' }
+}
+export async function adminSaveSchedule(interval_hours: number) {
+  const r = await fetch('/api/admin/settings/schedule', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interval_hours }) })
+  const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || '保存失败'); return j
+}

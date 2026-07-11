@@ -4,6 +4,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"gorm.io/gorm"
@@ -14,6 +15,7 @@ import (
 	"sentinel/internal/explain"
 	"sentinel/internal/investigate"
 	"sentinel/internal/pipeline"
+	"sentinel/internal/scheduler"
 	"sentinel/internal/portfolio"
 	"sentinel/internal/store"
 	"sentinel/internal/allocate"
@@ -49,6 +51,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/snapshot", a.snapshot)
 	mux.HandleFunc("/api/snapshot/dates", a.dates)
 	mux.HandleFunc("/api/run", auth.RequireAdmin(a.run)) // 重算仅管理员
+	mux.HandleFunc("/api/admin/settings/schedule", auth.RequireAdmin(a.schedule)) // 调度间隔(管理员维护)
 	mux.HandleFunc("/api/positions", a.positions)
 	mux.HandleFunc("/api/explain", a.explainHandler)
 	mux.HandleFunc("/api/history", a.history)
@@ -447,6 +450,34 @@ func q(r *http.Request, k, d string) string {
 		return v
 	}
 	return d
+}
+
+// schedule 管理员维护调度间隔(小时)。GET 读当前;PUT {interval_hours} 改(clamp[1,24])。
+func (a *API) schedule(w http.ResponseWriter, r *http.Request) {
+	cur := 4
+	if v := a.store.GetSetting(scheduler.SettingKey); v != "" {
+		if n, e := strconv.Atoi(v); e == nil && n >= 1 && n <= 24 {
+			cur = n
+		}
+	}
+	if r.Method == http.MethodPut {
+		var body struct {
+			IntervalHours int `json:"interval_hours"`
+		}
+		if json.NewDecoder(r.Body).Decode(&body) != nil || body.IntervalHours < 1 || body.IntervalHours > 24 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "interval_hours 须为 1-24 的整数"})
+			return
+		}
+		if e := a.store.SetSetting(scheduler.SettingKey, strconv.Itoa(body.IntervalHours)); e != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": e.Error()})
+			return
+		}
+		cur = body.IntervalHours
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"interval_hours": cur, "markets": scheduler.MARKETS,
+		"note": "每 " + strconv.Itoa(cur) + " 小时自动刷新数据+跑双市场;EOD数据每天更一次,多跑=兜底重试;下个周期生效",
+	})
 }
 
 // mktParam 从请求读市场(?market=cn/us),默认 us(向后兼容)。
