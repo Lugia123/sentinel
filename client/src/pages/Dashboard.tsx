@@ -119,7 +119,9 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
         <div className="card">
           <div className="muted">风险灯 <InfoDot text="看整体市场波动大不大。绿=正常可满仓，黄=波动偏高建议降点仓，红=波动很大大幅降仓。它管的是总仓位，不针对单只股。" /></div>
           <div className="big"><span className={`light ${rl.level}`} />{rl.note}</div>
-          <div className="muted">大盘(SPY)年化波动 {pct(rl.spy_vol)} · 建议总仓位 {pct(rl.exposure)}</div>
+          {snap.market === 'cn'
+            ? <div className="muted">市场宽度 {pct((rl as any).bench_breadth)} · 微盘拥挤度 {pct((rl as any).crowd_pct)}{(rl as any).diverge ? ' · 小盘背离⚠' : ''} · 建议总仓位 {pct(rl.exposure)}</div>
+            : <div className="muted">大盘(SPY)年化波动 {pct(rl.spy_vol)} · 建议总仓位 {pct(rl.exposure)}</div>}
         </div>
         <div className="card">
           <div className="muted">策略建议组合</div>
@@ -135,7 +137,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
             </>
           ) : (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
-              <span className="muted">$</span>
+              <span className="muted">{CUR}</span>
               <input value={capVal} onChange={(e) => setCapVal(e.target.value.replace(/[^0-9.]/g, ''))}
                 onKeyDown={(e) => e.key === 'Enter' && saveCap()} style={{ width: 100 }} autoFocus />
               <button className="primary" onClick={saveCap} disabled={capBusy}>{capBusy ? '…' : '保存'}</button>
