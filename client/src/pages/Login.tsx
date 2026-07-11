@@ -42,7 +42,6 @@ export default function Login({ onLogin }: { onLogin: (u: AuthUser) => void }) {
     <div className="login-wrap">
       <div className="login-card">
         <div className="login-brand">SENTINEL</div>
-        <div className="login-sub">美股策略决策支持 · 研究工具,非投资建议</div>
 
         {mode === 'login' && (<>
           <input className="login-in" placeholder="邮箱(账号)" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doLogin()} />
