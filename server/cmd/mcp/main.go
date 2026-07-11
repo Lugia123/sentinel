@@ -128,17 +128,20 @@ func withBlob(raw string, err error) (string, error) {
 
 func tools() []tool {
 	return []tool{
-		{"sentinel_snapshot", "获取当前策略快照(建议持仓列表/风险灯/组合)。可选 date=YYYY-MM-DD",
-			obj(map[string]any{"date": str("快照日期,省略取最新")}),
-			func(a map[string]any) (string, error) { return httpCall("GET", "/api/snapshot", qs(a, "date"), nil) }},
-		{"sentinel_snapshot_dates", "列出所有有快照的历史日期(回填的)。", obj(nil),
-			func(a map[string]any) (string, error) { return httpCall("GET", "/api/snapshot/dates", nil, nil) }},
-		{"sentinel_run", "【重算按钮】重跑今天的策略引擎(约30秒)。sy=是否含股东回报腿(默认true)。",
-			obj(map[string]any{"sy": boolean("是否含SY腿,默认true")}),
+		{"sentinel_snapshot", "获取当前策略快照(建议持仓列表/风险灯/组合)。可选 date=YYYY-MM-DD, market=us|cn",
+			obj(map[string]any{"date": str("快照日期,省略取最新"), "market": str("市场 us(美股)/cn(A股),默认us")}),
+			func(a map[string]any) (string, error) { return httpCall("GET", "/api/snapshot", qs(a, "date", "market"), nil) }},
+		{"sentinel_snapshot_dates", "列出某市场所有快照日期。可选 market=us|cn。", obj(map[string]any{"market": str("市场 us(美股)/cn(A股),默认us")}),
+			func(a map[string]any) (string, error) { return httpCall("GET", "/api/snapshot/dates", qs(a, "market"), nil) }},
+		{"sentinel_run", "【重算按钮】重跑策略引擎。market=us(约30秒)/cn(约1分钟)。sy=是否含股东回报腿(仅us)。",
+			obj(map[string]any{"sy": boolean("是否含SY腿,默认true"), "market": str("市场 us(美股)/cn(A股),默认us")}),
 			func(a map[string]any) (string, error) {
 				q := url.Values{"sy": {"1"}}
 				if v, ok := a["sy"].(bool); ok && !v {
 					q.Set("sy", "0")
+				}
+				if m, ok := a["market"].(string); ok && m == "cn" {
+					q.Set("market", "cn")
 				}
 				return httpCall("POST", "/api/run", q, nil)
 			}},
@@ -172,12 +175,12 @@ func tools() []tool {
 				}
 				return httpCall("GET", "/api/capital", nil, nil)
 			}},
-		{"sentinel_focus", "【自选股分析按钮】对任意股用同一套档位/概率规则分析(资金池假设全押这一只)。",
-			obj(map[string]any{"ticker": str("代码")}, "ticker"),
-			func(a map[string]any) (string, error) { return httpCall("GET", "/api/focus", qs(a, "ticker"), nil) }},
-		{"sentinel_positions", "【我的持仓页】查持仓盈亏(as-of 一致定价)。可选 date。",
-			obj(map[string]any{"date": str("日期,省略取最新")}),
-			func(a map[string]any) (string, error) { return httpCall("GET", "/api/positions", qs(a, "date"), nil) }},
+		{"sentinel_focus", "【自选股分析按钮】对任意股用同一套档位/概率规则分析。market=us|cn。",
+			obj(map[string]any{"ticker": str("代码"), "market": str("市场 us(美股)/cn(A股),默认us")}, "ticker"),
+			func(a map[string]any) (string, error) { return httpCall("GET", "/api/focus", qs(a, "ticker", "market"), nil) }},
+		{"sentinel_positions", "【我的持仓页】查持仓盈亏。可选 date, market=us|cn。",
+			obj(map[string]any{"date": str("日期,省略取最新"), "market": str("市场 us(美股)/cn(A股),默认us")}),
+			func(a map[string]any) (string, error) { return httpCall("GET", "/api/positions", qs(a, "date", "market"), nil) }},
 		{"sentinel_trend", "【单股走势】某股历史档位/价/20日中位序列。可选 from/to(YYYY-MM-DD)。",
 			obj(map[string]any{"ticker": str("代码"), "from": str("起"), "to": str("止")}, "ticker"),
 			func(a map[string]any) (string, error) { return httpCall("GET", "/api/trend", qs(a, "ticker", "from", "to"), nil) }},
@@ -206,13 +209,13 @@ func tools() []tool {
 			func(a map[string]any) (string, error) { return httpCall("GET", "/api/meta", nil, nil) }},
 		{"sentinel_universe", "【添加自定义股票搜索源】全部可分析股(数据池1393只,带中文名的会标)。", obj(nil),
 			func(a map[string]any) (string, error) { return httpCall("GET", "/api/universe", nil, nil) }},
-		{"sentinel_strategies", "当前启用的策略组件(选股/定仓/趋势/预测/风险闸)+ 可用清单。", obj(nil),
-			func(a map[string]any) (string, error) { return httpCall("GET", "/api/strategies", nil, nil) }},
+		{"sentinel_strategies", "当前启用的策略组件。可选 market=us|cn。", obj(map[string]any{"market": str("市场 us(美股)/cn(A股),默认us")}),
+			func(a map[string]any) (string, error) { return httpCall("GET", "/api/strategies", qs(a, "market"), nil) }},
 		{"sentinel_history", "个股价格+均线历史(近 n 日,默认120)。",
 			obj(map[string]any{"ticker": str("代码"), "n": str("天数")}, "ticker"),
 			func(a map[string]any) (string, error) { return httpCall("GET", "/api/history", qs(a, "ticker", "n"), nil) }},
-		{"sentinel_datastatus", "数据状态(数据日/条数等)。", obj(nil),
-			func(a map[string]any) (string, error) { return httpCall("GET", "/api/datastatus", nil, nil) }},
+		{"sentinel_datastatus", "数据状态(数据日/条数)。可选 market=us|cn。", obj(map[string]any{"market": str("市场 us(美股)/cn(A股),默认us")}),
+			func(a map[string]any) (string, error) { return httpCall("GET", "/api/datastatus", qs(a, "market"), nil) }},
 		{"sentinel_version", "版本信息。", obj(nil),
 			func(a map[string]any) (string, error) { return httpCall("GET", "/api/version", nil, nil) }},
 		{"sentinel_trend_tickers", "【走势页多选下拉】列出所有有档位历史的可选股票(带样本数)。", obj(nil),
