@@ -18,13 +18,16 @@ import pandas as pd
 SAFNA_A = "/Users/lugia/lugia_fc/safna_jr_a"
 sys.path.insert(0, os.path.join(SAFNA_A, "lib"))
 import engine as E          # noqa  A股回测引擎(load_matrices/metrics)
-import legs as L            # noqa  头号腿+masks
+import legs as L            # noqa  头号腿+masks+size_neutral
 import timing as T          # noqa  择时/分档信号
+import altdata as A_        # noqa  事件长表→PIT矩阵
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(os.path.dirname(HERE), "data")
+ALT_DIR = os.path.join(SAFNA_A, "data", "alt")
 UNIV = os.path.join(SAFNA_A, "data", "meta", "universe.csv")
 N_HOLD = 50
+N_EVENT = 20   # rev+PEAD 事件腿展示数(容量友好,较少)
 DISCLAIMER = "研究工具,非投资建议"
 
 
@@ -116,6 +119,34 @@ def headline_pick(M):
     return [(c, float(tn[c]), float(fmc[c]) / 1e8) for c in codes]
 
 
+def rev_pead_pick(M):
+    """系统B:rev+PEAD size中性合成腿(R19)。事件数据在则算,否则返回[]。返回 [(code,score)]。"""
+    fp_an = os.path.join(ALT_DIR, "analyst.parquet"); fp_yj = os.path.join(ALT_DIR, "yjyg.parquet")
+    if not (os.path.exists(fp_an) and os.path.exists(fp_yj)):
+        return []
+    try:
+        fmc = M["fmc"]; mk = L.masks(M)
+        df = pd.read_parquet(fp_an); chg = df["评级变化"].astype(str)
+        df["rv"] = np.where(chg.str.contains("调高|上调", na=False), 1.0,
+                    np.where(chg.str.contains("调低|下调", na=False), -1.0, 0.0))
+        zr = L.size_neutral(A_.events_to_matrix(df, M, code_col="证券代码", date_col="发布日期",
+                            val_col="rv", lag=1, max_ffill=90, agg="sum"), fmc)
+        dy = pd.read_parquet(fp_yj); dy = dy[dy["预测指标"].astype(str).str.contains("净利润", na=False)]
+        TS = {"预增": 2, "扭亏": 2, "略增": 1, "续盈": 1, "减亏": 0.5, "预减": -1, "略减": -1,
+              "首亏": -2, "续亏": -2, "增亏": -2, "不确定": 0}
+        dy = dy.copy(); dy["s"] = dy["预告类型"].map(TS).fillna(0.0)
+        zp = L.size_neutral(A_.events_to_matrix(dy, M, code_col="股票代码", date_col="公告日期",
+                            val_col="s", lag=1, max_ffill=60, agg="last"), fmc)
+        comp = pd.concat([zr.stack(), zp.stack()], axis=1).mean(axis=1).unstack().reindex(
+            index=M["close"].index, columns=M["close"].columns)
+        comp = comp.where(mk["tr"])
+        row = comp.iloc[-1].dropna().sort_values(ascending=False)
+        return [(c, float(row[c])) for c in row.head(N_EVENT).index]
+    except Exception as e:
+        print(f"  [warn] rev+PEAD 腿跳过: {type(e).__name__} {str(e)[:60]}", flush=True)
+        return []
+
+
 def compute_snapshot_cn(asof=None, capital=100000.0):
     # 载入近~4年面板(足够 rolling500 拥挤 + 指标),到 asof
     end = None if (asof in (None, "latest")) else asof
@@ -142,6 +173,30 @@ def compute_snapshot_cn(asof=None, capital=100000.0):
             signals=sigs,
             indicators=dict(float_mktcap_yi=round(fmc_yi, 1), turn20=round(turn, 2)),
         ))
+    # ── 系统B:rev+PEAD 事件腿(sleeve=event,size中性容量友好)──
+    ev = rev_pead_pick(M); wv = 1.0 / max(1, len(ev)) if ev else 0
+    have = {h["ticker"] for h in holds}
+    for rank, (code, score) in enumerate(ev, 1):
+        grade, glabel, sigs, aw = trend_grade_cn(M, code, None)
+        prob = vol_scaled_prob(M, code, None)
+        price = float(px[code]) if code in px.index and np.isfinite(px[code]) else None
+        fmc_yi = float(M["fmc"].iloc[-1].get(code, np.nan)) / 1e8
+        if code in have:   # 两腿都选中 → 标 both
+            for h in holds:
+                if h["ticker"] == code:
+                    h["sleeve"] = "both"; break
+            continue
+        holds.append(dict(
+            ticker=code, name=names.get(code, ""), sleeve="event", price=price,
+            base_weight=round(wv, 4), target_shares=round(capital * wv * gate["exposure"] / price, 1) if price else 0,
+            target_value=round(capital * wv * gate["exposure"], 1),
+            grade=grade, grade_label=glabel, action="持有", action_weight=aw,
+            prob=dict(h20=prob) if prob else {},
+            reason=f"事件腿·分析师上修+业绩预告惊喜 size中性合成(第{rank},容量友好)"
+                   + (f" 流通{fmc_yi:.0f}亿" if np.isfinite(fmc_yi) else ""),
+            signals=sigs, indicators=dict(event_score=round(score, 3),
+                                          float_mktcap_yi=round(fmc_yi, 1) if np.isfinite(fmc_yi) else None),
+        ))
     snap = dict(
         market="cn", asof=str(last.date()), generated_at=str(pd.Timestamp("today").date()),
         capital=capital, disclaimer=DISCLAIMER,
@@ -150,8 +205,11 @@ def compute_snapshot_cn(asof=None, capital=100000.0):
                         amount_ratio=gate["amount_ratio"], diverge=gate["diverge"]),
         holdings=holds,
         portfolio=dict(n_holdings=len(holds), gross_exposure=gate["exposure"],
-                       cash_pct=round(1 - gate["exposure"], 2), rebalance="双周", next_rebalance=""),
-        strategy_config=dict(market="cn", selector="cn_smallcap_lowturn", gate="cn_breadth_crowding_optimized",
+                       cash_pct=round(1 - gate["exposure"], 2), rebalance="双周", next_rebalance="",
+                       sleeves=dict(smallcap=sum(1 for h in holds if h["sleeve"] in ("smallcap", "both")),
+                                    event=sum(1 for h in holds if h["sleeve"] in ("event", "both")))),
+        strategy_config=dict(market="cn", selectors=["cn_smallcap_lowturn", "cn_rev_pead"],
+                             gate="cn_breadth_crowding_optimized",
                              grader="cn_display_only", predictor="vol_scaled_rolling"),
     )
     return snap, M
