@@ -236,13 +236,17 @@ def main():
     if args.market == "cn":
         import cn_engine
         cap = args.capital if args.capital != 4000.0 else 100000.0   # A股默认10万
-        snap, _ = cn_engine.compute_snapshot_cn(args.asof, cap)
+        snap, M = cn_engine.compute_snapshot_cn(args.asof, cap)
         os.makedirs(OUT_DIR, exist_ok=True)
         for fp in (os.path.join(OUT_DIR, f"snapshot_cn_{snap['asof']}.json"),
                    os.path.join(OUT_DIR, "snapshot_cn_latest.json")):
             json.dump(snap, open(fp, "w"), ensure_ascii=False, indent=2)
+        px = M["close"].iloc[-1].dropna()
+        prices = {c: round(float(v), 4) for c, v in px.items() if np.isfinite(v)}
+        json.dump(dict(market="cn", asof=snap["asof"], prices=prices),
+                  open(os.path.join(OUT_DIR, "prices_cn_latest.json"), "w"), ensure_ascii=False)
         rl = snap["risk_light"]
-        print(f"[cn] 快照写入 snapshot_cn_{snap['asof']}.json | 持仓{len(snap['holdings'])} "
+        print(f"[cn] 快照写入 snapshot_cn_{snap['asof']}.json (+prices {len(prices)}只) | 持仓{len(snap['holdings'])} "
               f"风险灯{rl['level']} exposure{rl['exposure']} | {rl['note']}", flush=True)
         return
     print("装载数据 ...", flush=True)

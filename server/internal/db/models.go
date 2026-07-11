@@ -10,6 +10,7 @@ import (
 
 type Snapshot struct {
 	ID            int64          `gorm:"primaryKey" json:"id"`
+	Market        string         `gorm:"column:market" json:"market"` // us / cn(v2.0 双市场)
 	Asof          string         `gorm:"column:asof" json:"asof"` // DATE 以字符串收发
 	GeneratedAt   time.Time      `json:"generated_at"`
 	Capital       float64        `json:"capital"`
@@ -26,6 +27,7 @@ func (Snapshot) TableName() string { return "snapshots" }
 type Holding struct {
 	ID           int64          `gorm:"primaryKey" json:"id"`
 	SnapshotID   int64          `json:"snapshot_id"`
+	Market       string         `gorm:"column:market" json:"market"`
 	Ticker       string         `json:"ticker"`
 	Sleeve       string         `json:"sleeve"`
 	Price        float64        `json:"price"`
@@ -41,6 +43,7 @@ func (Holding) TableName() string { return "holdings" }
 
 type Position struct {
 	ID        int64     `gorm:"primaryKey" json:"id"`
+	Market    string    `gorm:"column:market" json:"market"`
 	Ticker    string    `json:"ticker"`
 	Shares    float64   `json:"shares"`
 	Cost      float64   `json:"cost"`
@@ -53,6 +56,7 @@ type Position struct {
 func (Position) TableName() string { return "positions" }
 
 type Price struct {
+	Market string  `gorm:"primaryKey;column:market" json:"market"`
 	Ticker string  `gorm:"primaryKey" json:"ticker"`
 	Date   string  `gorm:"primaryKey;column:date" json:"date"`
 	Close  float64 `json:"close"`

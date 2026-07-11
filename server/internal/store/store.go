@@ -23,28 +23,36 @@ func (s *Store) TrackedTickers() []string {
 	return ts
 }
 
-// Latest 最新快照的完整 raw JSON。
-func (s *Store) Latest() (json.RawMessage, error) {
+// mkt 规整市场参数(空→us,向后兼容)。
+func mkt(market string) string {
+	if market == "cn" {
+		return "cn"
+	}
+	return "us"
+}
+
+// Latest 最新快照的完整 raw JSON(按市场)。
+func (s *Store) Latest(market string) (json.RawMessage, error) {
 	var raw string
-	if err := s.gdb.Raw(`SELECT raw::text FROM snapshots ORDER BY asof DESC LIMIT 1`).Row().Scan(&raw); err != nil || raw == "" {
-		return nil, fmt.Errorf("无快照(先 POST /api/run)")
+	if err := s.gdb.Raw(`SELECT raw::text FROM snapshots WHERE market = ? ORDER BY asof DESC LIMIT 1`, mkt(market)).Row().Scan(&raw); err != nil || raw == "" {
+		return nil, fmt.Errorf("无快照(先 POST /api/run?market=%s)", mkt(market))
 	}
 	return json.RawMessage(raw), nil
 }
 
-// ByDate 指定收盘日快照。
-func (s *Store) ByDate(date string) (json.RawMessage, error) {
+// ByDate 指定收盘日快照(按市场)。
+func (s *Store) ByDate(market, date string) (json.RawMessage, error) {
 	var raw string
-	if err := s.gdb.Raw(`SELECT raw::text FROM snapshots WHERE asof = ?`, date).Row().Scan(&raw); err != nil || raw == "" {
+	if err := s.gdb.Raw(`SELECT raw::text FROM snapshots WHERE market = ? AND asof = ?`, mkt(market), date).Row().Scan(&raw); err != nil || raw == "" {
 		return nil, fmt.Errorf("无 %s 快照", date)
 	}
 	return json.RawMessage(raw), nil
 }
 
-// Dates 所有快照收盘日(倒序)。
-func (s *Store) Dates() ([]string, error) {
+// Dates 某市场所有快照收盘日(倒序)。
+func (s *Store) Dates(market string) ([]string, error) {
 	var dates []string
-	err := s.gdb.Raw(`SELECT asof::text FROM snapshots ORDER BY asof DESC`).Scan(&dates).Error
+	err := s.gdb.Raw(`SELECT asof::text FROM snapshots WHERE market = ? ORDER BY asof DESC`, mkt(market)).Scan(&dates).Error
 	return dates, err
 }
 
@@ -62,6 +70,7 @@ type snapProbeHolding struct {
 	Prob         json.RawMessage `json:"prob"`
 }
 type snapProbe struct {
+	Market    string `json:"market"`
 	Asof      string `json:"asof"`
 	Capital   float64
 	RiskLight struct {
@@ -85,20 +94,21 @@ func (s *Store) IngestSnapshot(raw []byte) (int64, error) {
 	if p.Asof == "" {
 		return 0, fmt.Errorf("快照缺 asof")
 	}
+	market := mkt(p.Market) // 快照缺 market → us(向后兼容)
 	var id int64
 	err := s.gdb.Transaction(func(tx *gorm.DB) error {
-		// upsert snapshot
+		// upsert snapshot(按 market+asof)
 		if e := tx.Exec(`
-			INSERT INTO snapshots(asof,generated_at,capital,risk_level,spy_vol,exposure,gross_exposure,cash_pct,raw)
-			VALUES (?, now(), ?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT (asof) DO UPDATE SET generated_at=now(), capital=EXCLUDED.capital,
+			INSERT INTO snapshots(market,asof,generated_at,capital,risk_level,spy_vol,exposure,gross_exposure,cash_pct,raw)
+			VALUES (?, ?, now(), ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT (market,asof) DO UPDATE SET generated_at=now(), capital=EXCLUDED.capital,
 			  risk_level=EXCLUDED.risk_level, spy_vol=EXCLUDED.spy_vol, exposure=EXCLUDED.exposure,
 			  gross_exposure=EXCLUDED.gross_exposure, cash_pct=EXCLUDED.cash_pct, raw=EXCLUDED.raw`,
-			p.Asof, p.Capital, p.RiskLight.Level, p.RiskLight.SpyVol, p.RiskLight.Exposure,
+			market, p.Asof, p.Capital, p.RiskLight.Level, p.RiskLight.SpyVol, p.RiskLight.Exposure,
 			p.Portfolio.GrossExposure, p.Portfolio.CashPct, string(raw)).Error; e != nil {
 			return e
 		}
-		if e := tx.Raw(`SELECT id FROM snapshots WHERE asof = ?`, p.Asof).Scan(&id).Error; e != nil {
+		if e := tx.Raw(`SELECT id FROM snapshots WHERE market = ? AND asof = ?`, market, p.Asof).Scan(&id).Error; e != nil {
 			return e
 		}
 		// 重建 holdings
@@ -110,9 +120,9 @@ func (s *Store) IngestSnapshot(raw []byte) (int64, error) {
 			if len(h.Prob) > 0 {
 				prob = string(h.Prob)
 			}
-			if e := tx.Exec(`INSERT INTO holdings(snapshot_id,ticker,sleeve,price,base_weight,target_shares,target_value,grade,action,prob)
-				VALUES (?,?,?,?,?,?,?,?,?,?)`,
-				id, h.Ticker, h.Sleeve, h.Price, h.BaseWeight, h.TargetShares, h.TargetValue, h.Grade, h.Action, prob).Error; e != nil {
+			if e := tx.Exec(`INSERT INTO holdings(snapshot_id,market,ticker,sleeve,price,base_weight,target_shares,target_value,grade,action,prob)
+				VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+				id, market, h.Ticker, h.Sleeve, h.Price, h.BaseWeight, h.TargetShares, h.TargetValue, h.Grade, h.Action, prob).Error; e != nil {
 				return e
 			}
 		}
@@ -124,21 +134,23 @@ func (s *Store) IngestSnapshot(raw []byte) (int64, error) {
 // IngestPrices 解析价格 JSON(asof + {ticker:close}),批量 upsert prices。
 func (s *Store) IngestPrices(raw []byte) (int, error) {
 	var pd struct {
+		Market string             `json:"market"`
 		Asof   string             `json:"asof"`
 		Prices map[string]float64 `json:"prices"`
 	}
 	if err := json.Unmarshal(raw, &pd); err != nil {
 		return 0, err
 	}
+	market := mkt(pd.Market)
 	rows := make([]db.Price, 0, len(pd.Prices))
 	for tk, c := range pd.Prices {
-		rows = append(rows, db.Price{Ticker: tk, Date: pd.Asof, Close: c})
+		rows = append(rows, db.Price{Market: market, Ticker: tk, Date: pd.Asof, Close: c})
 	}
 	if len(rows) == 0 {
 		return 0, nil
 	}
 	err := s.gdb.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "ticker"}, {Name: "date"}},
+		Columns:   []clause.Column{{Name: "market"}, {Name: "ticker"}, {Name: "date"}},
 		DoUpdates: clause.AssignmentColumns([]string{"close"}),
 	}).CreateInBatches(rows, 500).Error
 	return len(rows), err

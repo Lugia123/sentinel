@@ -56,7 +56,7 @@ func (s *Service) AIAllocate(ctx context.Context, userID int64, tickers []string
 	if !s.ai.Enabled() {
 		return nil, fmt.Errorf("未配置 DeepSeek,AI 分配不可用(可用均分/风险平价)")
 	}
-	raw, err := s.st.Latest()
+	raw, err := s.st.Latest("us")
 	if err != nil {
 		return nil, err
 	}

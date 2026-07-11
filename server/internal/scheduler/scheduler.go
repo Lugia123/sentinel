@@ -34,7 +34,7 @@ func New(rn *engine.Runner, st *store.Store, dataDir, capital, at string) *Sched
 func (s *Scheduler) Start() {
 	go func() {
 		// 启动自愈:库中无快照则补跑一次
-		if _, err := s.st.Latest(); err != nil {
+		if _, err := s.st.Latest("us"); err != nil {
 			log.Printf("[scheduler] 库中无快照,启动补跑…")
 			s.run()
 		}
@@ -60,7 +60,7 @@ func (s *Scheduler) run() {
 	log.Printf("[scheduler] 自动运行引擎 …")
 	// TODO(live-data): 此处先跑现有数据;接入 yfinance 每日刷新后才会拿到新交易日。
 	// 共享快照=策略持仓(不含任何用户的自定义股;自定义股按用户在读取时合并)
-	res, err := pipeline.RunAndIngest(s.rn, s.st, s.dataDir, "latest", s.capital, true, nil)
+	res, err := pipeline.RunAndIngest(s.rn, s.st, s.dataDir, "us", "latest", s.capital, true, nil)
 	if err != nil {
 		log.Printf("[scheduler] 运行失败:%v", err)
 		return

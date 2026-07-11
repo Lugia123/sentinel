@@ -130,7 +130,7 @@ func (s *Service) Explain(ctx context.Context, userID int64, ticker, date string
 
 func (s *Service) snapshot(date string) ([]byte, error) {
 	if date == "" || date == "latest" {
-		return s.store.Latest()
+		return s.store.Latest("us")
 	}
-	return s.store.ByDate(date)
+	return s.store.ByDate("us", date)
 }

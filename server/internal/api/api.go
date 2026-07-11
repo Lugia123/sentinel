@@ -151,7 +151,7 @@ func (a *API) focus(w http.ResponseWriter, r *http.Request) {
 
 // strategies 返回当天启用的策略组合(从最新快照的 strategy_config 提取)。
 func (a *API) strategies(w http.ResponseWriter, r *http.Request) {
-	raw, err := a.store.Latest()
+	raw, err := a.store.Latest(mktParam(r))
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "无快照"})
 		return
@@ -207,9 +207,10 @@ func (a *API) version(w http.ResponseWriter, r *http.Request) { writeJSON(w, htt
 
 // dataStatus 数据源完整性:快照(DB)+ 价格覆盖(DB)+ 数据源清单。
 func (a *API) dataStatus(w http.ResponseWriter, r *http.Request) {
-	dates, _ := a.store.Dates()
+	market := mktParam(r)
+	dates, _ := a.store.Dates(market)
 	status := map[string]any{"snapshot_dates": dates, "n_snapshots": len(dates), "storage": "PostgreSQL"}
-	if raw, err := a.store.Latest(); err == nil {
+	if raw, err := a.store.Latest(market); err == nil {
 		var snap map[string]any
 		_ = json.Unmarshal(raw, &snap)
 		status["latest_asof"] = snap["asof"]
@@ -220,8 +221,8 @@ func (a *API) dataStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	var nPrices int64
 	var priceAsof string
-	a.gdb.Raw(`SELECT count(*) FROM prices WHERE date = (SELECT max(date) FROM prices)`).Row().Scan(&nPrices)
-	a.gdb.Raw(`SELECT max(date)::text FROM prices`).Row().Scan(&priceAsof)
+	a.gdb.Raw(`SELECT count(*) FROM prices WHERE market=? AND date=(SELECT max(date) FROM prices WHERE market=?)`, market, market).Row().Scan(&nPrices)
+	a.gdb.Raw(`SELECT max(date)::text FROM prices WHERE market=?`, market).Row().Scan(&priceAsof)
 	status["price_table"] = map[string]any{"asof": priceAsof, "n_tickers": nPrices}
 	status["sources"] = map[string]string{
 		"prices":       "safna_jr/round20/data_broad(1393只 OHLCV+指标)→ 选股/档位/概率/盈亏",
@@ -233,14 +234,15 @@ func (a *API) dataStatus(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) snapshot(w http.ResponseWriter, r *http.Request) {
 	date := r.URL.Query().Get("date")
+	market := mktParam(r)
 	var (
 		raw json.RawMessage
 		err error
 	)
 	if date == "" || date == "latest" {
-		raw, err = a.store.Latest()
+		raw, err = a.store.Latest(market)
 	} else {
-		raw, err = a.store.ByDate(date)
+		raw, err = a.store.ByDate(market, date)
 	}
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "无快照,请先 POST /api/run 生成", "detail": err.Error()})
@@ -392,7 +394,7 @@ func (a *API) warmFocus(uid int64, ticker, asof string) map[string]any {
 }
 
 func (a *API) dates(w http.ResponseWriter, r *http.Request) {
-	ds, err := a.store.Dates()
+	ds, err := a.store.Dates(mktParam(r))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -407,7 +409,7 @@ func (a *API) run(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	asof := q(r, "asof", "latest")
-	res, err := pipeline.RunAndIngest(a.runner, a.store, a.dataDir, asof, q(r, "capital", "4000"), r.URL.Query().Get("sy") != "0", nil)
+	res, err := pipeline.RunAndIngest(a.runner, a.store, a.dataDir, mktParam(r), asof, q(r, "capital", "4000"), r.URL.Query().Get("sy") != "0", nil)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error(), "log": res.Log})
 		return
@@ -445,6 +447,14 @@ func q(r *http.Request, k, d string) string {
 		return v
 	}
 	return d
+}
+
+// mktParam 从请求读市场(?market=cn/us),默认 us(向后兼容)。
+func mktParam(r *http.Request) string {
+	if r.URL.Query().Get("market") == "cn" {
+		return "cn"
+	}
+	return "us"
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

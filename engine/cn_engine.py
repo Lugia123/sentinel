@@ -221,13 +221,19 @@ def main():
     ap.add_argument("--capital", type=float, default=100000.0)
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
-    snap, _ = compute_snapshot_cn(a.asof, a.capital)
+    snap, M = compute_snapshot_cn(a.asof, a.capital)
     os.makedirs(OUT_DIR, exist_ok=True)
     fps = [os.path.join(OUT_DIR, f"snapshot_cn_{snap['asof']}.json"),
            os.path.join(OUT_DIR, "snapshot_cn_latest.json")]
     for fp in fps:
         json.dump(snap, open(fp, "w"), ensure_ascii=False, indent=2)
-    print(f"SAVED {fps[0]}")
+    # 价格表(全池 asof 收盘,供后端算持仓盈亏,market 标记)
+    px = M["close"].iloc[-1].dropna()
+    prices = {c: round(float(v), 4) for c, v in px.items() if np.isfinite(v)}
+    pd_out = dict(market="cn", asof=snap["asof"], prices=prices)
+    for fp in (os.path.join(OUT_DIR, "prices_cn_latest.json"),):
+        json.dump(pd_out, open(fp, "w"), ensure_ascii=False)
+    print(f"SAVED {fps[0]} (+prices_cn {len(prices)}只)")
     print(f"  market={snap['market']} asof={snap['asof']} 风险灯={snap['risk_light']['level']} "
           f"exposure={snap['risk_light']['exposure']} 持仓={snap['portfolio']['n_holdings']}")
     print(f"  {snap['risk_light']['note']}")

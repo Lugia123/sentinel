@@ -17,13 +17,18 @@ type Result struct {
 }
 
 // RunAndIngest 跑 run_daily.py 产 JSON → ingest snapshots/holdings/prices 入 PG。
-func RunAndIngest(rn *engine.Runner, st *store.Store, dataDir, asof, capital string, withSY bool, track []string) (Result, error) {
-	out, err := rn.RunDaily(asof, capital, withSY, track)
+// market: us(snapshot_latest.json)/ cn(snapshot_cn_latest.json)。
+func RunAndIngest(rn *engine.Runner, st *store.Store, dataDir, market, asof, capital string, withSY bool, track []string) (Result, error) {
+	out, err := rn.RunDaily(market, asof, capital, withSY, track)
 	if err != nil {
 		return Result{Log: out}, err
 	}
-	snapRaw, e1 := os.ReadFile(filepath.Join(dataDir, "snapshot_latest.json"))
-	priceRaw, e2 := os.ReadFile(filepath.Join(dataDir, "prices_latest.json"))
+	suffix := ""
+	if market == "cn" {
+		suffix = "_cn"
+	}
+	snapRaw, e1 := os.ReadFile(filepath.Join(dataDir, "snapshot"+suffix+"_latest.json"))
+	priceRaw, e2 := os.ReadFile(filepath.Join(dataDir, "prices"+suffix+"_latest.json"))
 	if e1 != nil || e2 != nil {
 		return Result{Log: out}, fmt.Errorf("引擎产出读取失败")
 	}
