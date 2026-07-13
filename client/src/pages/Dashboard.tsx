@@ -5,11 +5,12 @@ import type { TickerMeta } from '../api'
 import { pct, pct2, InfoDot, GradeBadge, SleeveBadge, actionColor, cnMarketAction } from '../ui'
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
-import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, type UniverseItem } from '../api'
+import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, fetchDropped, type UniverseItem, type DroppedItem } from '../api'
 
-export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onReload }: {
+export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onSelectDropped, onReload }: {
   snap: Snapshot; meta: TickerMeta; watch: Set<string>
   onToggleWatch: (t: string, on: boolean) => void; onSelect: (t: string) => void
+  onSelectDropped: (d: DroppedItem) => void
   onReload: () => void
 }) {
   const chartRef = useRef<HTMLDivElement>(null)
@@ -42,6 +43,11 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
   }
   // 建议股数分配:纯工具弹窗(不回写列表)
   const [allocOpen, setAllocOpen] = useState(false)
+  // 建议持仓 / 掉出推荐 tab
+  const [listTab, setListTab] = useState<'rec' | 'dropped'>('rec')
+  const [dropped, setDropped] = useState<DroppedItem[]>([])
+  useEffect(() => { setListTab('rec'); fetchDropped().then(setDropped) }, [snap.market, snap.asof])
+  const daysOut = (d: string) => Math.max(0, Math.round((new Date(snap.asof).getTime() - new Date(d).getTime()) / 86400000))
   // 我的持仓(和「我的持仓」页联动:把实际持仓股数显示到列表)
   const [myPos, setMyPos] = useState<Record<string, number>>({})
   useEffect(() => {
@@ -152,8 +158,15 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
-          <h3 style={{ margin: 0 }}>建议持仓 <span className="muted" style={{ fontWeight: 400 }}>· 点行看详情 · ★关注置顶</span></h3>
-          <div className="pos-add" style={{ margin: 0 }}>
+          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className={listTab === 'rec' ? '' : 'muted'} style={{ cursor: 'pointer' }} onClick={() => setListTab('rec')}>建议持仓</span>
+            <span className={listTab === 'dropped' ? '' : 'muted'} style={{ cursor: 'pointer' }} onClick={() => setListTab('dropped')}>
+              掉出推荐{dropped.length > 0 && <span className="pill g-neg1" style={{ marginLeft: 4 }}>{dropped.length}</span>}
+            </span>
+            <InfoDot text="掉出推荐=曾被策略选中、连续2个交易日不再满足入选条件的股票(30天后自动清理;连续2日重新入选会自动回归)。点行看 AI 分析掉出原因。" />
+            {listTab === 'rec' && <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>· 点行看详情 · ★关注置顶</span>}
+          </h3>
+          {listTab === 'rec' && <div className="pos-add" style={{ margin: 0 }}>
             {picked
               ? <span className="picked-chip">{picked}{meta[picked]?.cn ? ' ' + meta[picked].cn : ''}<button onClick={() => setPicked('')} aria-label="取消">×</button></span>
               : <SearchSelect options={addable} onPick={setPicked}
@@ -161,10 +174,34 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
             <button className="primary" onClick={doAdd} disabled={!picked}>添加</button>
             <InfoDot text="先搜索选中一只(可输代码或中文名),再点「添加」纳入你的追踪列表(不会自动关注)。添加后会算它的档位/概率,列表出现「加载中」行,算完即显示。" />
             <button className="th-btn" onClick={() => setAllocOpen(true)} title="选股票 + 方式,算各股买多少(工具,不改列表)">⚖ 分配计算</button>
-          </div>
+          </div>}
         </div>
         {addErr && <div className="down" style={{ fontSize: 13, marginBottom: 6 }}>{addErr}</div>}
-        <div className="tbl-scroll">
+        {listTab === 'dropped' && (
+          <div className="tbl-scroll">
+            <table>
+              <thead><tr><th>标的</th><th>掉出日期</th><th>已掉出</th><th>掉出时档位</th><th>掉出时价</th><th>现价</th><th>掉出后涨跌 <InfoDot text="从最后在推荐中那天的收盘价到最新收盘价的涨跌——回头检验策略掉出得对不对。" /></th></tr></thead>
+              <tbody>
+                {dropped.map((d) => {
+                  const chg = d.price_now > 0 && d.last_price > 0 ? (d.price_now - d.last_price) / d.last_price : null
+                  return (
+                    <tr key={d.ticker} className="clickable" onClick={() => onSelectDropped(d)}>
+                      <td><b>{d.ticker}</b>{(d.name || meta[d.ticker]?.cn) && <span className="cn">{d.name || meta[d.ticker]?.cn}</span>} <span className="go">›</span></td>
+                      <td className="muted">{d.dropped_at}</td>
+                      <td>{daysOut(d.dropped_at)} 天</td>
+                      <td><GradeBadge g={d.last_grade} /></td>
+                      <td className="muted">{CUR}{d.last_price}</td>
+                      <td>{d.price_now > 0 ? `${CUR}${d.price_now}` : '—'}</td>
+                      <td className={chg == null ? 'muted' : chg >= 0 ? 'up' : 'down'}>{chg == null ? '—' : pct2(chg)}</td>
+                    </tr>
+                  )
+                })}
+                {dropped.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 20 }}>暂无掉出记录(股票连续 2 个交易日不再被策略选中才会出现在这里)</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {listTab === 'rec' && <div className="tbl-scroll">
           <table>
             <thead>
               <tr>
@@ -213,7 +250,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
               })}
             </tbody>
           </table>
-        </div>
+        </div>}
       </div>
 
       <div className="card">

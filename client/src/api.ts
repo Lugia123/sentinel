@@ -95,6 +95,16 @@ export async function fetchTrendTickers(): Promise<{ ticker: string; n: number; 
   return r.ok ? (await r.json()).tickers || [] : []
 }
 
+// 掉出推荐列表(曾被策略选中、经 CD 防抖后判定掉出)
+export interface DroppedItem {
+  ticker: string; name: string; last_seen: string; dropped_at: string
+  last_price: number; last_grade: number; price_now: number; context: string
+}
+export async function fetchDropped(): Promise<DroppedItem[]> {
+  const r = await fetch(`/api/dropped${mq()}`)
+  return r.ok ? (await r.json()).dropped || [] : []
+}
+
 import type { Holding } from './types'
 export async function fetchFocus(ticker: string): Promise<{ asof: string; ticker: string; holding: Holding }> {
   const r = await fetch(`/api/focus?ticker=${ticker.toUpperCase()}${currentMarket==='cn'?'&market=cn':''}`)

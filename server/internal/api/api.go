@@ -65,6 +65,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/focus", a.focus)
 	mux.HandleFunc("/api/trend", a.trend)
 	mux.HandleFunc("/api/trend/tickers", a.trendTickers)
+	mux.HandleFunc("/api/dropped", a.dropped)
 	mux.HandleFunc("/api/investigate", a.investigate)
 	mux.HandleFunc("/api/earnings/quarters", a.earningsQuarters)
 	mux.HandleFunc("/api/earnings", a.earningsInterpret)
@@ -134,6 +135,16 @@ func (a *API) investigate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
+}
+
+// dropped 掉出推荐列表:曾被策略选中、现已掉出(经 CD 防抖)的股票。?market=cn
+func (a *API) dropped(w http.ResponseWriter, r *http.Request) {
+	items, err := a.store.Dropped(mktParam(r))
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"dropped": items})
 }
 
 // focus 单股观察:任意 ticker 用同规则分析(资金池=这一只)。?ticker=X&market=cn

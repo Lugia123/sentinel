@@ -73,10 +73,24 @@ type holding struct {
 	Prob       json.RawMessage `json:"prob"`
 }
 
+// SYSTEM_DROPPED 掉出分析:股票从策略推荐中掉出后,详情页 AI 讲解切到这个视角。
+const SYSTEM_DROPPED = `你是资深量化投资顾问。一只曾被策略选中的股票【已从推荐列表掉出】,请基于【策略规则】和【掉出前最后一天的计算结果】+【掉出后的价格表现】,给读者讲清楚掉出这件事。
+【铁律】策略每天按固定规则重选,掉出=不再满足入选条件,不是"策略讨厌它"或方向预测。不要复述数字,要解释含义。不确定的机制绝不编造。
+四段固定结构:
+① 为什么掉出 —— 对照选股规则推断最可能的落选原因(美股:动量相对排名回落/跌破趋势门(200日线/50日线/距52周高)/股东收益率排名被挤出;A股:20日换手率抬升排出低换手前50/流通市值涨出最小20%分位/事件分衰减/被ST或停牌)。结合给你的掉出前指标点出最可疑的1-2条,措辞用"最可能""大概率"。
+② 掉出意味着什么 —— 讲清楚:掉出≠看空预测,只是不再是策略眼中"最优的那批";历史上掉出后有的继续涨有的回落,策略不预测方向。
+③ 持有者怎么办 —— 结合当前市场级风险灯/档位动作口径给操作参考(不是投资建议):美股按档位动作;A股按市场级风险灯统一指令。
+④ 什么情况下会回来 —— 说明重新满足入选条件即可回归推荐(以及防抖CD机制:连续满足才回来)。
+【输出格式】HTML 片段(不要 <html>/<body>/代码围栏),<h4>小标题</h4> + <p>/<ul><li>,关键处 <b>。四个小标题固定:为什么掉出 / 掉出意味着什么 / 持有者怎么办 / 什么情况下会回来。结尾 <p class="disc">研究工具,非投资建议。</p>。全文 350 字内。`
+
 // Explain 返回某股白话讲解(按用户缓存;force=true 强制重算)。market: us/cn(取对应市场快照与规则)。
+// 若该股在「掉出推荐」列表中,自动切换为掉出原因分析视角。
 func (s *Service) Explain(ctx context.Context, userID int64, market, ticker, date string, force bool) (map[string]any, error) {
 	if market != "cn" {
 		market = "us"
+	}
+	if di := s.droppedInfo(market, ticker); di != nil {
+		return s.explainDropped(ctx, userID, market, ticker, di, force)
 	}
 	raw, err := s.snapshot(market, date)
 	if err != nil {
@@ -155,4 +169,65 @@ func (s *Service) snapshot(market, date string) ([]byte, error) {
 		return s.store.Latest(market)
 	}
 	return s.store.ByDate(market, date)
+}
+
+// droppedRec 掉出记录(查 dropped_stocks,nil=不在掉出列表)。
+type droppedRec struct {
+	LastSeen  string
+	DroppedAt string
+	LastPrice float64
+	LastGrade int
+	Context   string
+}
+
+func (s *Service) droppedInfo(market, ticker string) *droppedRec {
+	var d droppedRec
+	s.gdb.Raw(`SELECT last_seen::text AS last_seen, dropped_at::text AS dropped_at, last_price, last_grade, context::text AS context
+		FROM dropped_stocks WHERE market=? AND ticker=? AND status='dropped'`, market, ticker).Scan(&d)
+	if d.DroppedAt == "" {
+		return nil
+	}
+	return &d
+}
+
+// explainDropped 掉出原因分析:注入掉出前 holding + 掉出后价格表现,缓存 kind='dropped'。
+func (s *Service) explainDropped(ctx context.Context, userID int64, market, ticker string, di *droppedRec, force bool) (map[string]any, error) {
+	if !force {
+		var cached string
+		if s.gdb.Raw(`SELECT content FROM explanations WHERE user_id=? AND ticker=? AND asof=? AND kind='dropped'`,
+			userID, ticker, di.DroppedAt).Row().Scan(&cached) == nil && cached != "" {
+			return map[string]any{"ticker": ticker, "asof": di.DroppedAt, "content": cached, "cached": true, "dropped": true}, nil
+		}
+	}
+	if !s.ai.Enabled() {
+		return nil, fmt.Errorf("未配置 DeepSeek(server/.env 的 SENTINEL_DEEPSEEK_KEY);其余功能不受影响")
+	}
+	// 掉出后现价(该市场最新价),给 AI 讲"掉出后表现"
+	var priceNow float64
+	s.gdb.Raw(`SELECT close FROM prices WHERE market=? AND ticker=? ORDER BY date DESC LIMIT 1`, market, ticker).Row().Scan(&priceNow)
+	perf := "无最新价"
+	if priceNow > 0 && di.LastPrice > 0 {
+		perf = fmt.Sprintf("掉出时价 %.2f → 现价 %.2f(%+.1f%%)", di.LastPrice, priceNow, (priceNow-di.LastPrice)/di.LastPrice*100)
+	}
+	rules := RULES
+	if market == "cn" {
+		rules = RULES_CN
+	}
+	user := fmt.Sprintf("%s\n\n【股票 %s 已从推荐掉出】\n最后在推荐中:%s;判定掉出:%s;掉出时档位:%d\n掉出后表现:%s\n【掉出前最后一天的完整计算结果】\n%s",
+		rules, ticker, di.LastSeen, di.DroppedAt, di.LastGrade, perf, di.Context)
+	content, err := s.ai.Chat(ctx, SYSTEM_DROPPED, user)
+	if err != nil {
+		return nil, err
+	}
+	content = strings.TrimSpace(content)
+	if strings.HasPrefix(content, "```") {
+		if i := strings.IndexByte(content, '\n'); i >= 0 {
+			content = content[i+1:]
+		}
+		content = strings.TrimSuffix(strings.TrimSpace(content), "```")
+	}
+	s.gdb.Exec(`INSERT INTO explanations(user_id,ticker,asof,kind,content,model) VALUES (?,?,?,'dropped',?,?)
+		ON CONFLICT (user_id,ticker,asof,kind) DO UPDATE SET content=EXCLUDED.content, model=EXCLUDED.model, created_at=now()`,
+		userID, ticker, di.DroppedAt, content, "deepseek")
+	return map[string]any{"ticker": ticker, "asof": di.DroppedAt, "content": content, "cached": false, "dropped": true}, nil
 }

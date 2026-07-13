@@ -3,6 +3,7 @@ package pipeline
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -35,6 +36,9 @@ func RunAndIngest(rn *engine.Runner, st *store.Store, dataDir, market, asof, cap
 	sid, e3 := st.IngestSnapshot(snapRaw)
 	if e3 != nil {
 		return Result{Log: out}, fmt.Errorf("ingest 快照: %w", e3)
+	}
+	if e := st.UpdateDropped(snapRaw); e != nil { // 掉出状态机(失败不阻断快照入库)
+		log.Printf("[pipeline] 掉出状态机失败(快照不受影响): %v", e)
 	}
 	n, e4 := st.IngestPrices(priceRaw)
 	if e4 != nil {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchSnapshot, runEngine, fetchVersion, fetchMeta, fetchWatchlist, setStar, getMarket, setMarket, type Market, type TickerMeta } from './api'
+import { fetchSnapshot, runEngine, fetchVersion, fetchMeta, fetchWatchlist, setStar, getMarket, setMarket, type Market, type TickerMeta, type DroppedItem } from './api'
 import type { Snapshot, Holding } from './types'
 import Dashboard from './pages/Dashboard'
 import Positions from './pages/Positions'
@@ -31,6 +31,7 @@ export default function App() {
   const [running, setRunning] = useState(false)
   const [view, setView] = useState<View>('signals')
   const [sel, setSel] = useState<string | null>(null)
+  const [droppedSel, setDroppedSel] = useState<DroppedItem | null>(null) // 掉出股详情(holding 来自掉出前 context)
   const [meta, setMeta] = useState<TickerMeta>({})
   const [watch, setWatch] = useState<Set<string>>(new Set())
   const [userMenu, setUserMenu] = useState(false)
@@ -41,7 +42,7 @@ export default function App() {
   // 切换市场:设全局市场 → 重载快照/关注(元数据 us 用中文名映射,cn 用快照内 name)
   const switchMarket = async (m: Market) => {
     if (m === market) return
-    setMarket(m); setMarketState(m); setSel(null); setSnap(null); setErr('')
+    setMarket(m); setMarketState(m); setSel(null); setDroppedSel(null); setSnap(null); setErr('')
     try { setSnap(await fetchSnapshot()) } catch (e: any) { setErr(String(e.message || e)) }
     loadWatch()
   }
@@ -75,8 +76,10 @@ export default function App() {
     try { await runEngine(true); await load() } catch (e: any) { setErr('重算失败：' + String(e.message || e)) }
     setRunning(false)
   }
-  const goto = (v: View) => { setView(v); setSel(null) }
+  const goto = (v: View) => { setView(v); setSel(null); setDroppedSel(null) }
   const detailH = sel && snap ? snap.holdings.find((h) => h.ticker === sel) : null
+  // 掉出股详情:holding 用掉出前最后一天的 context(页面会标注这是掉出前数据)
+  const droppedH: Holding | null = droppedSel ? (() => { try { return JSON.parse(droppedSel.context) } catch { return null } })() : null
 
   if (!authReady) return <div className="login-wrap"><div className="muted">加载中…</div></div>
   if (!me) return <Login onLogin={(u) => setMe(u)} />
@@ -136,13 +139,14 @@ export default function App() {
           </div>
         )}
 
-        {detailH && <StockDetail h={detailH} meta={meta} market={market} riskLight={snap?.risk_light} />}
-        {!detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onReload={load} />}
-        {!detailH && view === 'positions' && <Positions market={market} />}
-        {!detailH && view === 'trends' && <Trends meta={meta} watch={watch} market={market} />}
-        {!detailH && view === 'help' && <Help market={market} />}
-        {!detailH && view === 'admin' && isAdmin && <Admin />}
-        {!detailH && view === 'signals' && !snap && !err && <div className="card">加载中…</div>}
+        {droppedH && droppedSel && <StockDetail h={droppedH} meta={meta} market={market} riskLight={snap?.risk_light} dropped={droppedSel} />}
+        {!droppedH && detailH && <StockDetail h={detailH} meta={meta} market={market} riskLight={snap?.risk_light} />}
+        {!droppedH && !detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onSelectDropped={setDroppedSel} onReload={load} />}
+        {!droppedH && !detailH && view === 'positions' && <Positions market={market} />}
+        {!droppedH && !detailH && view === 'trends' && <Trends meta={meta} watch={watch} market={market} />}
+        {!droppedH && !detailH && view === 'help' && <Help market={market} />}
+        {!droppedH && !detailH && view === 'admin' && isAdmin && <Admin />}
+        {!droppedH && !detailH && view === 'signals' && !snap && !err && <div className="card">加载中…</div>}
 
         <div className="disc">
           研究工具，非投资建议。档位=趋势状态（松·只减防御跟法，只减不追涨）；概率带=波动范围的校准估计（非方向预言）；

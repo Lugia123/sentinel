@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import { fetchHistory, fetchExplain, fetchInvestigate, fetchBlobHTML, fetchEarningsQuarters, fetchEarningsInterpret, type EarnQuarter } from '../api'
 import type { Holding, HistPoint, RiskLight } from '../types'
-import type { TickerMeta, Market } from '../api'
+import type { TickerMeta, Market, DroppedItem } from '../api'
 import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot, cnMarketAction } from '../ui'
 import Select, { type SelectOption } from '../components/Select'
 import EarningsChart from '../components/EarningsChart'
 import ProbBandChart from '../components/ProbBandChart'
 
-export default function StockDetail({ h, meta, market = 'us', riskLight }: { h: Holding; meta: TickerMeta; market?: Market; riskLight?: RiskLight }) {
+export default function StockDetail({ h, meta, market = 'us', riskLight, dropped }: { h: Holding; meta: TickerMeta; market?: Market; riskLight?: RiskLight; dropped?: DroppedItem }) {
   const m = meta[h.ticker]
   const isCN = market === 'cn'
   const cur = isCN ? '¥' : '$'
@@ -75,8 +75,22 @@ export default function StockDetail({ h, meta, market = 'us', riskLight }: { h: 
   }, [hist, tab]) // 含 tab:从背调/财报切回概览时容器重新挂载,须重新 init(否则图空白)
 
   const ind = h.indicators
+  const dChg = dropped && dropped.price_now > 0 && dropped.last_price > 0
+    ? (dropped.price_now - dropped.last_price) / dropped.last_price : null
   return (
     <>
+      {dropped && (
+        <div className="card" style={{ borderColor: 'var(--warn)', marginBottom: 10 }}>
+          <b style={{ color: 'var(--warn)' }}>⚠ 已掉出推荐</b>
+          <span className="muted" style={{ marginLeft: 8 }}>
+            最后在推荐中 {dropped.last_seen} · 判定掉出 {dropped.dropped_at}
+            {dChg != null && <> · 掉出后 <span className={dChg >= 0 ? 'up' : 'down'}>{pct2(dChg)}</span>({cur}{dropped.last_price} → {cur}{dropped.price_now})</>}
+          </span>
+          <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+            下方档位/指标/概率为<b>掉出前最后一天</b>的快照数据;「AI 讲解」已切换为<b>掉出原因分析</b>。连续 2 个交易日重新满足入选条件会自动回归推荐。
+          </div>
+        </div>
+      )}
       <div className="card detail-head">
         <div>
           <span className="dh-tk">{h.ticker}</span>
@@ -154,7 +168,7 @@ export default function StockDetail({ h, meta, market = 'us', riskLight }: { h: 
 
       {/* AI 讲解 */}
       <div className="card ai-card">
-        <h3>🤖 AI 讲解 <span className="muted" style={{ fontWeight: 400 }}>· DeepSeek 按策略规则白话解读</span>
+        <h3>🤖 {dropped ? 'AI 掉出分析' : 'AI 讲解'} <span className="muted" style={{ fontWeight: 400 }}>· {dropped ? 'DeepSeek 分析为什么掉出推荐' : 'DeepSeek 按策略规则白话解读'}</span>
           <button className="ghost mini" style={{ float: 'right' }} onClick={() => loadAI(true)} disabled={aiLoading}>{aiLoading ? '生成中…' : '重新讲解'}</button>
         </h3>
         {aiLoading && <div className="muted">正在生成讲解…（首次约几秒）</div>}
