@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import { fetchHistory, fetchExplain, fetchInvestigate, fetchBlobHTML, fetchEarningsQuarters, fetchEarningsInterpret, type EarnQuarter } from '../api'
-import type { Holding, HistPoint } from '../types'
+import type { Holding, HistPoint, RiskLight } from '../types'
 import type { TickerMeta, Market } from '../api'
-import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot } from '../ui'
+import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot, cnMarketAction } from '../ui'
 import Select, { type SelectOption } from '../components/Select'
 import EarningsChart from '../components/EarningsChart'
 import ProbBandChart from '../components/ProbBandChart'
 
-export default function StockDetail({ h, meta, market = 'us' }: { h: Holding; meta: TickerMeta; market?: Market }) {
+export default function StockDetail({ h, meta, market = 'us', riskLight }: { h: Holding; meta: TickerMeta; market?: Market; riskLight?: RiskLight }) {
   const m = meta[h.ticker]
   const isCN = market === 'cn'
   const cur = isCN ? '¥' : '$'
+  // A股动作=市场级风险灯统一指令(单票不按档位减仓);美股=单票档位映射
+  const act = isCN && riskLight ? cnMarketAction(riskLight.level) : { text: h.action, color: actionColor(h.action) }
   const [tab, setTab] = useState<'overview' | 'bg' | 'earnings'>('overview')
   // 背景调查:取回 HTML 片段注入页面(不用 iframe,随整页滚)
   const [bgHtml, setBgHtml] = useState(''); const [bgLoading, setBgLoading] = useState(false); const [bgErr, setBgErr] = useState('')
@@ -82,7 +84,7 @@ export default function StockDetail({ h, meta, market = 'us' }: { h: Holding; me
           <span className="dh-px">{cur}{h.price}</span>
         </div>
         <div>
-          <GradeBadge g={h.grade} label={h.grade_label} /> <span style={{ color: actionColor(h.action), fontWeight: 700, marginLeft: 8 }}>{h.action}</span>
+          <GradeBadge g={h.grade} label={h.grade_label} /> <span style={{ color: act.color, fontWeight: 700, marginLeft: 8 }}>{act.text}</span>
         </div>
       </div>
 
@@ -171,7 +173,11 @@ export default function StockDetail({ h, meta, market = 'us' }: { h: Holding; me
             </div>
           ))}
         </div>
-        <div className="muted" style={{ marginTop: 8 }}>当前档位 <GradeBadge g={h.grade} label={h.grade_label} /> → 动作「{h.action}」{isCN ? '（A股逐票不减仓，风险由市场级风险灯统一管）' : '（只减不追涨）'}</div>
+        <div className="muted" style={{ marginTop: 8 }}>
+          {isCN
+            ? <>当前档位 <GradeBadge g={h.grade} label={h.grade_label} />(仅展示趋势,不触发单票减仓)→ 动作由市场级风险灯决定:「<span style={{ color: act.color, fontWeight: 600 }}>{act.text}</span>」{riskLight ? `(当前风险灯:${riskLight.note})` : ''}</>
+            : <>当前档位 <GradeBadge g={h.grade} label={h.grade_label} /> → 动作「{h.action}」（只减不追涨）</>}
+        </div>
       </div>}
 
       {/* 关键指标 */}

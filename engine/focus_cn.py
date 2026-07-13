@@ -24,15 +24,27 @@ def _name_of(code):
         return ""
 
 
+GAP_DAYS = 180  # 相邻交易日间隔超过此值=数据断档(历史下载不完整+增量接尾的污染)
+
+
 def _load(code, asof):
+    """读单只CSV;若存在内部断档(相邻>GAP_DAYS天),只保留最后一段连续数据——
+    跨缝混算会产生假收益(如 +173%/日)污染波动率/均线。返回 (df, had_gap)。"""
     fp = os.path.join(DATA_CN, code.replace(".", "_") + ".csv")
     if not os.path.exists(fp):
-        return None
+        return None, False
     df = pd.read_csv(fp, parse_dates=["date"]).set_index("date").sort_index()
     if asof not in (None, "latest"):
         df = df.loc[:pd.Timestamp(asof)]
     df = df[np.isfinite(df["close"])]
-    return df if len(df) else None
+    if not len(df):
+        return None, False
+    gaps = df.index.to_series().diff().dt.days
+    had_gap = bool((gaps > GAP_DAYS).any())
+    if had_gap:
+        last_break = gaps[gaps > GAP_DAYS].index[-1]
+        df = df.loc[last_break:]
+    return df, had_gap
 
 
 def trend_grade_cn(C):
@@ -84,12 +96,25 @@ def main():
     args = ap.parse_args()
     code = args.ticker.strip().lower()
 
-    df = _load(code, args.asof)
+    df, had_gap = _load(code, args.asof)
     if df is None:
         print(json.dumps({"error": f"{code} 不在A股数据池(确认代码形如 sh.600000 / sz.000001)"}, ensure_ascii=False))
         return
     C = df["close"]
     asof = C.index[-1]
+    if had_gap and len(C) < 200:
+        # 断档且缝后连续数据不足:档位/概率都算不可信 → 明确提示,不硬算
+        holding = dict(
+            ticker=code, name=_name_of(code), sleeve="focus", price=round(float(C.iloc[-1]), 2),
+            base_weight=1.0, target_shares=0, target_value=0,
+            grade=0, grade_label="数据异常", action="持有", action_weight=1.0, prob={},
+            reason=f"⚠ 数据异常:该股历史数据存在断档(仅有断档后 {len(C)} 个交易日),档位/概率暂不可信;"
+                   "待数据修复(全量重拉)后自动恢复",
+            signals=[dict(name="数据完整性", detail=f"历史断档,连续数据仅{len(C)}日(<200)", verdict="空")],
+            indicators=dict(float_mktcap_yi=None, turn20=None),
+        )
+        print(json.dumps(dict(asof=str(asof.date()), ticker=code, holding=holding), ensure_ascii=False))
+        return
     grade, glabel, sigs, aw = trend_grade_cn(C)
     prob = vol_scaled_prob(C)
     px = float(C.iloc[-1])

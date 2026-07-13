@@ -136,7 +136,7 @@ export default function App() {
           </div>
         )}
 
-        {detailH && <StockDetail h={detailH} meta={meta} market={market} />}
+        {detailH && <StockDetail h={detailH} meta={meta} market={market} riskLight={snap?.risk_light} />}
         {!detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onReload={load} />}
         {!detailH && view === 'positions' && <Positions market={market} />}
         {!detailH && view === 'trends' && <Trends meta={meta} watch={watch} market={market} />}

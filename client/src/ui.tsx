@@ -15,6 +15,13 @@ export const SLEEVE: Record<string, { label: string; hint: string; cls: string }
 
 export const gradeCls = (g: number) => (g >= 2 ? 'g-3' : g >= 0 ? 'g-1' : g === -1 ? 'g-neg1' : 'g-neg2')
 export const actionColor = (a: string) => (a.includes('清仓') ? 'var(--down)' : a.includes('减') ? 'var(--warn)' : 'var(--up)')
+
+// A股单票不减仓(反转市,逐票减仓有害·R36),动作由【市场级风险灯】统一决定——
+// 引擎里 action 恒"持有"只是占位,展示时必须翻译成市场级指令,否则用户会以为无论如何都拿着。
+export const cnMarketAction = (level: string): { text: string; color: string } =>
+  level === 'red' ? { text: '清仓观望', color: 'var(--down)' }
+  : level === 'amber' ? { text: '减至半仓', color: 'var(--warn)' }
+  : { text: '持有', color: 'var(--up)' }
 export const verdictCls = (v: string) => (v === '多' ? 'up' : v === '空' ? 'down' : 'muted')
 
 // 悬浮说明小圆点 —— tooltip 用 fixed 定位跟随触发点,绝不被表格 overflow 裁掉

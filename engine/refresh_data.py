@@ -46,6 +46,85 @@ def _last_date(fp):
     return None
 
 
+CN_FIELDS = "date,open,high,low,close,preclose,volume,amount,turn,tradestatus,pctChg,isST"
+GAP_DAYS = 180  # 相邻行日期差超过此值视为断档(污染:旧历史+新增量拼接)
+
+
+def _dates_of(fp):
+    """读单只 CSV 全部日期列(修复模式全扫用)。"""
+    out = []
+    try:
+        with open(fp) as f:
+            for row in csv.reader(f):
+                if row and row[0][:4].isdigit():
+                    out.append(row[0])
+    except Exception:
+        pass
+    return out
+
+
+def _max_gap_days(dates):
+    """相邻日期最大间隔(天)。"""
+    worst = 0
+    for a, b in zip(dates, dates[1:]):
+        try:
+            d = (datetime.strptime(b, "%Y-%m-%d") - datetime.strptime(a, "%Y-%m-%d")).days
+            worst = max(worst, d)
+        except ValueError:
+            continue
+    return worst
+
+
+def _full_refetch_cn(bs, code, fp, dry=False):
+    """全量重拉一只A股并原子重写 CSV(修复断档/落后太久)。返回重写后的最后日期(失败 None)。"""
+    rs = bs.query_history_k_data_plus(code, CN_FIELDS, start_date="1990-01-01",
+                                      frequency="d", adjustflag="2")
+    rows = []
+    while rs.error_code == '0' and rs.next():
+        rows.append(rs.get_row_data())
+    if not rows:
+        return None
+    if not dry:
+        tmp = fp + ".tmp"
+        with open(tmp, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(CN_FIELDS.split(","))
+            w.writerows(rows)
+        os.replace(tmp, fp)
+    return rows[-1][0]
+
+
+def repair_cn(data_dir, limit=None, dry=False):
+    """修复模式:全扫每只 CSV 的日期列,发现内部断档(相邻>GAP_DAYS天)→ 全量重拉重写。
+    一次性使用(存量污染:历史下载不完整 + 后来增量直接接尾)。"""
+    import baostock as bs
+    files = sorted(glob.glob(os.path.join(data_dir, "*.csv")))
+    if limit:
+        files = files[:limit]
+    bs.login()
+    bad = fixed = 0
+    for i, fp in enumerate(files):
+        dates = _dates_of(fp)
+        if len(dates) < 2 or _max_gap_days(dates) <= GAP_DAYS:
+            continue
+        bad += 1
+        code = os.path.basename(fp)[:-4].replace("_", ".", 1)
+        try:
+            last = _full_refetch_cn(bs, code, fp, dry)
+            if last:
+                fixed += 1
+                print(f"  修复 {code}: 断档→全量重拉 {len(_dates_of(fp))}行 至{last}" if not dry
+                      else f"  [dry] {code} 需重拉", flush=True)
+        except Exception as e:
+            print(f"  [warn] {code} 重拉失败: {type(e).__name__}", flush=True)
+            bs.login()
+        if i % 80 == 79:
+            bs.logout(); bs.login()
+    bs.logout()
+    print(f"cn-repair: {'DRY ' if dry else ''}断档{bad}只,修复{fixed}只")
+    return 0 if fixed == bad else 1
+
+
 # ────────────────────────── A股(baostock 后复权)──────────────────────────
 def refresh_cn(data_dir, limit=None, dry=False):
     import baostock as bs
@@ -62,22 +141,43 @@ def refresh_cn(data_dir, limit=None, dry=False):
     files = sorted(glob.glob(os.path.join(data_dir, "*.csv")))
     if limit:
         files = files[:limit]
-    # 落后超 ~20 日历天的按退市/长期停牌处理,不追(否则会拉全历史)
+    # 落后超 ~20 日历天的:不再直接追增量(会在文件里拼出断档),改走【全量重拉】;
+    # 重拉后仍落后的是真退市/长期停牌 → 记入 .norefetch,后续周期不再反复重拉。
     cutoff = (datetime.strptime(lmax, "%Y-%m-%d") - timedelta(days=20)).strftime("%Y-%m-%d")
+    norefetch_fp = os.path.join(data_dir, ".norefetch")
+    norefetch = set()
+    if os.path.exists(norefetch_fp):
+        norefetch = set(open(norefetch_fp).read().split())
     # 不做基于单一探针的整体 skip:改为逐只 per-file 判断(已最新的秒过 continue),
     # 这样上次跑到一半被中断也能自愈续传(探针股已更新≠全体已更新)。
     print(f"cn: 探针{lmax} → 数据源{src_max}({len(files)}只,per-file 断点续传;各只已最新则跳过)", flush=True)
     updated = 0
     for i, fp in enumerate(files):
         flast = _last_date(fp)  # 该只自身最后日期(断点)
-        if not flast or flast >= src_max or flast < cutoff:
-            continue  # 已最新 / 退市停牌太久 → 跳过
-        start_i = (datetime.strptime(flast, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        if not flast or flast >= src_max:
+            continue  # 已最新
         code = os.path.basename(fp)[:-4].replace("_", ".", 1)
+        if flast < cutoff:  # 落后太久:增量追加会造断档 → 全量重拉(退市股缓存跳过)
+            if code in norefetch:
+                continue
+            try:
+                last = _full_refetch_cn(bs, code, fp, dry)
+            except Exception:
+                bs.login(); last = None
+            if last and last >= cutoff:
+                updated += 1
+                print(f"  {code} 落后({flast})→ 全量重拉至{last}", flush=True)
+            else:  # 重拉后仍旧 = 真退市/停牌 → 记缓存
+                norefetch.add(code)
+                if not dry:
+                    with open(norefetch_fp, "w") as f:
+                        f.write("\n".join(sorted(norefetch)))
+            continue
+        start_i = (datetime.strptime(flast, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
         for attempt in range(2):
             try:
                 rs = bs.query_history_k_data_plus(
-                    code, "date,open,high,low,close,preclose,volume,amount,turn,tradestatus,pctChg,isST",
+                    code, CN_FIELDS,
                     start_date=start_i, end_date=src_max, frequency="d", adjustflag="2")
                 rows = []
                 while rs.error_code == '0' and rs.next():
@@ -159,8 +259,13 @@ def main():
     ap.add_argument("--market", required=True, choices=["us", "cn"])
     ap.add_argument("--limit", type=int, default=None, help="只刷前N只(测试)")
     ap.add_argument("--dry", action="store_true", help="只检测不写入")
+    ap.add_argument("--repair", action="store_true", help="cn 修复模式:全扫内部断档并全量重拉(一次性)")
     a = ap.parse_args()
     data_dir = os.path.join(HERE, "data_cn" if a.market == "cn" else "data")
+    if a.repair:
+        if a.market != "cn":
+            print("--repair 目前仅支持 cn"); sys.exit(1)
+        sys.exit(repair_cn(data_dir, a.limit, a.dry))
     rc = (refresh_cn if a.market == "cn" else refresh_us)(data_dir, a.limit, a.dry)
     sys.exit(rc)
 

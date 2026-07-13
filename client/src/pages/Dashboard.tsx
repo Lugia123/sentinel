@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import type { Snapshot, Holding } from '../types'
 import type { TickerMeta } from '../api'
-import { pct, pct2, InfoDot, GradeBadge, SleeveBadge, actionColor } from '../ui'
+import { pct, pct2, InfoDot, GradeBadge, SleeveBadge, actionColor, cnMarketAction } from '../ui'
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
 import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, type UniverseItem } from '../api'
@@ -175,7 +175,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                 <th>现价</th>
                 <th>我的持仓 <InfoDot text="你在「我的持仓」里录入的实际股数(和持仓页联动)。未持有显示 —。想算该买多少,用上方「⚖ 分配计算」。" /></th>
                 <th>档位 <InfoDot text={isCN ? "趋势健康度 -3到+3,由3个信号(站上20/60/200日线)合成。A股逐票只看不减,档位仅展示趋势状态。" : "趋势健康度 -3到+3,由7个信号(站上均线/动量/排列等)合成。+1及以上=持有,往下=逐步减仓。"} /></th>
-                <th>动作 <InfoDot text={isCN ? "A股逐票不减仓(反转市,逐票减仓有害),动作恒为「持有」;单票风险由市场级风险灯统一管总仓。" : "档位对应的操作。只减不追涨:走弱才逐档减仓,趋势好就拿住。"} /></th>
+                <th>动作 <InfoDot text={isCN ? "A股逐票不按档位减仓(反转市,逐票减仓有害),动作由【市场级风险灯】统一决定:绿=持有满仓,黄=减至半仓,红=清仓观望——对列表里所有票一致生效。" : "档位对应的操作。只减不追涨:走弱才逐档减仓,趋势好就拿住。"} /></th>
                 <th>未来20日区间 <InfoDot text="未来20天收益的70%概率范围(15%~85%分位)。这是波动范围估计,不是涨跌预测。" /></th>
               </tr>
             </thead>
@@ -203,7 +203,10 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                     <td>{CUR}{h.price}</td>
                     <td className={myPos[h.ticker.toUpperCase()] ? 'gold' : 'muted'}>{myPos[h.ticker.toUpperCase()] || '—'}</td>
                     <td><GradeBadge g={h.grade} label={h.grade_label} /></td>
-                    <td style={{ color: actionColor(h.action), fontWeight: 600 }}>{h.action}</td>
+                    <td style={isCN
+                      ? { color: cnMarketAction(rl.level).color, fontWeight: 600 }
+                      : { color: actionColor(h.action), fontWeight: 600 }}>
+                      {isCN ? cnMarketAction(rl.level).text : h.action}</td>
                     <td className="muted">{b ? <>{pct2(b.band70[0])} ~ {pct2(b.band70[1])}</> : '—'}</td>
                   </tr>
                 )

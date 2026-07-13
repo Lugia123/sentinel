@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // history 返回某 ticker 最近 N 日收盘+均线(均线由收盘价算,原CSV只有OHLCV)。
@@ -60,6 +61,11 @@ func (a *API) history(w http.ResponseWriter, r *http.Request) {
 		dates = append(dates, row[di])
 		closes = append(closes, c)
 	}
+	// 数据断档防护:历史下载不完整+增量接尾会造成跨年断缝,均线跨缝混算无意义 →
+	// 只保留最后一段连续数据(相邻>180天视为断档)。
+	if cut := lastContiguous(dates, 180); cut > 0 {
+		dates, closes = dates[cut:], closes[cut:]
+	}
 	sma := func(i, k int) *float64 { // i 处 trailing k 日均线
 		if i+1 < k {
 			return nil
@@ -87,4 +93,17 @@ func (a *API) history(w http.ResponseWriter, r *http.Request) {
 		out = append(out, pt{Date: dates[i], Close: closes[i], Sma20: sma(i, 20), SmaMid: sma(i, midWin), Sma200: sma(i, 200)})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ticker": ticker, "mid_window": midWin, "history": out})
+}
+
+// lastContiguous 返回最后一段连续数据的起始下标(相邻日期差>maxGapDays 视为断档;无断档返回 0)。
+func lastContiguous(dates []string, maxGapDays float64) int {
+	cut := 0
+	for i := 1; i < len(dates); i++ {
+		a, e1 := time.Parse("2006-01-02", dates[i-1])
+		b, e2 := time.Parse("2006-01-02", dates[i])
+		if e1 == nil && e2 == nil && b.Sub(a).Hours() > maxGapDays*24 {
+			cut = i
+		}
+	}
+	return cut
 }
