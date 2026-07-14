@@ -20,6 +20,22 @@ def fp(*parts):
     return hashlib.sha1("|".join(str(p) for p in parts).encode("utf-8", "ignore")).hexdigest()
 
 
+def norm_ticker(code):
+    """裸码 → 归一化(sh.600000/sz.000021/bj.830799),与 Sentinel 其余部分一致。
+    已带前缀的原样返回(小写)。6→sh,0/3→sz,4/8→bj。"""
+    c = str(code).strip().lower()
+    if c[:3] in ("sh.", "sz.", "bj."):
+        return c
+    c = c.zfill(6)
+    if c[0] == "6":
+        return "sh." + c
+    if c[0] in ("0", "3"):
+        return "sz." + c
+    if c[0] in ("4", "8"):
+        return "bj." + c
+    return c
+
+
 # 公告类型白名单(R2):对金融有影响 → is_signal=true。
 ANN_WHITELIST = {
     "分配预案", "分配方案实施", "分配方案决议公告", "回购进展情况", "股权激励进展公告",

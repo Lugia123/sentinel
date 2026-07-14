@@ -17,7 +17,7 @@ news_collector.py — A股新闻采集(news_lab R3)
 import sys, os, argparse, asyncio, datetime as dt, warnings, signal
 import asyncpg
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from newsdb import parse_dsn, fp, ann_is_signal  # noqa
+from newsdb import parse_dsn, fp, ann_is_signal, norm_ticker  # noqa
 warnings.filterwarnings("ignore")
 
 
@@ -104,7 +104,7 @@ async def collect_stock_news(conn, code):
     df = _call(20, ak.stock_news_em, symbol=code)
     rows = [("stock_em", fp("stock_em", code, r["新闻标题"], r["发布时间"]), str(r["新闻标题"]),
              str(r.get("新闻内容", "")), str(r.get("新闻链接", "")), str(r.get("关键词", "")),
-             code, _parse_ts(r["发布时间"])) for _, r in df.iterrows()]
+             norm_ticker(code), _parse_ts(r["发布时间"])) for _, r in df.iterrows()]
     return await _ins_news(conn, rows)
 
 
@@ -121,7 +121,7 @@ async def collect_announcements(conn, code, recent_only=True):
             d = dt.date.fromisoformat(str(r["公告日期"])[:10])
         except ValueError:
             continue
-        rows.append((code, d, title, typ, str(r.get("网址", "")), ann_is_signal(typ, title)))
+        rows.append((norm_ticker(code), d, title, typ, str(r.get("网址", "")), ann_is_signal(typ, title)))
     return await _ins_ann(conn, rows)
 
 
