@@ -118,15 +118,21 @@ def event_study(M, events, ks=KS, size_neutral=False, label="", min_n=30):
         if used is None:
             used = len(a)
         if len(a) < min_n:
-            out[k] = dict(CAAR=None, t=None, hit=None, N=len(a)); continue
+            out[k] = dict(CAAR=None, t=None, hit=None, N=len(a), med=None, wins=None); continue
         caar = a.mean(); t = caar / (a.std(ddof=1) / np.sqrt(len(a))) if a.std() > 0 else 0
-        out[k] = dict(CAAR=round(caar * 100, 3), t=round(t, 2), hit=round((a > 0).mean() * 100, 1), N=len(a))
+        med = np.median(a)
+        lo, hi = np.percentile(a, [2.5, 97.5])  # 去尾均值(2.5%双侧)判右尾驱动
+        wins = a[(a >= lo) & (a <= hi)].mean()
+        out[k] = dict(CAAR=round(caar * 100, 3), t=round(t, 2), hit=round((a > 0).mean() * 100, 1),
+                      N=len(a), med=round(med * 100, 3), wins=round(wins * 100, 3))
     tag = f"[{label}] " if label else ""
     print(f"{tag}{'size中性' if size_neutral else 'vs市场'} (事件≈{used}):", flush=True)
     for k in ks:
         o = out[k]
-        s = f"CAAR {o['CAAR']:+.2f}% t={o['t']:+.2f} hit={o['hit']}% N={o['N']}" if o["CAAR"] is not None else f"N={o['N']}(不足)"
-        print(f"   T+{k:<2}: {s}", flush=True)
+        if o["CAAR"] is not None:
+            print(f"   T+{k:<2}: 均值{o['CAAR']:+.2f}%(t{o['t']:+.1f}) 中位{o['med']:+.2f}% 去尾{o['wins']:+.2f}% hit{o['hit']}% N={o['N']}", flush=True)
+        else:
+            print(f"   T+{k:<2}: N={o['N']}(不足)", flush=True)
     return out
 
 
