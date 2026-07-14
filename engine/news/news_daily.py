@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from newsdb import parse_dsn  # noqa
 import newsai  # noqa
 from news_classify import classify_batch  # noqa
+from transmission import lead_lag_label  # noqa
 
 # L0 碎片聚合:同源+标题前缀相同(如"沃什：…"发言人前缀)视为一个主题簇,只留代表条 + 计数
 SPEAKER_PREFIX = re.compile(r"^([一-龥A-Za-z·]{2,6})[:：]")
@@ -42,14 +43,17 @@ def prefilter(rows):
 
 
 DIGEST_SYS = """你是资深财经编辑,为中国A股投资者写【每日金融要闻日报】。给你今日已分级的要闻(每条带 level/dims/tone),
-提炼成结构化日报。只输出JSON,不编造未给出的事实,不预测涨跌幅。
+以及【全球事件+传导标注】(每条带对A股的板块传导和提前/滞后时序)。提炼成结构化日报。
+只输出JSON,不编造未给出的事实,不预测涨跌幅。
 {
  "overview": "一段today综述(80字内,今天市场最该关注什么)",
  "world": [{"title":"世界大事标题","impact":"对A股的可能影响(一句)","tone":"利好/利空/中性"}],
  "domestic": [{"title":"国内大事","impact":"...","tone":"..."}],
- "market_impact": [{"sector":"受影响板块/主题","reason":"为什么","tone":"..."}]
+ "market_impact": [{"sector":"受影响板块/主题","reason":"为什么","tone":"..."}],
+ "global_transmission": [{"event":"全球事件","cn_sectors":"传导到的A股板块","timing":"提前/滞后特征(如'海外隔夜先行,A股次日反应')","tone":"..."}]
 }
-world/domestic 各取最重要的 3-5 条(major 优先),market_impact 取 2-4 个板块。宁缺勿凑,没有就空数组。"""
+world/domestic 各取最重要 3-5 条(major优先),market_impact 取 2-4 板块。
+global_transmission 从【全球事件】里挑 2-4 个对A股传导明确的,必须写清 timing(提前还是滞后)。宁缺勿凑,没有空数组。"""
 
 
 def build_digest_user(items):
@@ -99,9 +103,23 @@ async def gen(date=None):
     top = [n for n in items if lvl(n) in ("major", "watch")]
     top.sort(key=lambda n: 0 if lvl(n) == "major" else 1)
     top = top[:40]
-    print(f"{d}: 原始{len(rows)}→聚合{len(items)}→要闻{len(top)}(喂AI)", flush=True)
 
-    out = newsai.chat(DIGEST_SYS, build_digest_user(top), temperature=0.3, json_mode=True)
+    # 全球新闻(GDELT)+ 传导标注:近3天(海外先行,窗口放宽)
+    grows = await conn.fetch("""SELECT title, keywords FROM news_items
+        WHERE source='gdelt' AND published_at::date > $1::date - 3 ORDER BY published_at DESC LIMIT 60""", d)
+    gblock = ""
+    if grows:
+        lines = []
+        for r in grows:
+            try:
+                k = json.loads(r["keywords"])
+                lines.append(f'[{k.get("theme","")}|{lead_lag_label(k.get("lead_lag",0))}|板块:{"/".join(k.get("cn_sectors",[]))}] {r["title"][:70]}')
+            except Exception:
+                continue
+        gblock = "\n\n【全球事件+传导标注】(每条已标 A股板块传导 + 提前/滞后时序):\n" + "\n".join(lines[:40])
+    print(f"{d}: 原始{len(rows)}→聚合{len(items)}→要闻{len(top)} + 全球{len(grows)}(喂AI)", flush=True)
+
+    out = newsai.chat(DIGEST_SYS, build_digest_user(top) + gblock, temperature=0.3, json_mode=True)
     digest = newsai.extract_json(out)
     await conn.execute("""INSERT INTO news_digest(market,digest_date,digest,n_source)
         VALUES('cn',$1,$2::jsonb,$3) ON CONFLICT(market,digest_date) DO UPDATE SET digest=EXCLUDED.digest, n_source=EXCLUDED.n_source, generated_at=now()""",
@@ -110,7 +128,7 @@ async def gen(date=None):
     # 打印预览
     print("\n=== 日报预览 ===")
     print("综述:", digest.get("overview", ""))
-    for sec in ("world", "domestic", "market_impact"):
+    for sec in ("world", "domestic", "market_impact", "global_transmission"):
         arr = digest.get(sec, [])
         print(f"\n[{sec}] {len(arr)}条")
         for x in arr[:5]:
