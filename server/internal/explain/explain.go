@@ -77,7 +77,7 @@ type holding struct {
 const SYSTEM_DROPPED = `你是资深量化投资顾问。一只曾被策略选中的股票【已从推荐列表掉出】,请基于【策略规则】和【掉出前最后一天的计算结果】+【掉出后的价格表现】,给读者讲清楚掉出这件事。
 【铁律】策略每天按固定规则重选,掉出=不再满足入选条件,不是"策略讨厌它"或方向预测。不要复述数字,要解释含义。不确定的机制绝不编造。
 四段固定结构:
-① 为什么掉出 —— 对照选股规则推断最可能的落选原因(美股:动量相对排名回落/跌破趋势门(200日线/50日线/距52周高)/股东收益率排名被挤出;A股:20日换手率抬升排出低换手前50/流通市值涨出最小20%分位/事件分衰减/被ST或停牌)。结合给你的掉出前指标点出最可疑的1-2条,措辞用"最可能""大概率"。
+① 为什么掉出 —— 对照选股规则推断最可能的落选原因(美股:动量相对排名回落/跌破趋势门(200日线/50日线/距52周高)/股东收益率排名被挤出;A股:20日换手率抬升排出低换手前50/流通市值涨出最小20%分位/事件分衰减/被ST或停牌)。结合给你的掉出前指标点出最可疑的1-2条,措辞用"最可能""大概率"。【若提供了近期关联新闻/公告,可引用其中与掉出相关的事件佐证(如业绩预减、减持、被ST),但新闻仅作解释素材、非选股依据】。
 ② 掉出意味着什么 —— 讲清楚:掉出≠看空预测,只是不再是策略眼中"最优的那批";历史上掉出后有的继续涨有的回落,策略不预测方向。
 ③ 持有者怎么办 —— 结合当前市场级风险灯/档位动作口径给操作参考(不是投资建议):美股按档位动作;A股按市场级风险灯统一指令。
 ④ 什么情况下会回来 —— 说明重新满足入选条件即可回归推荐(以及防抖CD机制:连续满足才回来)。
@@ -180,6 +180,27 @@ type droppedRec struct {
 	Context   string
 }
 
+// recentNewsContext 取该股近 30 天关联新闻/信号公告(A股),拼成 AI 掉出分析的素材段(无则空)。
+// 新闻独立于策略:这里只把已采集的新闻作为"解释素材"注入,不影响任何策略计算。
+func (s *Service) recentNewsContext(market, ticker string) string {
+	if market != "cn" {
+		return ""
+	}
+	var titles []string
+	s.gdb.Raw(`(SELECT title FROM news_items WHERE ticker=? AND published_at >= now() - interval '30 days' ORDER BY published_at DESC LIMIT 5)
+		UNION ALL
+		(SELECT title FROM stock_announcements WHERE market=? AND ticker=? AND is_signal AND ann_date >= current_date - 30 ORDER BY ann_date DESC LIMIT 5)`,
+		ticker, market, ticker).Scan(&titles)
+	if len(titles) == 0 {
+		return ""
+	}
+	out := "\n【近期关联新闻/公告(供参考,新闻独立于策略)】\n"
+	for _, t := range titles {
+		out += "· " + t + "\n"
+	}
+	return out
+}
+
 func (s *Service) droppedInfo(market, ticker string) *droppedRec {
 	var d droppedRec
 	s.gdb.Raw(`SELECT last_seen::text AS last_seen, dropped_at::text AS dropped_at, last_price, last_grade, context::text AS context
@@ -213,8 +234,10 @@ func (s *Service) explainDropped(ctx context.Context, userID int64, market, tick
 	if market == "cn" {
 		rules = RULES_CN
 	}
-	user := fmt.Sprintf("%s\n\n【股票 %s 已从推荐掉出】\n最后在推荐中:%s;判定掉出:%s;掉出时档位:%d\n掉出后表现:%s\n【掉出前最后一天的完整计算结果】\n%s",
-		rules, ticker, di.LastSeen, di.DroppedAt, di.LastGrade, perf, di.Context)
+	// 注入近期关联新闻/公告(A股):让掉出分析"有据"而非纯推断(新闻独立,仅作解释素材)
+	newsCtx := s.recentNewsContext(market, ticker)
+	user := fmt.Sprintf("%s\n\n【股票 %s 已从推荐掉出】\n最后在推荐中:%s;判定掉出:%s;掉出时档位:%d\n掉出后表现:%s\n【掉出前最后一天的完整计算结果】\n%s%s",
+		rules, ticker, di.LastSeen, di.DroppedAt, di.LastGrade, perf, di.Context, newsCtx)
 	content, err := s.ai.Chat(ctx, SYSTEM_DROPPED, user)
 	if err != nil {
 		return nil, err

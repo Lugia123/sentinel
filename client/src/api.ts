@@ -172,6 +172,12 @@ export async function fetchNewsDigest(): Promise<{ digest_date?: string; digest:
   return { digest_date: j.digest_date, digest: j.digest ? JSON.parse(j.digest) : null, n_source: j.n_source }
 }
 
+export interface CalendarEvent { event_date: string; category: string; title: string; importance: number }
+export async function fetchNewsCalendar(): Promise<CalendarEvent[]> {
+  const r = await fetch(`/api/news/calendar${mq()}`)
+  return r.ok ? (await r.json()).calendar || [] : []
+}
+
 export interface StockNewsItem { title: string; source: string; url: string; published: string; relation: string }
 export interface NewsFlag { type: string; level: string; text: string; basis: string; note: string }
 export interface StockNews {

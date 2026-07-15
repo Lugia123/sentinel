@@ -119,6 +119,22 @@ func (a *API) newsStockFlags(market, tk string) []map[string]string {
 	return flags
 }
 
+// newsCalendar 未来事件日历(财报/宏观)。GET /api/news/calendar?market=cn
+func (a *API) newsCalendar(w http.ResponseWriter, r *http.Request) {
+	market := mktParam(r)
+	type evRow struct {
+		EventDate  string `json:"event_date"`
+		Category   string `json:"category"`
+		Title      string `json:"title"`
+		Importance int    `json:"importance"`
+	}
+	var evs []evRow
+	a.gdb.Raw(`SELECT event_date::text AS event_date, category, title, importance
+		FROM event_calendar WHERE market=? AND event_date >= current_date
+		ORDER BY event_date, importance DESC LIMIT 60`, market).Scan(&evs)
+	writeJSON(w, http.StatusOK, map[string]any{"calendar": evs})
+}
+
 func trunc(s string, n int) string {
 	r := []rune(s)
 	if len(r) > n {

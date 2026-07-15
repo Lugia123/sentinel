@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchNewsDigest, type NewsDigest, type Market } from '../api'
+import { fetchNewsDigest, fetchNewsCalendar, type NewsDigest, type CalendarEvent, type Market } from '../api'
 
 // 今日金融要闻日报页(纯展示 news_digest,与策略解耦)。资讯参考,非策略信号。
 const toneCls = (t?: string) => (t === '利好' ? 'up' : t === '利空' ? 'down' : 'muted')
@@ -8,10 +8,12 @@ export default function News({ market = 'us' }: { market?: Market }) {
   const [d, setD] = useState<NewsDigest | null>(null)
   const [date, setDate] = useState('')
   const [n, setN] = useState(0)
+  const [cal, setCal] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
   useEffect(() => {
     setLoading(true)
     fetchNewsDigest().then((r) => { setD(r.digest); setDate(r.digest_date || ''); setN(r.n_source || 0) }).finally(() => setLoading(false))
+    fetchNewsCalendar().then(setCal)
   }, [market])
 
   if (loading) return <div className="card">加载今日要闻…</div>
@@ -80,6 +82,24 @@ export default function News({ market = 'us' }: { market?: Market }) {
                 {(d.global_transmission || []).map((x, i) => (
                   <tr key={i}><td><b>{x.event}</b></td><td>{x.cn_sectors}</td>
                     <td className="muted">{x.timing}</td><td className={toneCls(x.tone)}>{x.tone}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {cal.length > 0 && (
+        <div className="card">
+          <h3>📅 未来事件日历</h3>
+          <div className="tbl-scroll">
+            <table>
+              <thead><tr><th>日期</th><th>类别</th><th>事件</th></tr></thead>
+              <tbody>
+                {cal.slice(0, 20).map((e, i) => (
+                  <tr key={i}><td className="muted">{e.event_date}</td>
+                    <td><span className="pill muted" style={{ fontSize: 11 }}>{e.category === 'earnings' ? '财报' : e.category === 'macro' ? '宏观' : e.category}</span></td>
+                    <td>{e.title}</td></tr>
                 ))}
               </tbody>
             </table>

@@ -88,6 +88,8 @@ func (s *Scheduler) runNews() {
 	}{
 		{"采集宏观快讯", []string{"news/news_collector.py", "--macro"}},
 		{"采集全球一手", []string{"news/news_global.py", "--collect"}},
+		{"实体关联", []string{"news/news_link.py", "--today"}},
+		{"财报日历", []string{"news/news_calendar.py", "--earnings"}},
 		{"生成日报", []string{"news/news_daily.py", "--gen"}},
 	}
 	for _, st := range steps {
