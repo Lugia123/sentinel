@@ -150,7 +150,7 @@ export default function StockDetail({ h, meta, market = 'us', riskLight, dropped
             <div className="news-list">
               {news.news.map((n, i) => (
                 <div key={i} className="news-item" onClick={() => n.id && setNewsItemId(n.id)}>
-                  <div className="news-time">{n.published && n.published.length >= 16 ? n.published.slice(11, 16) : ''}</div>
+                  <div className="news-time"><span className="nd-date">{n.published && n.published.length >= 10 ? n.published.slice(5, 10) : ''}</span><span className="nd-time">{n.published && n.published.length >= 16 ? n.published.slice(11, 16) : ''}</span></div>
                   <div className="news-main">
                     <div className="news-headline">{n.title.replace(/^【(.+?)】/, '$1').trim()}</div>
                     <div className="news-meta"><span className="news-src-tag">{n.source}</span>{n.relation !== 'company' ? ` · ${n.relation}` : ''}</div>

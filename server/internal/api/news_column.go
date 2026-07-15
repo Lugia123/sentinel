@@ -142,10 +142,10 @@ func (a *API) newsFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	var rows []feedRow
 	if sector == "" {
-		a.gdb.Raw(`SELECT id, title, source, url, published_at::text AS published FROM news_items
+		a.gdb.Raw(`SELECT id, title, source, url, to_char(published_at AT TIME ZONE 'Asia/Shanghai','YYYY-MM-DD HH24:MI') AS published FROM news_items
 			WHERE market=? AND ticker IS NULL ORDER BY published_at DESC NULLS LAST LIMIT 40`, market).Scan(&rows)
 	} else {
-		a.gdb.Raw(`SELECT id, title, source, url, published_at::text AS published FROM news_items
+		a.gdb.Raw(`SELECT id, title, source, url, to_char(published_at AT TIME ZONE 'Asia/Shanghai','YYYY-MM-DD HH24:MI') AS published FROM news_items
 			WHERE market=? AND (title LIKE ? OR body LIKE ?) ORDER BY published_at DESC NULLS LAST LIMIT 40`,
 			market, "%"+sector+"%", "%"+sector+"%").Scan(&rows)
 	}

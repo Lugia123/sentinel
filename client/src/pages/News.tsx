@@ -9,6 +9,7 @@ const toneCls = (t?: string) => (t === '利好' ? 'up' : t === '利空' ? 'down'
 // 剥离快讯标题里的【】包裹(阅读噪声)+ 取时间 HH:MM
 const cleanTitle = (t: string) => t.replace(/^【(.+?)】/, '$1').trim()
 const hhmm = (p?: string) => (p && p.length >= 16 ? p.slice(11, 16) : '')
+const mmdd = (p?: string) => (p && p.length >= 10 ? p.slice(5, 10) : '')
 
 // 今日要闻页(tab 式):综合 + 每个自定义板块一个 tab + 管理。每个 tab 都是完整一套。
 export default function News({ market = 'us' }: { market?: Market }) {
@@ -149,7 +150,7 @@ function NewsFeed({ feed, onOpen, title = '📰 相关新闻' }: { feed: FeedIte
       <div className="news-list">
         {feed.map((n) => (
           <div key={n.id} className="news-item" onClick={() => onOpen(n.id)}>
-            <div className="news-time">{hhmm(n.published)}</div>
+            <div className="news-time"><span className="nd-date">{mmdd(n.published)}</span><span className="nd-time">{hhmm(n.published)}</span></div>
             <div className="news-main">
               <div className="news-headline">{cleanTitle(n.title)}</div>
               <div className="news-meta"><span className="news-src-tag">{SRC_CN[n.source] || n.source}</span></div>

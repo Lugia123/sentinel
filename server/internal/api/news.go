@@ -71,10 +71,10 @@ func (a *API) newsStock(w http.ResponseWriter, r *http.Request) {
 	}
 	var news []newsRow
 	a.gdb.Raw(`
-		SELECT id, title, source, url, published_at::text AS published, 'company' AS relation
+		SELECT id, title, source, url, to_char(published_at AT TIME ZONE 'Asia/Shanghai','YYYY-MM-DD HH24:MI') AS published, 'company' AS relation
 		FROM news_items WHERE ticker=$1
 		UNION ALL
-		SELECT n.id, n.title, n.source, n.url, n.published_at::text, sn.relation
+		SELECT n.id, n.title, n.source, n.url, to_char(n.published_at AT TIME ZONE 'Asia/Shanghai','YYYY-MM-DD HH24:MI'), sn.relation
 		FROM stock_news sn JOIN news_items n ON n.id=sn.news_id
 		WHERE sn.market=$2 AND sn.ticker=$1
 		ORDER BY published DESC NULLS LAST LIMIT 30`, tk, market).Scan(&news)
@@ -154,7 +154,7 @@ func (a *API) newsItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var title, body, url, source, published, interpret string
-	err := a.gdb.Raw(`SELECT title, body, url, source, published_at::text, COALESCE(ai_interpret,'')
+	err := a.gdb.Raw(`SELECT title, body, url, source, to_char(published_at AT TIME ZONE 'Asia/Shanghai','YYYY-MM-DD HH24:MI'), COALESCE(ai_interpret,'')
 		FROM news_items WHERE id=?`, id).Row().Scan(&title, &body, &url, &source, &published, &interpret)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "无此新闻"})
