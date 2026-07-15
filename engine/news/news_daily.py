@@ -119,7 +119,8 @@ async def gen(date=None):
         gblock = "\n\n【全球事件+传导标注】(每条已标 A股板块传导 + 提前/滞后时序):\n" + "\n".join(lines[:40])
     print(f"{d}: 原始{len(rows)}→聚合{len(items)}→要闻{len(top)} + 全球{len(grows)}(喂AI)", flush=True)
 
-    out = newsai.chat(DIGEST_SYS, build_digest_user(top) + gblock, temperature=0.3, json_mode=True)
+    date_hdr = f"【报告日期】{d.strftime('%Y年%m月%d日')}(所有时间判断以此为准,新闻均为近日,勿臆断年份如'2024年')\n\n"
+    out = newsai.chat(DIGEST_SYS, date_hdr + build_digest_user(top) + gblock, temperature=0.3, json_mode=True)
     digest = newsai.extract_json(out)
     await conn.execute("""INSERT INTO news_digest(market,digest_date,digest,n_source)
         VALUES('cn',$1,$2::jsonb,$3) ON CONFLICT(market,digest_date) DO UPDATE SET digest=EXCLUDED.digest, n_source=EXCLUDED.n_source, generated_at=now()""",

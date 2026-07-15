@@ -57,10 +57,10 @@ func (s *Service) Investigate(ctx context.Context, userID int64, market, ticker 
 	var user string
 	if market == "cn" {
 		system = SYSTEM_CN
-		user = fmt.Sprintf("公司代码:%s\n公司名:%s\n请对这家A股上市公司做背景调查。", ticker, s.cnNameOf(ticker))
+		user = fmt.Sprintf("【当前日期】%s(涉及时间以此为准,勿臆断年份)\n公司代码:%s\n公司名:%s\n请对这家A股上市公司做背景调查。", ai.TodayCN(), ticker, s.cnNameOf(ticker))
 	} else {
 		cn, sector := s.metaOf(ticker)
-		user = fmt.Sprintf("公司代码:%s\n中文名:%s\n所属板块:%s\n请对这家美股上市公司做背景调查。", ticker, cn, sector)
+		user = fmt.Sprintf("【当前日期】%s(涉及时间以此为准,勿臆断年份)\n公司代码:%s\n中文名:%s\n所属板块:%s\n请对这家美股上市公司做背景调查。", ai.TodayCN(), ticker, cn, sector)
 	}
 	html, err := s.ai.Chat(ctx, system, user)
 	if err != nil {

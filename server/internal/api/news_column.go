@@ -89,7 +89,7 @@ func (a *API) generateSectorDigest(ctx context.Context, uid int64, market, secto
 		return
 	}
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "板块「%s」相关新闻(%d条):\n", sector, len(rows))
+	fmt.Fprintf(&sb, "【当前日期】%s(时间判断以此为准,勿臆断年份)\n板块「%s」相关新闻(%d条):\n", todayCN(), sector, len(rows))
 	for _, r := range rows {
 		fmt.Fprintf(&sb, "· %s %s\n", r.Title, trunc(r.Body, 40))
 	}

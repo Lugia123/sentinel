@@ -15,6 +15,7 @@ const newsInterpretSys = `你是资深财经分析师,面向A股投资者解读�
 ① 发生了什么 —— 把这条新闻讲清楚(标题若太简,用你掌握的背景补全来龙去脉;不确定的地方标注"(需核实)",绝不编造具体数字)。
 ② 对A股意味着什么 —— 涉及哪些板块/主题?利好还是利空?是否有提前/滞后的传导(如海外隔夜事件A股次日反应)?
 ③ 需要关注什么 —— 后续要盯的点。
+【时间基准】新闻均为近日发生。用户消息会给出【当前日期】,一切时间判断以它为准;绝不臆断为往年(如不要写"2024年"),涉及年份直接用当前日期的年份。
 【硬要求】<h4>+<p>/<ul><li>,关键处 <b>,不写 CSS,中文,250字内。结尾 <p class="disc">AI 依常识解读,非实时核实,非投资建议。</p>
 另外:在解读之外,单独一行输出 <!--SECTORS:板块1,板块2--> (涉及的A股板块,逗号分隔,2-5个),供系统标注。`
 
@@ -164,7 +165,7 @@ func (a *API) newsItem(w http.ResponseWriter, r *http.Request) {
 	}
 	// 懒生成解读(缓存;force 重生成)
 	if (interpret == "" || r.URL.Query().Get("force") == "1") && a.aiClient != nil && a.aiClient.Enabled() {
-		user := fmt.Sprintf("标题:%s\n摘要:%s\n来源:%s", title, body, source)
+		user := fmt.Sprintf("【当前日期】%s\n标题:%s\n摘要:%s\n来源:%s", todayCN(), title, body, source)
 		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 		defer cancel()
 		out, e := a.aiClient.Chat(ctx, newsInterpretSys, user)
@@ -201,6 +202,7 @@ const eventInterpretSys = `你是资深财经分析师,面向A股投资者【深
 ① 事件是什么 —— 讲清来龙去脉、背景与关键事实(标题若太简,用你掌握的背景补全;不确定处标"(需核实)",绝不编造具体数字)。
 ② 对A股意味着什么 —— 传导路径:涉及哪些板块/主题?利好还是利空?海外事件对A股是否有提前/滞后反应(如隔夜事件次日反应)?哪些行业弹性最大?
 ③ 需要关注什么 —— 后续要盯的信号、关键时间节点、风险点。
+【时间基准】事件均为近日发生。用户消息会给出【当前日期】,一切时间判断以它为准;绝不臆断为往年(如不要写"2024年"),涉及年份直接用当前日期的年份。
 【硬要求】<h4>+<p>/<ul><li>,关键处 <b>,不写 CSS,中文,300字内。结尾 <p class="disc">AI 依常识解读,非实时核实,非投资建议。</p>
 另外:单独一行输出 <!--SECTORS:板块1,板块2--> (涉及的A股板块,逗号分隔,2-5个),供系统标注。`
 
@@ -224,7 +226,7 @@ func (a *API) newsEventInterpret(w http.ResponseWriter, r *http.Request) {
 	var interpret, secStr string
 	a.gdb.Raw(`SELECT interpret, sectors FROM event_interpret WHERE market=? AND event_key=?`, market, key).Row().Scan(&interpret, &secStr)
 	if (interpret == "" || req.Force) && a.aiClient != nil && a.aiClient.Enabled() {
-		user := fmt.Sprintf("事件标题:%s\n初步影响判断:%s", req.Title, req.Context)
+		user := fmt.Sprintf("【当前日期】%s\n事件标题:%s\n初步影响判断:%s", todayCN(), req.Title, req.Context)
 		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 		defer cancel()
 		out, e := a.aiClient.Chat(ctx, eventInterpretSys, user)
@@ -289,6 +291,11 @@ func stripSectorMarker(s string) string {
 		return s[:i]
 	}
 	return strings.TrimSpace(s[:i] + s[i+j+3:])
+}
+
+// 当前北京日期,注入 AI 解读 prompt 作时间基准(否则 DeepSeek 会臆断为训练期年份如2024)
+func todayCN() string {
+	return time.Now().In(time.FixedZone("CST", 8*3600)).Format("2006年01月02日")
 }
 
 func trunc(s string, n int) string {

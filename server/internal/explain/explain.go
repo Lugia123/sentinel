@@ -145,8 +145,8 @@ func (s *Service) Explain(ctx context.Context, userID int64, market, ticker, dat
 	if market == "cn" {
 		rules = RULES_CN
 	}
-	user := fmt.Sprintf("%s\n\n【这只股票 %s 的计算结果】\n档位:%d(%s)→ 动作:%s\n选股理由:%s\n档位子信号:%s\n关键指标:%s\n概率带:%s",
-		rules, h.Ticker, h.Grade, h.GradeLabel, h.Action, h.Reason, string(h.Signals), string(h.Indicators), string(h.Prob))
+	user := fmt.Sprintf("【当前日期】%s(时间判断以此为准,勿臆断年份)\n\n%s\n\n【这只股票 %s 的计算结果】\n档位:%d(%s)→ 动作:%s\n选股理由:%s\n档位子信号:%s\n关键指标:%s\n概率带:%s",
+		ai.TodayCN(), rules, h.Ticker, h.Grade, h.GradeLabel, h.Action, h.Reason, string(h.Signals), string(h.Indicators), string(h.Prob))
 	content, err := s.ai.Chat(ctx, SYSTEM, user)
 	if err != nil {
 		return nil, err
@@ -236,8 +236,8 @@ func (s *Service) explainDropped(ctx context.Context, userID int64, market, tick
 	}
 	// 注入近期关联新闻/公告(A股):让掉出分析"有据"而非纯推断(新闻独立,仅作解释素材)
 	newsCtx := s.recentNewsContext(market, ticker)
-	user := fmt.Sprintf("%s\n\n【股票 %s 已从推荐掉出】\n最后在推荐中:%s;判定掉出:%s;掉出时档位:%d\n掉出后表现:%s\n【掉出前最后一天的完整计算结果】\n%s%s",
-		rules, ticker, di.LastSeen, di.DroppedAt, di.LastGrade, perf, di.Context, newsCtx)
+	user := fmt.Sprintf("【当前日期】%s(时间判断以此为准,勿臆断年份)\n\n%s\n\n【股票 %s 已从推荐掉出】\n最后在推荐中:%s;判定掉出:%s;掉出时档位:%d\n掉出后表现:%s\n【掉出前最后一天的完整计算结果】\n%s%s",
+		ai.TodayCN(), rules, ticker, di.LastSeen, di.DroppedAt, di.LastGrade, perf, di.Context, newsCtx)
 	content, err := s.ai.Chat(ctx, SYSTEM_DROPPED, user)
 	if err != nil {
 		return nil, err

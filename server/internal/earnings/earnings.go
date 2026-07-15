@@ -114,8 +114,8 @@ func (s *Service) Interpret(ctx context.Context, userID int64, market, ticker, p
 	if market == "cn" {
 		system = SYSTEM_CN
 	}
-	user := fmt.Sprintf("公司:%s\n本季(%s):%s\n上一季:%s\n去年同期:%s\n请解读本季财报。",
-		ticker, period, fmtQ(cur), fmtQ(prev), fmtQ(yoy))
+	user := fmt.Sprintf("【当前日期】%s(涉及时间以此为准,勿臆断年份;季度以「本季(%s)」标注为准)\n公司:%s\n本季(%s):%s\n上一季:%s\n去年同期:%s\n请解读本季财报。",
+		ai.TodayCN(), period, ticker, period, fmtQ(cur), fmtQ(prev), fmtQ(yoy))
 	html, err := s.ai.Chat(ctx, system, user)
 	if err != nil {
 		return nil, err

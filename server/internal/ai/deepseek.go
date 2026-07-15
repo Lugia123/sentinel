@@ -23,6 +23,12 @@ func New(key, base, model string) *Client {
 // Enabled 是否配了 key(未配则 AI 讲解功能优雅降级)。
 func (c *Client) Enabled() bool { return c.key != "" }
 
+// TodayCN 当前北京日期(如 2026年07月16日)。注入 AI prompt 作时间基准,
+// 否则 DeepSeek 无当前时间概念,会按训练期臆断年份(如把近期数据写成"2024年")。
+func TodayCN() string {
+	return time.Now().In(time.FixedZone("CST", 8*3600)).Format("2006年01月02日")
+}
+
 type msg struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`

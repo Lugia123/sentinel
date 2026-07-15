@@ -119,7 +119,7 @@ func (s *Service) AIAllocate(ctx context.Context, userID int64, market string, t
 		cur = "¥"
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "资金池:%s%.0f\n风险灯:%s(%s)\n候选股(%d只):\n", cur, capital, snap.RiskLight.Note, snap.RiskLight.Level, len(cands))
+	fmt.Fprintf(&b, "【当前日期】%s\n资金池:%s%.0f\n风险灯:%s(%s)\n候选股(%d只):\n", ai.TodayCN(), cur, capital, snap.RiskLight.Note, snap.RiskLight.Level, len(cands))
 	priceOf := map[string]float64{}
 	nameOf := map[string]string{}
 	for _, h := range cands {
