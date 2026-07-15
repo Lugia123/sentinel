@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchNewsDigest, fetchNewsCalendar, type NewsDigest, type CalendarEvent, type Market } from '../api'
+import MyColumn from '../components/MyColumn'
 
 // 今日金融要闻日报页(纯展示 news_digest,与策略解耦)。资讯参考,非策略信号。
 const toneCls = (t?: string) => (t === '利好' ? 'up' : t === '利空' ? 'down' : 'muted')
@@ -29,6 +30,8 @@ export default function News({ market = 'us' }: { market?: Market }) {
         📰 每日金融要闻日报（由新闻源采集 + AI 分级合成）。<b>纯资讯参考,与选股策略完全独立,非投资建议。</b>
         {date && <span className="muted"> · {date} · 基于 {n} 条要闻</span>}
       </div>
+
+      {market === 'cn' && <MyColumn market={market} />}
 
       {d.overview && <div className="card"><h3>今日综述</h3><p style={{ margin: 0, lineHeight: 1.7 }}>{d.overview}</p></div>}
 

@@ -178,6 +178,22 @@ export async function fetchNewsCalendar(): Promise<CalendarEvent[]> {
   return r.ok ? (await r.json()).calendar || [] : []
 }
 
+// 用户自定义板块专栏(用户隔离)
+export interface ColumnDigest { overview?: string; items?: { sector: string; points: string[]; tone: string; impact: string }[] }
+export async function fetchColumn(): Promise<{ sectors: string[]; digest_date?: string; digest: ColumnDigest | null }> {
+  const r = await fetch(`/api/news/column${mq()}`)
+  const j = await r.json()
+  return { sectors: j.sectors || [], digest_date: j.digest_date, digest: j.digest ? JSON.parse(j.digest) : null }
+}
+export async function saveColumnSectors(sectors: string[]): Promise<void> {
+  await fetch(`/api/news/column${mq()}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sectors }) })
+}
+export async function generateColumn(): Promise<{ sectors: string[]; digest: ColumnDigest | null }> {
+  const r = await fetch(`/api/news/column${mq('?refresh=1')}`, { method: 'POST' })
+  const j = await r.json()
+  return { sectors: j.sectors || [], digest: j.digest ? JSON.parse(j.digest) : null }
+}
+
 export interface NewsItemDetail {
   title: string; body: string; url: string; source: string; published: string
   interpret: string; sectors: string[]; ai_error?: string
