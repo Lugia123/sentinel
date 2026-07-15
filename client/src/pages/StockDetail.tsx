@@ -7,6 +7,7 @@ import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot, cnMark
 import Select, { type SelectOption } from '../components/Select'
 import EarningsChart from '../components/EarningsChart'
 import ProbBandChart from '../components/ProbBandChart'
+import NewsItemModal from '../components/NewsItemModal'
 
 export default function StockDetail({ h, meta, market = 'us', riskLight, dropped }: { h: Holding; meta: TickerMeta; market?: Market; riskLight?: RiskLight; dropped?: DroppedItem }) {
   const m = meta[h.ticker]
@@ -17,6 +18,7 @@ export default function StockDetail({ h, meta, market = 'us', riskLight, dropped
   const [tab, setTab] = useState<'overview' | 'bg' | 'earnings' | 'news'>('overview')
   // 相关新闻(仅 A股;懒加载,类似背调)
   const [news, setNews] = useState<StockNews | null>(null); const [newsLoading, setNewsLoading] = useState(false)
+  const [newsItemId, setNewsItemId] = useState<number | null>(null)
   const loadNews = async (refresh = false) => {
     setNewsLoading(true)
     try { setNews(await fetchStockNews(h.ticker, refresh)) } catch { /* ignore */ }
@@ -146,15 +148,17 @@ export default function StockDetail({ h, meta, market = 'us', riskLight, dropped
             )}
             {news.news.length === 0 && <div className="muted">暂无采集到的相关新闻。点「刷新」触发采集(约 20 秒)。</div>}
             {news.news.map((n, i) => (
-              <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #2c2418' }}>
-                <div>{n.url ? <a href={n.url} target="_blank" rel="noreferrer">{n.title}</a> : n.title}</div>
-                <div className="muted" style={{ fontSize: 12 }}>{n.published?.slice(0, 16)} · {n.source}{n.relation !== 'company' ? ` · ${n.relation}` : ''}</div>
+              <div key={i} className="clickable" style={{ padding: '6px 0', borderBottom: '1px solid #2c2418' }}
+                onClick={() => n.id && setNewsItemId(n.id)}>
+                <div>{n.title} <span className="go">›</span></div>
+                <div className="muted" style={{ fontSize: 12 }}>{n.published?.slice(0, 16)} · {n.source}{n.relation !== 'company' ? ` · ${n.relation}` : ''} · 点击看 AI 解读</div>
               </div>
             ))}
             <div className="src-cite">{news.disclaimer || '资讯/关注/风险提示,非投资建议。'}</div>
           </>)}
         </div>
       )}
+      {newsItemId && <NewsItemModal id={newsItemId} onClose={() => setNewsItemId(null)} />}
 
       {tab === 'bg' && (
         <div className="card ai-card">

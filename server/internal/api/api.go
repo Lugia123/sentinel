@@ -9,6 +9,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"sentinel/internal/ai"
 	"sentinel/internal/blob"
 	"sentinel/internal/earnings"
 	"sentinel/internal/engine"
@@ -34,13 +35,14 @@ type API struct {
 	authSvc   *auth.Service
 	blob      *blob.Store
 	gdb       *gorm.DB
+	aiClient  *ai.Client // 新闻解读/专栏合成用(与策略无关)
 	dataDir   string
 	engineDir string
 	ver       version.Info
 }
 
-func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, inv *investigate.Service, earn *earnings.Service, al *allocate.Service, au *auth.Service, bs *blob.Store, gdb *gorm.DB, dataDir, engineDir string, ver version.Info) *API {
-	return &API{store: st, runner: rn, port: pf, explain: ex, invest: inv, earn: earn, alloc: al, authSvc: au, blob: bs, gdb: gdb, dataDir: dataDir, engineDir: engineDir, ver: ver}
+func New(st *store.Store, rn *engine.Runner, pf *portfolio.Store, ex *explain.Service, inv *investigate.Service, earn *earnings.Service, al *allocate.Service, au *auth.Service, bs *blob.Store, gdb *gorm.DB, aic *ai.Client, dataDir, engineDir string, ver version.Info) *API {
+	return &API{store: st, runner: rn, port: pf, explain: ex, invest: inv, earn: earn, alloc: al, authSvc: au, blob: bs, gdb: gdb, aiClient: aic, dataDir: dataDir, engineDir: engineDir, ver: ver}
 }
 
 func (a *API) Routes() http.Handler {
@@ -69,6 +71,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/news/digest", a.newsDigest) // 新闻模块(只读 overlay,不碰策略)
 	mux.HandleFunc("/api/news/stock", a.newsStock)
 	mux.HandleFunc("/api/news/calendar", a.newsCalendar)
+	mux.HandleFunc("/api/news/item", a.newsItem)
 	mux.HandleFunc("/api/investigate", a.investigate)
 	mux.HandleFunc("/api/earnings/quarters", a.earningsQuarters)
 	mux.HandleFunc("/api/earnings", a.earningsInterpret)

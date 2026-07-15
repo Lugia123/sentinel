@@ -178,7 +178,16 @@ export async function fetchNewsCalendar(): Promise<CalendarEvent[]> {
   return r.ok ? (await r.json()).calendar || [] : []
 }
 
-export interface StockNewsItem { title: string; source: string; url: string; published: string; relation: string }
+export interface NewsItemDetail {
+  title: string; body: string; url: string; source: string; published: string
+  interpret: string; sectors: string[]; ai_error?: string
+}
+export async function fetchNewsItem(id: number, force = false): Promise<NewsItemDetail> {
+  const r = await fetch(`/api/news/item?id=${id}${force ? '&force=1' : ''}`)
+  return r.json()
+}
+
+export interface StockNewsItem { id: number; title: string; source: string; url: string; published: string; relation: string }
 export interface NewsFlag { type: string; level: string; text: string; basis: string; note: string }
 export interface StockNews {
   ticker: string; news: StockNewsItem[]; summary?: string; flags: NewsFlag[]

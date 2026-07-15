@@ -1,10 +1,20 @@
 package api
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 )
+
+const newsInterpretSys = `你是资深财经分析师,面向A股投资者解读一条新闻。给你标题+摘要(可能很短),用你的常识把这条新闻【展开解读】。输出一段 HTML 片段(不要 <html>/<body>/代码围栏)。
+分区(用 <h4> 小标题):
+① 发生了什么 —— 把这条新闻讲清楚(标题若太简,用你掌握的背景补全来龙去脉;不确定的地方标注"(需核实)",绝不编造具体数字)。
+② 对A股意味着什么 —— 涉及哪些板块/主题?利好还是利空?是否有提前/滞后的传导(如海外隔夜事件A股次日反应)?
+③ 需要关注什么 —— 后续要盯的点。
+【硬要求】<h4>+<p>/<ul><li>,关键处 <b>,不写 CSS,中文,250字内。结尾 <p class="disc">AI 依常识解读,非实时核实,非投资建议。</p>
+另外:在解读之外,单独一行输出 <!--SECTORS:板块1,板块2--> (涉及的A股板块,逗号分隔,2-5个),供系统标注。`
 
 // news.go — 新闻模块只读 API(独立 overlay,绝不碰策略端点)。
 // 读写分工:Python engine/news 写表,Go 只读展示。全部 market-scoped。
@@ -52,6 +62,7 @@ func (a *API) newsStock(w http.ResponseWriter, r *http.Request) {
 
 	// 关联新闻(个股新闻 + 命中的宏观关联),按时间倒序
 	type newsRow struct {
+		ID        int64  `json:"id"`
 		Title     string `json:"title"`
 		Source    string `json:"source"`
 		URL       string `json:"url"`
@@ -60,10 +71,10 @@ func (a *API) newsStock(w http.ResponseWriter, r *http.Request) {
 	}
 	var news []newsRow
 	a.gdb.Raw(`
-		SELECT title, source, url, published_at::text AS published, 'company' AS relation
+		SELECT id, title, source, url, published_at::text AS published, 'company' AS relation
 		FROM news_items WHERE ticker=$1
 		UNION ALL
-		SELECT n.title, n.source, n.url, n.published_at::text, sn.relation
+		SELECT n.id, n.title, n.source, n.url, n.published_at::text, sn.relation
 		FROM stock_news sn JOIN news_items n ON n.id=sn.news_id
 		WHERE sn.market=$2 AND sn.ticker=$1
 		ORDER BY published DESC NULLS LAST LIMIT 30`, tk, market).Scan(&news)
@@ -133,6 +144,96 @@ func (a *API) newsCalendar(w http.ResponseWriter, r *http.Request) {
 		FROM event_calendar WHERE market=? AND event_date >= current_date
 		ORDER BY event_date, importance DESC LIMIT 60`, market).Scan(&evs)
 	writeJSON(w, http.StatusOK, map[string]any{"calendar": evs})
+}
+
+// newsItem 单条新闻详情 + AI 解读。GET /api/news/item?id=&force=1
+func (a *API) newsItem(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 id"})
+		return
+	}
+	var title, body, url, source, published, interpret string
+	err := a.gdb.Raw(`SELECT title, body, url, source, published_at::text, COALESCE(ai_interpret,'')
+		FROM news_items WHERE id=?`, id).Row().Scan(&title, &body, &url, &source, &published, &interpret)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "无此新闻"})
+		return
+	}
+	// 懒生成解读(缓存;force 重生成)
+	if (interpret == "" || r.URL.Query().Get("force") == "1") && a.aiClient != nil && a.aiClient.Enabled() {
+		user := fmt.Sprintf("标题:%s\n摘要:%s\n来源:%s", title, body, source)
+		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+		defer cancel()
+		out, e := a.aiClient.Chat(ctx, newsInterpretSys, user)
+		if e != nil {
+			// AI 失败(如余额不足)→ 优雅降级:仍返回新闻+来源,不阻断
+			writeJSON(w, http.StatusOK, map[string]any{
+				"title": title, "body": body, "url": url, "source": source, "published": published,
+				"interpret": "", "sectors": []string{}, "ai_error": e.Error(),
+			})
+			return
+		}
+		if out != "" {
+			out = stripFence(out)
+			secStr := strings.Join(extractSectors(out), ",")
+			out = stripSectorMarker(out)
+			interpret = out
+			a.gdb.Exec(`UPDATE news_items SET ai_interpret=?, ai_sectors=string_to_array(?, ',') WHERE id=?`, out, secStr, id)
+		}
+	}
+	var secStr string
+	a.gdb.Raw(`SELECT COALESCE(array_to_string(ai_sectors, ','),'') FROM news_items WHERE id=?`, id).Row().Scan(&secStr)
+	sectors := []string{}
+	if secStr != "" {
+		sectors = strings.Split(secStr, ",")
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"title": title, "body": body, "url": url, "source": source, "published": published,
+		"interpret": interpret, "sectors": sectors,
+	})
+}
+
+func stripFence(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "```") {
+		if i := strings.IndexByte(s, '\n'); i >= 0 {
+			s = s[i+1:]
+		}
+		s = strings.TrimSuffix(strings.TrimSpace(s), "```")
+	}
+	return strings.TrimSpace(s)
+}
+
+func extractSectors(s string) []string {
+	i := strings.Index(s, "<!--SECTORS:")
+	if i < 0 {
+		return nil
+	}
+	rest := s[i+len("<!--SECTORS:"):]
+	j := strings.Index(rest, "-->")
+	if j < 0 {
+		return nil
+	}
+	var out []string
+	for _, x := range strings.Split(rest[:j], ",") {
+		if x = strings.TrimSpace(x); x != "" {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+func stripSectorMarker(s string) string {
+	i := strings.Index(s, "<!--SECTORS:")
+	if i < 0 {
+		return s
+	}
+	j := strings.Index(s[i:], "-->")
+	if j < 0 {
+		return s[:i]
+	}
+	return strings.TrimSpace(s[:i] + s[i+j+3:])
 }
 
 func trunc(s string, n int) string {

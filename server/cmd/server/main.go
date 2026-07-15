@@ -57,7 +57,7 @@ func main() {
 	} else {
 		log.Printf("默认管理员: %s(密码见 SENTINEL_ADMIN_PASSWORD,默认 admin123)", adminEmail)
 	}
-	a := api.New(st, rn, pf, ex, inv, earn, al, au, bs, gdb, cfg.DataDir, cfg.EngineDir, ver)
+	a := api.New(st, rn, pf, ex, inv, earn, al, au, bs, gdb, aic, cfg.DataDir, cfg.EngineDir, ver)
 
 	// 后台定时任务:每日定点自动跑引擎+ingest;启动时若库中无快照则自愈补跑
 	scheduler.New(rn, st, cfg.DataDir, cfg.Capital, cfg.Schedule).Start()
