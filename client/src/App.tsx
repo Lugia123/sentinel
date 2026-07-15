@@ -6,6 +6,7 @@ import Positions from './pages/Positions'
 import Help from './pages/Help'
 import StockDetail from './pages/StockDetail'
 import Trends from './pages/Trends'
+import News from './pages/News'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
 import Modal from './components/Modal'
@@ -13,11 +14,12 @@ import { installFetchAuth, fetchMe, logout, changePassword, type AuthUser } from
 
 installFetchAuth() // 全局 fetch 带 token
 
-type View = 'signals' | 'positions' | 'trends' | 'help' | 'admin'
+type View = 'signals' | 'positions' | 'trends' | 'news' | 'help' | 'admin'
 const NAV: { key: View; label: string; adminOnly?: boolean }[] = [
   { key: 'signals', label: '策略信号' },
   { key: 'positions', label: '我的持仓' },
   { key: 'trends', label: '分析走势' },
+  { key: 'news', label: '今日要闻' },
   { key: 'help', label: '帮助说明' },
   { key: 'admin', label: '系统管理', adminOnly: true },
 ]
@@ -144,6 +146,7 @@ export default function App() {
         {!droppedH && !detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onSelectDropped={setDroppedSel} onReload={load} />}
         {!droppedH && !detailH && view === 'positions' && <Positions market={market} />}
         {!droppedH && !detailH && view === 'trends' && <Trends meta={meta} watch={watch} market={market} />}
+        {!droppedH && !detailH && view === 'news' && <News market={market} />}
         {!droppedH && !detailH && view === 'help' && <Help market={market} />}
         {!droppedH && !detailH && view === 'admin' && isAdmin && <Admin />}
         {!droppedH && !detailH && view === 'signals' && !snap && !err && <div className="card">加载中…</div>}

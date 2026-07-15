@@ -13,6 +13,9 @@ import (
 	"sentinel/internal/store"
 )
 
+// newsTimeout 新闻任务各步超时(采集/生成较慢,给足)。
+const newsTimeout = 15 * time.Minute
+
 // MARKETS 每周期跑的市场(各自 EOD 刷新+重算)。
 var MARKETS = []string{"us", "cn"}
 
@@ -66,8 +69,35 @@ func (s *Scheduler) Start() {
 			log.Printf("[scheduler] 下次自动运行:%dh 后(每 %dh 跑一次,双市场 %v)", h, h, MARKETS)
 			time.Sleep(d)
 			s.run()
+			s.runNews() // 策略后跑独立新闻任务(错峰;失败隔离,不影响策略)
 		}
 	}()
+}
+
+// runNews 独立新闻任务:采集宏观快讯+全球一手 + 生成日报。与策略完全解耦,失败只记日志。
+// A股新闻模块;用 RunPython 调 engine/news/ 脚本(与 backfill/refresh 同机制)。
+func (s *Scheduler) runNews() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[news] 任务 panic(不影响策略):%v", r)
+		}
+	}()
+	steps := []struct {
+		name string
+		args []string
+	}{
+		{"采集宏观快讯", []string{"news/news_collector.py", "--macro"}},
+		{"采集全球一手", []string{"news/news_global.py", "--collect"}},
+		{"生成日报", []string{"news/news_daily.py", "--gen"}},
+	}
+	for _, st := range steps {
+		out, err := s.rn.RunPython(st.args[0], st.args[1:], newsTimeout)
+		if err != nil {
+			log.Printf("[news] %s 失败(跳过,不影响策略):%v", st.name, err)
+			continue
+		}
+		log.Printf("[news] %s:%s", st.name, lastLine(out))
+	}
 }
 
 // run 每周期:逐市场 刷新数据(S3 接) + 跑引擎 + ingest(幂等 upsert)。

@@ -157,6 +157,21 @@ export async function saveCapital(capital: number): Promise<void> {
   const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || '保存资金池失败')
 }
 
+// ── 新闻模块(只读 overlay,与策略解耦)──
+export interface NewsDigest {
+  overview?: string
+  world?: { title: string; impact: string; tone: string }[]
+  domestic?: { title: string; impact: string; tone: string }[]
+  market_impact?: { sector: string; reason: string; tone: string }[]
+  global_transmission?: { event: string; cn_sectors: string; timing: string; tone: string }[]
+}
+export async function fetchNewsDigest(): Promise<{ digest_date?: string; digest: NewsDigest | null; n_source?: number }> {
+  const r = await fetch(`/api/news/digest${mq()}`)
+  if (!r.ok) return { digest: null }
+  const j = await r.json()
+  return { digest_date: j.digest_date, digest: j.digest ? JSON.parse(j.digest) : null, n_source: j.n_source }
+}
+
 export interface UniverseItem { ticker: string; cn?: string; sector?: string }
 export async function fetchUniverse(): Promise<UniverseItem[]> {
   const r = await fetch(`/api/universe${mq()}`)
