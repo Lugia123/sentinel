@@ -216,6 +216,16 @@ export async function fetchNewsItem(id: number, force = false): Promise<NewsItem
   return r.json()
 }
 
+// 世界大事/国内大事条目的按需 AI 解读(digest 事件无 news_item id,按标题解读)
+export interface EventInterpret { interpret: string; sectors: string[]; ai_error?: string }
+export async function fetchEventInterpret(title: string, context: string, force = false): Promise<EventInterpret> {
+  const r = await fetch('/api/news/event-interpret', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, context, market: getMarket(), force }),
+  })
+  return r.json()
+}
+
 export interface StockNewsItem { id: number; title: string; source: string; url: string; published: string; relation: string }
 export interface NewsFlag { type: string; level: string; text: string; basis: string; note: string }
 export interface StockNews {

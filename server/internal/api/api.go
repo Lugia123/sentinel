@@ -72,6 +72,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/news/stock", a.newsStock)
 	mux.HandleFunc("/api/news/calendar", a.newsCalendar)
 	mux.HandleFunc("/api/news/item", a.newsItem)
+	mux.HandleFunc("/api/news/event-interpret", a.newsEventInterpret)
 	mux.HandleFunc("/api/news/column", a.newsColumn)
 	mux.HandleFunc("/api/news/column/digest", a.newsSectorDigest)
 	mux.HandleFunc("/api/news/feed", a.newsFeed)

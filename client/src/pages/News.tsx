@@ -4,6 +4,9 @@ import {
   type NewsDigest, type SectorDigest, type CalendarEvent, type FeedItem, type Market,
 } from '../api'
 import NewsItemModal from '../components/NewsItemModal'
+import EventInterpretModal from '../components/EventInterpretModal'
+
+type EventPick = { title: string; context: string; kind: string }
 
 const toneCls = (t?: string) => (t === '利好' ? 'up' : t === '利空' ? 'down' : 'muted')
 // 剥离快讯标题里的【】包裹(阅读噪声)+ 取时间 HH:MM
@@ -16,6 +19,7 @@ export default function News({ market = 'us' }: { market?: Market }) {
   const [sectors, setSectors] = useState<string[]>([])
   const [tab, setTab] = useState<string>('综合') // '综合' | 板块名 | '管理'
   const [openId, setOpenId] = useState<number | null>(null)
+  const [openEvent, setOpenEvent] = useState<EventPick | null>(null)
 
   useEffect(() => { setTab('综合'); if (market === 'cn') fetchColumnSectors().then(setSectors); else setSectors([]) }, [market])
 
@@ -37,16 +41,17 @@ export default function News({ market = 'us' }: { market?: Market }) {
       {tab === '管理'
         ? <ManageSectors sectors={sectors} onSaved={(ss) => { setSectors(ss); setTab(ss[0] || '综合') }} />
         : tab === '综合'
-          ? <GeneralDigest market={market} onOpen={setOpenId} />
-          : <SectorColumn sector={tab} onOpen={setOpenId} />}
+          ? <GeneralDigest market={market} onOpen={setOpenId} onOpenEvent={setOpenEvent} />
+          : <SectorColumn sector={tab} onOpen={setOpenId} onOpenEvent={setOpenEvent} />}
 
       {openId && <NewsItemModal id={openId} onClose={() => setOpenId(null)} />}
+      {openEvent && <EventInterpretModal event={openEvent} onClose={() => setOpenEvent(null)} />}
     </>
   )
 }
 
 // ── 综合 tab:全市场日报 + 可点新闻列表 + 日历 ──
-function GeneralDigest({ market, onOpen }: { market: Market; onOpen: (id: number) => void }) {
+function GeneralDigest({ market, onOpen, onOpenEvent }: { market: Market; onOpen: (id: number) => void; onOpenEvent: (e: EventPick) => void }) {
   const [d, setD] = useState<NewsDigest | null>(null)
   const [date, setDate] = useState(''); const [n, setN] = useState(0)
   const [feed, setFeed] = useState<FeedItem[]>([]); const [cal, setCal] = useState<CalendarEvent[]>([])
@@ -60,7 +65,7 @@ function GeneralDigest({ market, onOpen }: { market: Market; onOpen: (id: number
   return (
     <>
       {d?.overview && <div className="card"><h3>今日综述 <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>{date} · 基于 {n} 条要闻</span></h3><p style={{ margin: 0, lineHeight: 1.7 }}>{d.overview}</p></div>}
-      <TwoCol world={d?.world} domestic={d?.domestic} />
+      <TwoCol world={d?.world} domestic={d?.domestic} onOpenEvent={onOpenEvent} />
       <ImpactTable title="📊 板块影响" head="板块/主题" rows={(d?.market_impact || []).map((x) => ({ a: x.sector, b: x.reason, tone: x.tone }))} />
       <Transmission items={d?.global_transmission} />
       <NewsFeed feed={feed} onOpen={onOpen} />
@@ -71,7 +76,7 @@ function GeneralDigest({ market, onOpen }: { market: Market; onOpen: (id: number
 }
 
 // ── 板块 tab:围绕该板块的完整一套 ──
-function SectorColumn({ sector, onOpen }: { sector: string; onOpen: (id: number) => void }) {
+function SectorColumn({ sector, onOpen, onOpenEvent }: { sector: string; onOpen: (id: number) => void; onOpenEvent: (e: EventPick) => void }) {
   const [d, setD] = useState<SectorDigest | null>(null)
   const [date, setDate] = useState(''); const [feed, setFeed] = useState<FeedItem[]>([])
   const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false)
@@ -91,7 +96,7 @@ function SectorColumn({ sector, onOpen }: { sector: string; onOpen: (id: number)
       {!loading && !d && <div className="card muted">还没生成「{sector}」专栏。点右上「刷新专栏」由 AI 从当日新闻合成一套聚焦该板块的资讯。</div>}
       {d && (<>
         {d.overview && <div className="card"><h3>{sector} · 今日综述</h3><p style={{ margin: 0, lineHeight: 1.7 }}>{d.overview}</p></div>}
-        <TwoCol world={d.world} domestic={d.domestic} />
+        <TwoCol world={d.world} domestic={d.domestic} onOpenEvent={onOpenEvent} />
         <ImpactTable title="🎯 个股影响" head="个股" rows={(d.stock_impact || []).map((x) => ({ a: x.stock, b: x.reason, tone: x.tone }))} />
         <Transmission items={d.global_transmission} />
       </>)}
@@ -102,12 +107,13 @@ function SectorColumn({ sector, onOpen }: { sector: string; onOpen: (id: number)
 }
 
 // ── 复用小组件 ──
-function TwoCol({ world, domestic }: { world?: { title: string; impact: string; tone: string }[]; domestic?: { title: string; impact: string; tone: string }[] }) {
-  const col = (title: string, arr?: { title: string; impact: string; tone: string }[]) => (
+type Evt = { title: string; impact: string; tone: string }
+function TwoCol({ world, domestic, onOpenEvent }: { world?: Evt[]; domestic?: Evt[]; onOpenEvent: (e: EventPick) => void }) {
+  const col = (title: string, kind: string, arr?: Evt[]) => (
     <div className="card" style={{ flex: 1 }}>
-      <h3>{title}</h3>
+      <h3>{title} <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>· 点击展开 AI 解读</span></h3>
       {(arr || []).map((x, i) => (
-        <div key={i} className="evt-item">
+        <div key={i} className="evt-item evt-click" onClick={() => onOpenEvent({ title: x.title, context: x.impact, kind })}>
           <div className="evt-title">{x.title} <span className={`pill ${toneCls(x.tone)}`} style={{ fontSize: 11 }}>{x.tone}</span></div>
           <div className="evt-impact">{x.impact}</div>
         </div>
@@ -115,7 +121,7 @@ function TwoCol({ world, domestic }: { world?: { title: string; impact: string; 
       {!(arr || []).length && <div className="muted">—</div>}
     </div>
   )
-  return <div className="row">{col('🌍 世界大事', world)}{col('🇨🇳 国内大事', domestic)}</div>
+  return <div className="row">{col('🌍 世界大事', '世界大事', world)}{col('🇨🇳 国内大事', '国内大事', domestic)}</div>
 }
 
 function ImpactTable({ title, head, rows }: { title: string; head: string; rows: { a: string; b: string; tone: string }[] }) {

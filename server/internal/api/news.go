@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -192,6 +194,59 @@ func (a *API) newsItem(w http.ResponseWriter, r *http.Request) {
 		"title": title, "body": body, "url": url, "source": source, "published": published,
 		"interpret": interpret, "sectors": sectors,
 	})
+}
+
+const eventInterpretSys = `你是资深财经分析师,面向A股投资者【深度解读】一则宏观/时政大事。给你【事件标题】和【初步影响判断】,用你的常识把它展开。输出一段 HTML 片段(不要 <html>/<body>/代码围栏)。
+分区(用 <h4> 小标题):
+① 事件是什么 —— 讲清来龙去脉、背景与关键事实(标题若太简,用你掌握的背景补全;不确定处标"(需核实)",绝不编造具体数字)。
+② 对A股意味着什么 —— 传导路径:涉及哪些板块/主题?利好还是利空?海外事件对A股是否有提前/滞后反应(如隔夜事件次日反应)?哪些行业弹性最大?
+③ 需要关注什么 —— 后续要盯的信号、关键时间节点、风险点。
+【硬要求】<h4>+<p>/<ul><li>,关键处 <b>,不写 CSS,中文,300字内。结尾 <p class="disc">AI 依常识解读,非实时核实,非投资建议。</p>
+另外:单独一行输出 <!--SECTORS:板块1,板块2--> (涉及的A股板块,逗号分隔,2-5个),供系统标注。`
+
+// newsEventInterpret 宏观「世界大事/国内大事」条目的按需 AI 深度解读(缓存)。POST /api/news/event-interpret
+func (a *API) newsEventInterpret(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Title   string `json:"title"`
+		Context string `json:"context"`
+		Market  string `json:"market"`
+		Force   bool   `json:"force"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Title) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 title"})
+		return
+	}
+	market := req.Market
+	if market == "" {
+		market = "cn"
+	}
+	key := fmt.Sprintf("%x", md5.Sum([]byte(req.Title)))
+	var interpret, secStr string
+	a.gdb.Raw(`SELECT interpret, sectors FROM event_interpret WHERE market=? AND event_key=?`, market, key).Row().Scan(&interpret, &secStr)
+	if (interpret == "" || req.Force) && a.aiClient != nil && a.aiClient.Enabled() {
+		user := fmt.Sprintf("事件标题:%s\n初步影响判断:%s", req.Title, req.Context)
+		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+		defer cancel()
+		out, e := a.aiClient.Chat(ctx, eventInterpretSys, user)
+		if e != nil {
+			writeJSON(w, http.StatusOK, map[string]any{"interpret": "", "sectors": []string{}, "ai_error": e.Error()})
+			return
+		}
+		if out != "" {
+			out = stripFence(out)
+			secStr = strings.Join(extractSectors(out), ",")
+			out = stripSectorMarker(out)
+			interpret = out
+			a.gdb.Exec(`INSERT INTO event_interpret (market, event_key, interpret, sectors) VALUES (?,?,?,?)
+				ON CONFLICT (market, event_key) DO UPDATE SET interpret=EXCLUDED.interpret, sectors=EXCLUDED.sectors, created_at=now()`,
+				market, key, interpret, secStr)
+		}
+	}
+	sectors := []string{}
+	if secStr != "" {
+		sectors = strings.Split(secStr, ",")
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"interpret": interpret, "sectors": sectors})
 }
 
 func stripFence(s string) string {

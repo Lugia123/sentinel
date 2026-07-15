@@ -327,6 +327,11 @@ a:hover { color: var(--gold-hi); text-decoration: underline; text-underline-offs
 .evt-item:last-child { border-bottom: 0; }
 .evt-title { font-size: 14px; line-height: 1.5; color: var(--ink); font-weight: 500; margin-bottom: 3px; }
 .evt-impact { font-size: 12.5px; line-height: 1.6; color: var(--ink-soft); }
+.evt-click { cursor: pointer; padding: 9px 8px; margin: 0 -8px; border-radius: 8px; border-left: 2px solid transparent;
+  border-bottom: 1px solid var(--border); transition: background .12s, border-color .12s; }
+.evt-click:last-child { border-bottom: 1px solid transparent; }
+.evt-click:hover { background: var(--gold-glow); border-left-color: var(--gold-dim); }
+.evt-click:hover .evt-title { color: var(--gold-hi); }
 
 /* 板块 tag(涉及板块)*/
 .sec-tag { display: inline-block; font-size: 12px; color: var(--gold-hi); background: var(--gold-glow);
