@@ -178,20 +178,33 @@ export async function fetchNewsCalendar(): Promise<CalendarEvent[]> {
   return r.ok ? (await r.json()).calendar || [] : []
 }
 
-// 用户自定义板块专栏(用户隔离)
-export interface ColumnDigest { overview?: string; items?: { sector: string; points: string[]; tone: string; impact: string }[] }
-export async function fetchColumn(): Promise<{ sectors: string[]; digest_date?: string; digest: ColumnDigest | null }> {
+// 用户自定义板块专栏(tab 式,每板块完整 digest;用户隔离)
+// 板块 digest 复用与综合相同的结构,但 market_impact 换成 stock_impact(个股影响)
+export interface SectorDigest {
+  overview?: string
+  world?: { title: string; impact: string; tone: string }[]
+  domestic?: { title: string; impact: string; tone: string }[]
+  stock_impact?: { stock: string; reason: string; tone: string }[]
+  global_transmission?: { event: string; timing: string; tone: string }[]
+}
+export async function fetchColumnSectors(): Promise<string[]> {
   const r = await fetch(`/api/news/column${mq()}`)
-  const j = await r.json()
-  return { sectors: j.sectors || [], digest_date: j.digest_date, digest: j.digest ? JSON.parse(j.digest) : null }
+  return r.ok ? (await r.json()).sectors || [] : []
 }
 export async function saveColumnSectors(sectors: string[]): Promise<void> {
   await fetch(`/api/news/column${mq()}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sectors }) })
 }
-export async function generateColumn(): Promise<{ sectors: string[]; digest: ColumnDigest | null }> {
-  const r = await fetch(`/api/news/column${mq('?refresh=1')}`, { method: 'POST' })
+export async function fetchSectorDigest(sector: string, refresh = false): Promise<{ digest_date?: string; digest: SectorDigest | null }> {
+  const r = await fetch(`/api/news/column/digest${mq(`?sector=${encodeURIComponent(sector)}${refresh ? '&refresh=1' : ''}`)}`)
   const j = await r.json()
-  return { sectors: j.sectors || [], digest: j.digest ? JSON.parse(j.digest) : null }
+  return { digest_date: j.digest_date, digest: j.digest ? JSON.parse(j.digest) : null }
+}
+// 可点新闻列表(综合=近期宏观;板块=命中板块词)
+export interface FeedItem { id: number; title: string; source: string; url: string; published: string }
+export async function fetchNewsFeed(sector?: string): Promise<FeedItem[]> {
+  const q = sector ? `?sector=${encodeURIComponent(sector)}` : ''
+  const r = await fetch(`/api/news/feed${mq(q)}`)
+  return r.ok ? (await r.json()).feed || [] : []
 }
 
 export interface NewsItemDetail {

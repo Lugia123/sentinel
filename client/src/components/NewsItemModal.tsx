@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react'
 import Modal from './Modal'
 import { fetchNewsItem, type NewsItemDetail } from '../api'
 
+const clean = (t: string) => t.replace(/^【(.+?)】/, '$1').trim()
+const SRC: Record<string, string> = { em_global: '东方财富', sina_global: '新浪财经', ths_global: '同花顺', cctv: '央视新闻', gdelt: '全球来源', stock_em: '东财个股' }
+const srcCn = (s: string) => SRC[s] || s
+
 // 新闻详情弹窗:AI 解读(涉及板块+传导)+ 来源链接。资讯参考,非投资建议。
 export default function NewsItemModal({ id, onClose }: { id: number; onClose: () => void }) {
   const [d, setD] = useState<NewsItemDetail | null>(null)
@@ -14,16 +18,19 @@ export default function NewsItemModal({ id, onClose }: { id: number; onClose: ()
       {loading && !d && <div className="muted">加载并解读中…（首次约 20 秒）</div>}
       {d && (
         <div>
-          <h3 style={{ marginTop: 0 }}>{d.title}</h3>
-          <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
-            {d.published?.slice(0, 16)} · {d.source}
-            {d.url && <> · <a href={d.url} target="_blank" rel="noreferrer">查看来源 ↗</a></>}
+          <h3 style={{ marginTop: 0, fontSize: 18, lineHeight: 1.4, color: 'var(--ink)', fontWeight: 700 }}>{clean(d.title)}</h3>
+          <div className="muted" style={{ fontSize: 12.5, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span>{d.published?.slice(0, 16)}</span>
+            <span>· {srcCn(d.source)}</span>
+            {d.url && <a className="src-link" href={d.url} target="_blank" rel="noreferrer">查看来源 ↗</a>}
           </div>
-          {d.body && d.body !== d.title && <p style={{ lineHeight: 1.7 }}>{d.body}</p>}
+          {d.body && clean(d.body) !== clean(d.title) &&
+            <p style={{ lineHeight: 1.75, color: 'var(--ink-soft)', fontSize: 14 }}>{clean(d.body)}</p>}
 
           {d.sectors && d.sectors.length > 0 && (
-            <div style={{ margin: '10px 0' }}>
-              涉及板块:{d.sectors.map((s, i) => <span key={i} className="pill" style={{ marginRight: 6 }}>{s}</span>)}
+            <div style={{ margin: '12px 0' }}>
+              <span className="muted" style={{ marginRight: 6 }}>涉及板块</span>
+              {d.sectors.map((s, i) => <span key={i} className="sec-tag">{s}</span>)}
             </div>
           )}
 

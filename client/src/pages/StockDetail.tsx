@@ -147,13 +147,17 @@ export default function StockDetail({ h, meta, market = 'us', riskLight, dropped
               </div>
             )}
             {news.news.length === 0 && <div className="muted">暂无采集到的相关新闻。点「刷新」触发采集(约 20 秒)。</div>}
-            {news.news.map((n, i) => (
-              <div key={i} className="clickable" style={{ padding: '6px 0', borderBottom: '1px solid #2c2418' }}
-                onClick={() => n.id && setNewsItemId(n.id)}>
-                <div>{n.title} <span className="go">›</span></div>
-                <div className="muted" style={{ fontSize: 12 }}>{n.published?.slice(0, 16)} · {n.source}{n.relation !== 'company' ? ` · ${n.relation}` : ''} · 点击看 AI 解读</div>
-              </div>
-            ))}
+            <div className="news-list">
+              {news.news.map((n, i) => (
+                <div key={i} className="news-item" onClick={() => n.id && setNewsItemId(n.id)}>
+                  <div className="news-time">{n.published && n.published.length >= 16 ? n.published.slice(11, 16) : ''}</div>
+                  <div className="news-main">
+                    <div className="news-headline">{n.title.replace(/^【(.+?)】/, '$1').trim()}</div>
+                    <div className="news-meta"><span className="news-src-tag">{n.source}</span>{n.relation !== 'company' ? ` · ${n.relation}` : ''}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
             <div className="src-cite">{news.disclaimer || '资讯/关注/风险提示,非投资建议。'}</div>
           </>)}
         </div>

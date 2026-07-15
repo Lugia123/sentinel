@@ -293,3 +293,39 @@ button.primary { background: var(--gold); color: #1a140a; }
 .market-switch button { background: transparent; border: none; color: var(--ink-mute, #8a93a6); font-size: 13px; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: all .15s; }
 .market-switch button:hover { color: var(--ink, #e8ecf3); }
 .market-switch button.ms-on { background: var(--gold, #c9a227); color: #1a1408; font-weight: 600; }
+
+/* ── 新闻阅读体验(暗金编辑风·重可读性)────────────────────────── */
+/* 全局链接:金色,不用浏览器默认蓝 */
+a { color: var(--gold); text-decoration: none; transition: color .15s; }
+a:hover { color: var(--gold-hi); text-decoration: underline; text-underline-offset: 2px; }
+
+/* 来源链接:小号带边框的 ghost 链接,融入暗金主题 */
+.src-link { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--ink-mute);
+  border: 1px solid var(--border-2); border-radius: 6px; padding: 1px 8px; margin-left: 6px; transition: all .15s; }
+.src-link:hover { color: var(--gold-hi); border-color: var(--gold-dim); text-decoration: none; }
+
+/* 新闻电讯/时间线列表:左时间轴 + 右标题,节奏清晰易扫读 */
+.news-list { margin-top: 4px; }
+.news-item { display: grid; grid-template-columns: 52px 1fr; gap: 14px; align-items: baseline;
+  padding: 11px 10px 11px 8px; margin: 0 -10px; border-radius: 9px; cursor: pointer;
+  border-left: 2px solid transparent; transition: background .12s, border-color .12s; }
+.news-item + .news-item { border-top: 1px solid var(--border); }
+.news-item:hover { background: var(--gold-glow); border-left-color: var(--gold-dim); border-top-color: transparent; }
+.news-item:hover + .news-item { border-top-color: transparent; }
+.news-time { font-size: 12px; color: var(--gold-dim); font-variant-numeric: tabular-nums; font-weight: 600; letter-spacing: .3px; padding-top: 1px; }
+.news-main { min-width: 0; }
+.news-headline { font-size: 14.5px; line-height: 1.55; color: var(--ink); font-weight: 500; }
+.news-item:hover .news-headline { color: var(--gold-hi); }
+.news-meta { font-size: 11.5px; color: var(--ink-mute); margin-top: 3px; display: flex; align-items: center; gap: 6px; }
+.news-src-tag { color: var(--ink-mute); }
+.news-more { display: none; }
+
+/* 世界/国内大事条目:更松弛的行距,标题与影响分层 */
+.evt-item { padding: 9px 0; border-bottom: 1px solid var(--border); }
+.evt-item:last-child { border-bottom: 0; }
+.evt-title { font-size: 14px; line-height: 1.5; color: var(--ink); font-weight: 500; margin-bottom: 3px; }
+.evt-impact { font-size: 12.5px; line-height: 1.6; color: var(--ink-soft); }
+
+/* 板块 tag(涉及板块)*/
+.sec-tag { display: inline-block; font-size: 12px; color: var(--gold-hi); background: var(--gold-glow);
+  border: 1px solid var(--gold-dim); border-radius: 6px; padding: 1px 9px; margin: 0 6px 4px 0; }
