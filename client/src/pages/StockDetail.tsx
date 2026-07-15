@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
-import { fetchHistory, fetchExplain, fetchInvestigate, fetchBlobHTML, fetchEarningsQuarters, fetchEarningsInterpret, type EarnQuarter } from '../api'
+import { fetchHistory, fetchExplain, fetchInvestigate, fetchBlobHTML, fetchEarningsQuarters, fetchEarningsInterpret, fetchStockNews, type EarnQuarter, type StockNews } from '../api'
 import type { Holding, HistPoint, RiskLight } from '../types'
 import type { TickerMeta, Market, DroppedItem } from '../api'
 import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot, cnMarketAction } from '../ui'
@@ -14,7 +14,15 @@ export default function StockDetail({ h, meta, market = 'us', riskLight, dropped
   const cur = isCN ? '¥' : '$'
   // A股动作=市场级风险灯统一指令(单票不按档位减仓);美股=单票档位映射
   const act = isCN && riskLight ? cnMarketAction(riskLight.level) : { text: h.action, color: actionColor(h.action) }
-  const [tab, setTab] = useState<'overview' | 'bg' | 'earnings'>('overview')
+  const [tab, setTab] = useState<'overview' | 'bg' | 'earnings' | 'news'>('overview')
+  // 相关新闻(仅 A股;懒加载,类似背调)
+  const [news, setNews] = useState<StockNews | null>(null); const [newsLoading, setNewsLoading] = useState(false)
+  const loadNews = async (refresh = false) => {
+    setNewsLoading(true)
+    try { setNews(await fetchStockNews(h.ticker, refresh)) } catch { /* ignore */ }
+    setNewsLoading(false)
+  }
+  useEffect(() => { if (tab === 'news' && !news && !newsLoading) loadNews(false) }, [tab])
   // 背景调查:取回 HTML 片段注入页面(不用 iframe,随整页滚)
   const [bgHtml, setBgHtml] = useState(''); const [bgLoading, setBgLoading] = useState(false); const [bgErr, setBgErr] = useState('')
   const loadBg = async (force = false) => {
@@ -106,7 +114,47 @@ export default function StockDetail({ h, meta, market = 'us', riskLight, dropped
         <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>策略概览</button>
         <button className={tab === 'bg' ? 'active' : ''} onClick={() => setTab('bg')}>背景调查</button>
         <button className={tab === 'earnings' ? 'active' : ''} onClick={() => setTab('earnings')}>财报解读</button>
+        {isCN && <button className={tab === 'news' ? 'active' : ''} onClick={() => setTab('news')}>相关新闻</button>}
       </div>
+
+      {tab === 'news' && (
+        <div className="card ai-card">
+          <h3>📰 相关新闻 <span className="muted" style={{ fontWeight: 400 }}>· 资讯参考,非策略信号</span>
+            <button className="ghost mini" style={{ float: 'right' }} onClick={() => loadNews(true)} disabled={newsLoading}>{newsLoading ? '刷新中…' : '刷新'}</button>
+          </h3>
+          {newsLoading && !news && <div className="muted">加载相关新闻…（首次约 20 秒）</div>}
+          {news && (<>
+            {news.summary && <div className="alloc-note" style={{ marginBottom: 10 }}>🧭 当前叙事:{news.summary}</div>}
+            {news.keywords && news.keywords.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                {news.keywords.map((k, i) => (
+                  <span key={i} className="pill" style={{ marginRight: 6, marginBottom: 4, display: 'inline-block' }}
+                    title={k.why}>{k.kw} <span className="muted" style={{ fontSize: 11 }}>{(k.weight * 100).toFixed(0)}</span></span>
+                ))}
+              </div>
+            )}
+            {news.flags && news.flags.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                {news.flags.map((f, i) => (
+                  <div key={i} className="muted" style={{ padding: '4px 0', fontSize: 13,
+                    color: f.type === 'avoid_risk' ? 'var(--warn)' : f.type === 'attention' ? 'var(--up)' : undefined }}>
+                    {f.type === 'avoid_risk' ? '⚠' : f.type === 'attention' ? '👀' : '📊'} <b>{f.text}</b>
+                    <span className="muted" style={{ fontSize: 12 }}> · {f.basis} · {f.note}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {news.news.length === 0 && <div className="muted">暂无采集到的相关新闻。点「刷新」触发采集(约 20 秒)。</div>}
+            {news.news.map((n, i) => (
+              <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid #2c2418' }}>
+                <div>{n.url ? <a href={n.url} target="_blank" rel="noreferrer">{n.title}</a> : n.title}</div>
+                <div className="muted" style={{ fontSize: 12 }}>{n.published?.slice(0, 16)} · {n.source}{n.relation !== 'company' ? ` · ${n.relation}` : ''}</div>
+              </div>
+            ))}
+            <div className="src-cite">{news.disclaimer || '资讯/关注/风险提示,非投资建议。'}</div>
+          </>)}
+        </div>
+      )}
 
       {tab === 'bg' && (
         <div className="card ai-card">

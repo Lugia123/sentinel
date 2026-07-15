@@ -67,6 +67,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/trend/tickers", a.trendTickers)
 	mux.HandleFunc("/api/dropped", a.dropped)
 	mux.HandleFunc("/api/news/digest", a.newsDigest) // 新闻模块(只读 overlay,不碰策略)
+	mux.HandleFunc("/api/news/stock", a.newsStock)
 	mux.HandleFunc("/api/investigate", a.investigate)
 	mux.HandleFunc("/api/earnings/quarters", a.earningsQuarters)
 	mux.HandleFunc("/api/earnings", a.earningsInterpret)

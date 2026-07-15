@@ -172,6 +172,20 @@ export async function fetchNewsDigest(): Promise<{ digest_date?: string; digest:
   return { digest_date: j.digest_date, digest: j.digest ? JSON.parse(j.digest) : null, n_source: j.n_source }
 }
 
+export interface StockNewsItem { title: string; source: string; url: string; published: string; relation: string }
+export interface NewsFlag { type: string; level: string; text: string; basis: string; note: string }
+export interface StockNews {
+  ticker: string; news: StockNewsItem[]; summary?: string; flags: NewsFlag[]
+  keywords?: { kw: string; weight: number; why: string }[]; disclaimer?: string; note?: string
+}
+export async function fetchStockNews(ticker: string, refresh = false): Promise<StockNews> {
+  const r = await fetch(`/api/news/stock${mq(`?ticker=${ticker}${refresh ? '&refresh=1' : ''}`)}`)
+  const j = await r.json()
+  let kw
+  try { kw = j.keywords_json ? JSON.parse(j.keywords_json) : undefined } catch { kw = undefined }
+  return { ticker: j.ticker, news: j.news || [], summary: j.summary, flags: j.flags || [], keywords: kw, disclaimer: j.disclaimer, note: j.note }
+}
+
 export interface UniverseItem { ticker: string; cn?: string; sector?: string }
 export async function fetchUniverse(): Promise<UniverseItem[]> {
   const r = await fetch(`/api/universe${mq()}`)
