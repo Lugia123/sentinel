@@ -16,10 +16,10 @@ installFetchAuth() // 全局 fetch 带 token
 
 type View = 'signals' | 'positions' | 'trends' | 'news' | 'help' | 'admin'
 const NAV: { key: View; label: string; adminOnly?: boolean }[] = [
+  { key: 'news', label: '今日要闻' },
   { key: 'signals', label: '策略信号' },
   { key: 'positions', label: '我的持仓' },
   { key: 'trends', label: '分析走势' },
-  { key: 'news', label: '今日要闻' },
   { key: 'help', label: '帮助说明' },
   { key: 'admin', label: '系统管理', adminOnly: true },
 ]
@@ -31,7 +31,7 @@ export default function App() {
   const [ver, setVer] = useState('dev')
   const [err, setErr] = useState('')
   const [running, setRunning] = useState(false)
-  const [view, setView] = useState<View>('signals')
+  const [view, setView] = useState<View>('news') // 默认进今日要闻页
   const [sel, setSel] = useState<string | null>(null)
   const [droppedSel, setDroppedSel] = useState<DroppedItem | null>(null) // 掉出股详情(holding 来自掉出前 context)
   const [meta, setMeta] = useState<TickerMeta>({})
@@ -92,7 +92,7 @@ export default function App() {
     <>
       <div className="topbar">
         <div className="topbar-in">
-          <div className="brand" onClick={() => goto('signals')}>SENTINEL<span className="ver">{ver}</span></div>
+          <div className="brand" onClick={() => goto('news')}>SENTINEL<span className="ver">{ver}</span></div>
           <div className="market-switch" title="切换市场:美股 / A股">
             <button className={market === 'us' ? 'ms-on' : ''} onClick={() => switchMarket('us')}>🇺🇸 美股</button>
             <button className={market === 'cn' ? 'ms-on' : ''} onClick={() => switchMarket('cn')}>🇨🇳 A股</button>
