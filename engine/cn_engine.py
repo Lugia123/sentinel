@@ -28,6 +28,11 @@ ALT_DIR = os.path.join(SAFNA_A, "data", "alt")
 UNIV = os.path.join(SAFNA_A, "data", "meta", "universe.csv")
 N_HOLD = 50
 N_EVENT = 20   # rev+PEAD 事件腿展示数(容量友好,较少)
+# 换手阻尼窗:方向1(2026-07)honest-WF——周频+turnMA40 net Cal 0.378裸/1.003+gate(vs月度turnMA20 0.228,+0.146)。
+# 40优于20(降成员churn);120更省换手容量友好(同Cal换手10.7x vs 14.7x)。可env覆盖。
+TURN_WIN = int(os.environ.get("SENTINEL_CN_TURN_WIN", "40"))
+# 周频调仓(交易日):每 REBAL_DAYS 交易日才重选,期间保持名单(降换手,兑现研究收益 + 稳定推荐列表)。
+REBAL_DAYS = int(os.environ.get("SENTINEL_CN_REBAL_DAYS", "5"))
 DISCLAIMER = "研究工具,非投资建议"
 
 
@@ -109,14 +114,57 @@ def compute_gate_cn(M):
                 exposure=expo, note=note)
 
 
+def _turn_ma(M):
+    """换手阻尼均线(TURN_WIN 日),供选股与持仓展示复用。"""
+    return M["turn"].rolling(TURN_WIN).mean()
+
+
 def headline_pick(M):
-    """头号腿选股:tradable∧剔ST∧小市值分位≤20% 内按20日均换手升序取前N。返回 [(code,turn,fmc)]。"""
-    m = L.masks(M); turn20 = M["turn"].rolling(20).mean()
-    sig = (-turn20).where(m["tr"] & m["st"] & m["small"] & M["in_market"])
+    """头号腿选股:tradable∧剔ST∧小市值分位≤20% 内按 TURN_WIN 日均换手升序取前N。返回 [(code,turn,fmc)]。"""
+    m = L.masks(M); turnw = _turn_ma(M)
+    sig = (-turnw).where(m["tr"] & m["st"] & m["small"] & M["in_market"])
     row = sig.iloc[-1].dropna().sort_values(ascending=False)
     codes = row.head(N_HOLD).index.tolist()
-    fmc = M["fmc"].iloc[-1]; tn = turn20.iloc[-1]
+    fmc = M["fmc"].iloc[-1]; tn = turnw.iloc[-1]
     return [(c, float(tn[c]), float(fmc[c]) / 1e8) for c in codes]
+
+
+def _load_prev_snapshot():
+    """读上次 A股 快照(周频持仓持续用)。缺失/损坏 → None。"""
+    fp = os.path.join(OUT_DIR, "snapshot_cn_latest.json")
+    if not os.path.exists(fp):
+        return None
+    try:
+        return json.load(open(fp, encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _trading_days_between(idx, d0, d1):
+    """交易日历 idx 上 d0→d1 的交易日数(d1 不早于 d0 返回 ≥0,否则 -1)。"""
+    try:
+        i0 = idx.searchsorted(pd.Timestamp(d0)); i1 = idx.searchsorted(pd.Timestamp(d1))
+        return int(i1 - i0)
+    except Exception:
+        return -1
+
+
+def _held_picks(prev, M, turnw):
+    """周内保持:从上次快照取持仓,过滤掉已失效(ST/停牌/退市/不可交易)的,不回补。
+    返回 (picks[(code,turn,fmc)], ev[(code,score)])——沿用 headline/event 两腿的下游构建。"""
+    m = L.masks(M)
+    ok = (m["tr"] & m["st"] & M["in_market"]).iloc[-1]   # 持仓存活门:可交易∧非ST∧在市(不再要求小盘,周内持有)
+    fmc = M["fmc"].iloc[-1]; tn = turnw.iloc[-1]
+    sc, ev = [], []
+    for h in prev.get("holdings", []):
+        c = h.get("ticker"); sl = h.get("sleeve", "")
+        if c not in ok.index or not bool(ok.get(c, False)):
+            continue   # 失效股当周剔除(自然进"掉出推荐")
+        if sl in ("smallcap", "both"):
+            sc.append((c, float(tn.get(c, np.nan)), float(fmc.get(c, np.nan)) / 1e8))
+        elif sl == "event":
+            ev.append((c, 0.0))
+    return sc, ev
 
 
 def rev_pead_pick(M):
@@ -155,7 +203,21 @@ def compute_snapshot_cn(asof=None, capital=100000.0):
     C = M["close"]; last = C.index[-1]
     names = _names()
     gate = compute_gate_cn(M)
-    picks = headline_pick(M)
+    turnw = _turn_ma(M)
+    # ── 周频调仓:距上次调仓 < REBAL_DAYS 交易日 → 保持持仓名单(降换手,兑现研究收益+稳定推荐列表);否则重选 ──
+    prev = _load_prev_snapshot()
+    prev_rb = (prev or {}).get("rebalance_asof")
+    dsince = _trading_days_between(C.index, prev_rb, last) if prev_rb else 999
+    held_mode = bool(prev) and 0 <= dsince < REBAL_DAYS
+    if held_mode:
+        picks, ev = _held_picks(prev, M, turnw)
+        if not picks:                                   # 持仓全失效(极端)→ 兜底重选
+            held_mode = False
+    if not held_mode:
+        picks, ev = headline_pick(M), rev_pead_pick(M)
+        rebalance_asof, dsince = str(last.date()), 0
+    else:
+        rebalance_asof = prev_rb
     px = C.iloc[-1]
     holds = []
     w = 1.0 / max(1, len(picks))
@@ -169,12 +231,13 @@ def compute_snapshot_cn(asof=None, capital=100000.0):
             target_value=round(capital * w * gate["exposure"], 1),
             grade=grade, grade_label=glabel, action="持有", action_weight=aw,
             prob=dict(h20=prob) if prob else {},
-            reason=f"头号腿·小市值×低换手(池内低换手第{rank}) 流通{fmc_yi:.1f}亿/20日换手{turn:.2f}%",
+            reason=(f"头号腿·小市值×低换手(池内低换手第{rank}) 流通{fmc_yi:.1f}亿/{TURN_WIN}日换手{turn:.2f}%"
+                    + (f" · 周频持仓第{dsince}日" if held_mode else " · 本周新选")),
             signals=sigs,
-            indicators=dict(float_mktcap_yi=round(fmc_yi, 1), turn20=round(turn, 2)),
+            indicators=dict(float_mktcap_yi=round(fmc_yi, 1), turn20=round(turn, 2), turn_win=TURN_WIN),
         ))
-    # ── 系统B:rev+PEAD 事件腿(sleeve=event,size中性容量友好)──
-    ev = rev_pead_pick(M); wv = 1.0 / max(1, len(ev)) if ev else 0
+    # ── 系统B:rev+PEAD 事件腿(sleeve=event,size中性容量友好;ev 已在周频决策中确定)──
+    wv = 1.0 / max(1, len(ev)) if ev else 0
     have = {h["ticker"] for h in holds}
     for rank, (code, score) in enumerate(ev, 1):
         grade, glabel, sigs, aw = trend_grade_cn(M, code, None)
@@ -193,24 +256,30 @@ def compute_snapshot_cn(asof=None, capital=100000.0):
             grade=grade, grade_label=glabel, action="持有", action_weight=aw,
             prob=dict(h20=prob) if prob else {},
             reason=f"事件腿·分析师上修+业绩预告惊喜 size中性合成(第{rank},容量友好)"
-                   + (f" 流通{fmc_yi:.0f}亿" if np.isfinite(fmc_yi) else ""),
+                   + (f" 流通{fmc_yi:.0f}亿" if np.isfinite(fmc_yi) else "")
+                   + (f" · 周频持仓第{dsince}日" if held_mode else ""),
             signals=sigs, indicators=dict(event_score=round(score, 3),
                                           float_mktcap_yi=round(fmc_yi, 1) if np.isfinite(fmc_yi) else None),
         ))
     snap = dict(
         market="cn", asof=str(last.date()), generated_at=str(pd.Timestamp("today").date()),
         capital=capital, disclaimer=DISCLAIMER,
+        rebalance_asof=rebalance_asof,   # 上次调仓日(周频持仓持续用,勿删)
         risk_light=dict(level=gate["level"], exposure=gate["exposure"], note=gate["note"],
                         bench_breadth=gate["bench_breadth"], crowd_pct=gate["crowd_pct"],
                         amount_ratio=gate["amount_ratio"], diverge=gate["diverge"]),
         holdings=holds,
         portfolio=dict(n_holdings=len(holds), gross_exposure=gate["exposure"],
-                       cash_pct=round(1 - gate["exposure"], 2), rebalance="双周", next_rebalance="",
+                       cash_pct=round(1 - gate["exposure"], 2),
+                       rebalance="周频", rebalance_days=REBAL_DAYS, days_since_rebalance=dsince,
+                       next_rebalance=str((C.index[min(len(C.index) - 1,
+                           C.index.searchsorted(pd.Timestamp(rebalance_asof)) + REBAL_DAYS)]).date()),
                        sleeves=dict(smallcap=sum(1 for h in holds if h["sleeve"] in ("smallcap", "both")),
                                     event=sum(1 for h in holds if h["sleeve"] in ("event", "both")))),
         strategy_config=dict(market="cn", selectors=["cn_smallcap_lowturn", "cn_rev_pead"],
                              gate="cn_breadth_crowding_optimized",
-                             grader="cn_display_only", predictor="vol_scaled_rolling"),
+                             grader="cn_display_only", predictor="vol_scaled_rolling",
+                             rebalance="weekly", turn_win=TURN_WIN, rebalance_days=REBAL_DAYS),
     )
     return snap, M
 
