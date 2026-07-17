@@ -157,6 +157,17 @@ export async function saveCapital(capital: number): Promise<void> {
   const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || '保存资金池失败')
 }
 
+// A股策略偏好(headline 头号腿·微盘 / dividend 红利低波·大资金,二选一;按用户×市场存)
+export type StrategyKey = 'headline' | 'dividend'
+export async function fetchStrategy(): Promise<StrategyKey> {
+  const r = await fetch(`/api/strategy${mq()}`)
+  return r.ok && (await r.json()).strategy === 'dividend' ? 'dividend' : 'headline'
+}
+export async function saveStrategy(strategy: StrategyKey): Promise<void> {
+  const r = await fetch(`/api/strategy${mq()}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ strategy }) })
+  const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || '保存策略失败')
+}
+
 // ── 新闻模块(只读 overlay,与策略解耦)──
 export interface NewsDigest {
   overview?: string

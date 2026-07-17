@@ -34,8 +34,8 @@ TURN_WIN = int(os.environ.get("SENTINEL_CN_TURN_WIN", "40"))
 # 周频调仓(交易日):每 REBAL_DAYS 交易日才重选,期间保持名单(降换手,兑现研究收益 + 稳定推荐列表)。
 REBAL_DAYS = int(os.environ.get("SENTINEL_CN_REBAL_DAYS", "5"))
 # 红利低波替代腿(方向2交付):高股息×低波 size中性,net Cal~0.21 容量友好,大资金替代腿(与头号腿二选一非叠加)。
-# 默认关(替代腿呈现方式需产品决策);env SENTINEL_CN_DIVLV=on 开启。数据 data/alt/div_events.parquet。
-DIVLV_ON = os.environ.get("SENTINEL_CN_DIVLV", "off").lower() in ("on", "1", "true")
+# 默认开(前端策略选择器「头号腿/红利」二选一呈现,红利腿始终产出供大资金切换);env SENTINEL_CN_DIVLV=off 可关。数据 data/alt/div_events.parquet。
+DIVLV_ON = os.environ.get("SENTINEL_CN_DIVLV", "on").lower() in ("on", "1", "true")
 N_DIV = 50
 DISCLAIMER = "研究工具,非投资建议"
 
@@ -246,6 +246,8 @@ def compute_snapshot_cn(asof=None, capital=100000.0):
         picks, ev, dvpk = _held_picks(prev, M, turnw)
         if not picks:                                   # 持仓全失效(极端)→ 兜底重选
             held_mode = False
+        elif DIVLV_ON and not dvpk:                     # 新启用红利腿:上周名单无红利 → 红利腿单独新选(其它腿保持持有,不打断周频)
+            dvpk = dividend_lowvol_pick(M)
     if not held_mode:
         picks, ev = headline_pick(M), rev_pead_pick(M)
         dvpk = dividend_lowvol_pick(M) if DIVLV_ON else []

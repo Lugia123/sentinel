@@ -5,7 +5,17 @@ import type { TickerMeta } from '../api'
 import { pct, pct2, InfoDot, GradeBadge, SleeveBadge, actionColor, cnMarketAction } from '../ui'
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
-import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, fetchDropped, type UniverseItem, type DroppedItem } from '../api'
+import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, fetchDropped, fetchStrategy, saveStrategy, type StrategyKey, type UniverseItem, type DroppedItem } from '../api'
+
+// A股策略腿 → sleeve 集合(头号腿·微盘 与 红利低波·大资金 二选一)。custom 自选不属任何策略,始终显示。
+const STRAT_SLEEVES: Record<StrategyKey, Set<string>> = {
+  headline: new Set(['smallcap', 'event', 'both']),
+  dividend: new Set(['dividend']),
+}
+const STRAT_DESC: Record<StrategyKey, string> = {
+  headline: '小市值 × 低换手,容量约千万级——A股长期最稳的维度。',
+  dividend: '高股息 × 低波动,size中性,容量亿级+、回撤更低——大资金替代腿(与头号腿二选一,非叠加)。',
+}
 
 export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onSelectDropped, onReload }: {
   snap: Snapshot; meta: TickerMeta; watch: Set<string>
@@ -30,6 +40,17 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
   // 资金池(每用户可编辑;改后重算缩放的快照)
   const [capEdit, setCapEdit] = useState(false)
   const isCN = snap.market === 'cn'
+  // A股策略腿选择(头号腿/红利,二选一;按用户存后端)。仅前端过滤,快照已含全 sleeve,切换不重算。
+  const [strategy, setStrategy] = useState<StrategyKey>('headline')
+  useEffect(() => { if (isCN) fetchStrategy().then(setStrategy).catch(() => {}) }, [snap.market, isCN])
+  const pickStrategy = async (s: StrategyKey) => {
+    if (s === strategy) return
+    setStrategy(s)
+    try { await saveStrategy(s) } catch { /* 存失败不影响本地展示 */ }
+  }
+  // 当前策略下可见的持仓:美股=全部;A股=选中策略腿 + 自选(custom 始终显示)
+  const inStrategy = (sl: string) => !isCN || sl === 'custom' || STRAT_SLEEVES[strategy].has(sl)
+  const shown = snap.holdings.filter((h) => inStrategy(h.sleeve))
   const CUR = isCN ? '¥' : '$'
   const money = (x: number) => `${CUR}${x.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
   const [capVal, setCapVal] = useState(String(snap.capital))
@@ -57,8 +78,34 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
       setMyPos(m)
     }).catch(() => {})
   }, [snap])
-  // 关注的置顶(保持各自组内原顺序)
-  const rows = [...snap.holdings].sort((a, b) => (watch.has(b.ticker) ? 1 : 0) - (watch.has(a.ticker) ? 1 : 0))
+  // 关注的置顶(保持各自组内原顺序)。策略推荐与「我的自选」分开成组。
+  const byWatch = (a: Holding, b: Holding) => (watch.has(b.ticker) ? 1 : 0) - (watch.has(a.ticker) ? 1 : 0)
+  const mainRows = shown.filter((h) => h.sleeve !== 'custom').sort(byWatch)
+  const customRows = shown.filter((h) => h.sleeve === 'custom').sort(byWatch)
+  const renderRow = (h: Holding) => {
+    const b = h.prob?.['h20']
+    const on = watch.has(h.ticker)
+    const m = meta[h.ticker]
+    const isCustom = h.sleeve === 'custom'
+    return (
+      <tr key={h.ticker} className="clickable" onClick={() => onSelect(h.ticker)}>
+        <td onClick={(e) => { e.stopPropagation(); onToggleWatch(h.ticker, !on) }} style={{ cursor: 'pointer', textAlign: 'center' }}>
+          <span className={on ? 'star on' : 'star'}>{on ? '★' : '☆'}</span>
+        </td>
+        <td><b>{h.ticker}</b>{(h.name || m?.cn) && <span className="cn">{h.name || m?.cn}</span>} <span className="go">›</span></td>
+        <td className="muted">{m?.sector || '—'}</td>
+        <td><SleeveBadge sleeve={h.sleeve} />{isCustom && <button className="rm-custom" title="从追踪移除" onClick={(e) => { e.stopPropagation(); removeCustomStock(h.ticker) }}>✕</button>}</td>
+        <td>{CUR}{h.price}</td>
+        <td className={myPos[h.ticker.toUpperCase()] ? 'gold' : 'muted'}>{myPos[h.ticker.toUpperCase()] || '—'}</td>
+        <td><GradeBadge g={h.grade} label={h.grade_label} /></td>
+        <td style={isCN
+          ? { color: cnMarketAction(rl.level).color, fontWeight: 600 }
+          : { color: actionColor(h.action), fontWeight: 600 }}>
+          {isCN ? cnMarketAction(rl.level).text : h.action}</td>
+        <td className="muted">{b ? <>{pct2(b.band70[0])} ~ {pct2(b.band70[1])}</> : '—'}</td>
+      </tr>
+    )
+  }
   // 可添加的自定义股 = 全部可分析股(数据池1393只)里尚未在列表的(不再只限98大盘股)
   const [universe, setUniverse] = useState<UniverseItem[]>([])
   useEffect(() => { fetchUniverse().then(setUniverse) }, [snap.market]) // 切市场重拉对应池
@@ -68,13 +115,13 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
     .map((u) => ({ value: u.ticker, label: u.ticker, sub: u.cn ? `${u.cn}${u.sector ? ' · ' + u.sector : ''}` : '', keywords: u.cn }))
   // 横向布局:每股一行(按档位→中位排序),行多时容器内竖向滚动,不再横向挤成一团
   const rowH = 26
-  const chartH = Math.max(240, snap.holdings.length * rowH + 60)
+  const chartH = Math.max(240, shown.length * rowH + 60)
   useEffect(() => {
     if (!chartRef.current) return
     const chart = echarts.init(chartRef.current)
     // 排序:档位高的在上,同档位按中位收益降序(prob 可能缺 h20,如 A股新股数据不足)
     const med = (h: Holding) => h.prob?.['h20']?.median ?? 0
-    const hs = [...snap.holdings].filter((h) => h.prob?.['h20']).sort((a, b) => b.grade - a.grade || med(b) - med(a))
+    const hs = [...shown].filter((h) => h.prob?.['h20']).sort((a, b) => b.grade - a.grade || med(b) - med(a))
     const bands = hs.map((h, i) => ({ value: [i, h.prob['h20'].band70[0] * 100, h.prob['h20'].band70[1] * 100, h.prob['h20'].median * 100], grade: h.grade }))
     const label = (i: number) => hs[i].ticker + ((hs[i].name || meta[hs[i].ticker]?.cn) ? ' ' + (hs[i].name || meta[hs[i].ticker]?.cn) : '')
     // 左轴宽度自适应:按最长标签估算像素(中文≈13px,其余≈7.5px @12px字号),避免长名被遮挡
@@ -114,7 +161,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
     })
     const onR = () => chart.resize(); window.addEventListener('resize', onR)
     return () => { window.removeEventListener('resize', onR); chart.dispose() }
-  }, [snap, meta])
+  }, [snap, meta, strategy])
 
   const rl = snap.risk_light
   return (
@@ -133,8 +180,8 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
             : <div className="muted">大盘(SPY)年化波动 {pct(rl.spy_vol)} · 建议总仓位 {pct(rl.exposure)}</div>}
         </div>
         <div className="card">
-          <div className="muted">策略建议组合</div>
-          <div className="big">{snap.portfolio.n_holdings} 只</div>
+          <div className="muted">策略建议组合{isCN && <span className="muted"> · {strategy === 'dividend' ? '红利低波' : '头号腿'}</span>}</div>
+          <div className="big">{isCN ? mainRows.length : snap.portfolio.n_holdings} 只</div>
           <div className="muted">总仓位 {pct(snap.portfolio.gross_exposure)} · 留现金 {pct(snap.portfolio.cash_pct)}</div>
         </div>
         <div className="card">
@@ -155,6 +202,23 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
           )}
         </div>
       </div>
+
+      {isCN && (
+        <div className="card strat-bar">
+          <div className="strat-head">
+            <span className="muted">A股策略 <InfoDot text="头号腿(微盘)与红利低波(大资金)是二选一的替代策略,不是同时持有——切换只换看哪套推荐,资金不叠加。小资金用头号腿;资金大到微盘吃不下(约千万级、冲击成本上升)用红利低波。你的自选股不受影响,始终显示。" /></span>
+            <div className="seg" role="tablist">
+              <button role="tab" aria-selected={strategy === 'headline'} className={strategy === 'headline' ? 'on' : ''} onClick={() => pickStrategy('headline')}>
+                头号腿 · 微盘 <em>小资金</em>
+              </button>
+              <button role="tab" aria-selected={strategy === 'dividend'} className={strategy === 'dividend' ? 'on' : ''} onClick={() => pickStrategy('dividend')}>
+                红利低波 <em>大资金</em>
+              </button>
+            </div>
+          </div>
+          <div className="muted strat-desc">{STRAT_DESC[strategy]}</div>
+        </div>
+      )}
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
@@ -224,30 +288,22 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                   <td colSpan={7} className="muted">⏳ 加载中…正在算它的档位/概率(约几秒),算完自动显示</td>
                 </tr>
               ))}
-              {rows.map((h: Holding) => {
-                const b = h.prob?.['h20']
-                const on = watch.has(h.ticker)
-                const m = meta[h.ticker]
-                const isCustom = h.sleeve === 'custom'
-                return (
-                  <tr key={h.ticker} className="clickable" onClick={() => onSelect(h.ticker)}>
-                    <td onClick={(e) => { e.stopPropagation(); onToggleWatch(h.ticker, !on) }} style={{ cursor: 'pointer', textAlign: 'center' }}>
-                      <span className={on ? 'star on' : 'star'}>{on ? '★' : '☆'}</span>
-                    </td>
-                    <td><b>{h.ticker}</b>{(h.name || m?.cn) && <span className="cn">{h.name || m?.cn}</span>} <span className="go">›</span></td>
-                    <td className="muted">{m?.sector || '—'}</td>
-                    <td><SleeveBadge sleeve={h.sleeve} />{isCustom && <button className="rm-custom" title="从追踪移除" onClick={(e) => { e.stopPropagation(); removeCustomStock(h.ticker) }}>✕</button>}</td>
-                    <td>{CUR}{h.price}</td>
-                    <td className={myPos[h.ticker.toUpperCase()] ? 'gold' : 'muted'}>{myPos[h.ticker.toUpperCase()] || '—'}</td>
-                    <td><GradeBadge g={h.grade} label={h.grade_label} /></td>
-                    <td style={isCN
-                      ? { color: cnMarketAction(rl.level).color, fontWeight: 600 }
-                      : { color: actionColor(h.action), fontWeight: 600 }}>
-                      {isCN ? cnMarketAction(rl.level).text : h.action}</td>
-                    <td className="muted">{b ? <>{pct2(b.band70[0])} ~ {pct2(b.band70[1])}</> : '—'}</td>
-                  </tr>
-                )
-              })}
+              {mainRows.map(renderRow)}
+              {mainRows.length === 0 && customRows.length === 0 && (
+                <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 20 }}>
+                  {isCN ? '当前策略今日无推荐(风险灯/数据所致),可切换策略或看自选。' : '今日无推荐持仓。'}
+                </td></tr>
+              )}
+              {customRows.length > 0 && (
+                <tr className="grp-row">
+                  <td></td>
+                  <td colSpan={8} className="muted">
+                    我的自选 <span className="pill b-custom" style={{ marginLeft: 2 }}>{customRows.length}</span>
+                    <span style={{ marginLeft: 6, fontWeight: 400 }}>· 你添加的追踪股,不占策略仓位、建议股数为 0</span>
+                  </td>
+                </tr>
+              )}
+              {customRows.map(renderRow)}
             </tbody>
           </table>
         </div>}
@@ -269,7 +325,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
       </div>
 
       {allocOpen && (
-        <AllocateModal holdings={snap.holdings} meta={meta} capital={snap.capital} exposure={rl.exposure}
+        <AllocateModal holdings={shown} meta={meta} capital={snap.capital} exposure={rl.exposure}
           onClose={() => setAllocOpen(false)} />
       )}
     </>

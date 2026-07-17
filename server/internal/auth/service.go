@@ -193,6 +193,24 @@ func (s *Service) SetCapital(uid int64, market string, capital float64) error {
 		uid, market, capital).Error
 }
 
+// ── 策略偏好(用户×市场,A股「头号腿/红利低波」二选一)──
+func (s *Service) GetStrategy(uid int64, market string) string {
+	var v string
+	s.db.Raw(`SELECT strategy FROM user_strategy WHERE user_id=? AND market=?`, uid, market).Scan(&v)
+	if v != "dividend" {
+		return "headline" // 空/未知 → 默认头号腿·微盘
+	}
+	return v
+}
+func (s *Service) SetStrategy(uid int64, market string, strategy string) error {
+	if strategy != "headline" && strategy != "dividend" {
+		return fmt.Errorf("未知策略")
+	}
+	return s.db.Exec(`INSERT INTO user_strategy(user_id,market,strategy,updated_at) VALUES(?,?,?,now())
+		ON CONFLICT (user_id,market) DO UPDATE SET strategy=EXCLUDED.strategy, updated_at=now()`,
+		uid, market, strategy).Error
+}
+
 // ── 系统设置(键值)──
 func (s *Service) GetSetting(key string) string {
 	var v string

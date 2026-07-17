@@ -10,6 +10,11 @@ export const SLEEVE: Record<string, { label: string; hint: string; cls: string }
   momentum: { label: '动量', hint: '因“趋势强、涨得比大盘好”被选中(动量腿)', cls: 'b-mom' },
   SY: { label: '股东回报', hint: '因“回购+分红多、回报股东”被选中(股东收益率腿)', cls: 'b-sy' },
   both: { label: '双腿', hint: '两条腿都选中它(趋势强 且 股东回报高)', cls: 'b-both' },
+  // A股·头号腿(微盘):小市值×低换手
+  smallcap: { label: '头号腿', hint: '因“小市值 + 低换手”被选中(头号腿·微盘,小资金)', cls: 'b-mom' },
+  event: { label: '事件腿', hint: '因“分析师上修 + 业绩预告惊喜”被选中(size中性合成,容量友好)', cls: 'b-sy' },
+  // A股·红利低波(大资金替代腿):高股息×低波
+  dividend: { label: '红利低波', hint: '因“高股息 × 低波动”被选中(红利低波·大资金替代腿,与头号腿二选一)', cls: 'b-div' },
   custom: { label: '自选·追踪', hint: '你「添加自定义股票」加入的:非策略选中,但每天也算档位/概率(不占策略仓位,建议股数为0)', cls: 'b-custom' },
 }
 

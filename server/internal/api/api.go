@@ -81,6 +81,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/earnings", a.earningsInterpret)
 	mux.HandleFunc("/api/allocate", a.allocateHandler)
 	mux.HandleFunc("/api/capital", a.capital)
+	mux.HandleFunc("/api/strategy", a.strategy)
 	a.authSvc.Register(mux) // 认证/管理员路由
 	// 中间件链:cors → 注入用户(解析令牌)→ 登录门(非公开路径需登录)→ mux
 	return cors(a.authSvc.Inject(gate(mux)))
@@ -366,6 +367,27 @@ func (a *API) capital(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"capital": b.Capital})
+	default:
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "GET/PUT"})
+	}
+}
+
+// strategy 用户×市场策略偏好(A股「headline 头号腿·微盘 / dividend 红利低波·大资金」二选一)
+func (a *API) strategy(w http.ResponseWriter, r *http.Request) {
+	uid := auth.UserID(r)
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{"strategy": a.authSvc.GetStrategy(uid, mktParam(r))})
+	case http.MethodPut:
+		var b struct {
+			Strategy string `json:"strategy"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&b)
+		if err := a.authSvc.SetStrategy(uid, mktParam(r), b.Strategy); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"strategy": b.Strategy})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "GET/PUT"})
 	}
