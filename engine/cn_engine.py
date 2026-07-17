@@ -33,6 +33,10 @@ N_EVENT = 20   # rev+PEAD 事件腿展示数(容量友好,较少)
 TURN_WIN = int(os.environ.get("SENTINEL_CN_TURN_WIN", "40"))
 # 周频调仓(交易日):每 REBAL_DAYS 交易日才重选,期间保持名单(降换手,兑现研究收益 + 稳定推荐列表)。
 REBAL_DAYS = int(os.environ.get("SENTINEL_CN_REBAL_DAYS", "5"))
+# 红利低波替代腿(方向2交付):高股息×低波 size中性,net Cal~0.21 容量友好,大资金替代腿(与头号腿二选一非叠加)。
+# 默认关(替代腿呈现方式需产品决策);env SENTINEL_CN_DIVLV=on 开启。数据 data/alt/div_events.parquet。
+DIVLV_ON = os.environ.get("SENTINEL_CN_DIVLV", "off").lower() in ("on", "1", "true")
+N_DIV = 50
 DISCLAIMER = "研究工具,非投资建议"
 
 
@@ -151,11 +155,11 @@ def _trading_days_between(idx, d0, d1):
 
 def _held_picks(prev, M, turnw):
     """周内保持:从上次快照取持仓,过滤掉已失效(ST/停牌/退市/不可交易)的,不回补。
-    返回 (picks[(code,turn,fmc)], ev[(code,score)])——沿用 headline/event 两腿的下游构建。"""
+    返回 (picks[(code,turn,fmc)], ev[(code,score)], dv[(code,yld,fmc)])——沿用各腿下游构建。"""
     m = L.masks(M)
     ok = (m["tr"] & m["st"] & M["in_market"]).iloc[-1]   # 持仓存活门:可交易∧非ST∧在市(不再要求小盘,周内持有)
     fmc = M["fmc"].iloc[-1]; tn = turnw.iloc[-1]
-    sc, ev = [], []
+    sc, ev, dv = [], [], []
     for h in prev.get("holdings", []):
         c = h.get("ticker"); sl = h.get("sleeve", "")
         if c not in ok.index or not bool(ok.get(c, False)):
@@ -164,7 +168,10 @@ def _held_picks(prev, M, turnw):
             sc.append((c, float(tn.get(c, np.nan)), float(fmc.get(c, np.nan)) / 1e8))
         elif sl == "event":
             ev.append((c, 0.0))
-    return sc, ev
+        elif sl == "dividend":
+            ind = h.get("indicators") or {}
+            dv.append((c, ind.get("div_yield") or 0.0, float(fmc.get(c, np.nan)) / 1e8))
+    return sc, ev, dv
 
 
 def rev_pead_pick(M):
@@ -195,6 +202,32 @@ def rev_pead_pick(M):
         return []
 
 
+def dividend_lowvol_pick(M):
+    """红利低波替代腿(方向2):实时股息率(TTM每股分红/价)× 低波(60日已实现波动),
+    各横截面rank等权复合 → size中性 → 取前 N_DIV。容量友好、偏大市值。返回 [(code, yld%, fmc亿)]。
+    数据缺 → []。yld 用 PIT 公告日的派现,防前视。"""
+    fp = os.path.join(ALT_DIR, "div_events.parquet")
+    if not os.path.exists(fp):
+        return []
+    try:
+        C = M["close"]; idx = C.index
+        ev = pd.read_parquet(fp)
+        dps = ev.pivot_table(index="ann_date", columns="code", values="dps", aggfunc="sum") \
+                .reindex(index=idx, columns=C.columns).fillna(0.0)
+        ttm = dps.rolling(252, min_periods=1).sum()               # TTM 每股分红(交易日近似1年)
+        yld = (ttm / C).replace([np.inf, -np.inf], np.nan)        # 实时股息率
+        vol60 = C.pct_change(fill_method=None).rolling(60).std()
+        mk = L.masks(M); tr = mk["tr"] & mk["st"]
+        comp = yld.rank(axis=1, pct=True) + (-vol60).rank(axis=1, pct=True)
+        sig = L.size_neutral(comp.where(tr), M["fmc"])
+        row = sig.iloc[-1].dropna().sort_values(ascending=False).head(N_DIV)
+        yv = yld.iloc[-1]; fmc = M["fmc"].iloc[-1]
+        return [(c, round(float(yv.get(c, np.nan)) * 100, 2), round(float(fmc.get(c, np.nan)) / 1e8, 1)) for c in row.index]
+    except Exception as e:
+        print(f"  [warn] 红利低波腿跳过: {type(e).__name__} {str(e)[:60]}", flush=True)
+        return []
+
+
 def compute_snapshot_cn(asof=None, capital=100000.0):
     # 载入近~4年面板(足够 rolling500 拥挤 + 指标),到 asof
     end = None if (asof in (None, "latest")) else asof
@@ -210,11 +243,12 @@ def compute_snapshot_cn(asof=None, capital=100000.0):
     dsince = _trading_days_between(C.index, prev_rb, last) if prev_rb else 999
     held_mode = bool(prev) and 0 <= dsince < REBAL_DAYS
     if held_mode:
-        picks, ev = _held_picks(prev, M, turnw)
+        picks, ev, dvpk = _held_picks(prev, M, turnw)
         if not picks:                                   # 持仓全失效(极端)→ 兜底重选
             held_mode = False
     if not held_mode:
         picks, ev = headline_pick(M), rev_pead_pick(M)
+        dvpk = dividend_lowvol_pick(M) if DIVLV_ON else []
         rebalance_asof, dsince = str(last.date()), 0
     else:
         rebalance_asof = prev_rb
@@ -261,6 +295,29 @@ def compute_snapshot_cn(asof=None, capital=100000.0):
             signals=sigs, indicators=dict(event_score=round(score, 3),
                                           float_mktcap_yi=round(fmc_yi, 1) if np.isfinite(fmc_yi) else None),
         ))
+    # ── 方向2:红利低波替代腿(sleeve=dividend,大资金容量友好;默认关,SENTINEL_CN_DIVLV=on 开)──
+    #    诚实定位:与头号腿【二选一非叠加】(日corr0.91非分散腿),给装不下微盘的大资金用。net Cal~0.21。
+    if DIVLV_ON and dvpk:
+        have = {h["ticker"] for h in holds}
+        wd = 1.0 / max(1, len(dvpk))
+        for rank, (code, yld, fmc_yi) in enumerate(dvpk, 1):
+            if code in have:   # 与前腿重叠 → 跳过,避免同名重复
+                continue
+            grade, glabel, sigs, aw = trend_grade_cn(M, code, None)
+            prob = vol_scaled_prob(M, code, None)
+            price = float(px[code]) if code in px.index and np.isfinite(px[code]) else None
+            holds.append(dict(
+                ticker=code, name=names.get(code, ""), sleeve="dividend", price=price,
+                base_weight=round(wd, 4),
+                target_shares=round(capital * wd * gate["exposure"] / price, 1) if price else 0,
+                target_value=round(capital * wd * gate["exposure"], 1),
+                grade=grade, grade_label=glabel, action="持有", action_weight=aw,
+                prob=dict(h20=prob) if prob else {},
+                reason=(f"红利低波·大资金替代腿(与头号腿二选一,非叠加)第{rank}"
+                        + (f" 股息{yld:.1f}%/流通{fmc_yi:.0f}亿" if yld else "")
+                        + (f" · 周频持仓第{dsince}日" if held_mode else "")),
+                signals=sigs, indicators=dict(div_yield=yld, float_mktcap_yi=fmc_yi),
+            ))
     snap = dict(
         market="cn", asof=str(last.date()), generated_at=str(pd.Timestamp("today").date()),
         capital=capital, disclaimer=DISCLAIMER,
@@ -275,7 +332,8 @@ def compute_snapshot_cn(asof=None, capital=100000.0):
                        next_rebalance=str((C.index[min(len(C.index) - 1,
                            C.index.searchsorted(pd.Timestamp(rebalance_asof)) + REBAL_DAYS)]).date()),
                        sleeves=dict(smallcap=sum(1 for h in holds if h["sleeve"] in ("smallcap", "both")),
-                                    event=sum(1 for h in holds if h["sleeve"] in ("event", "both")))),
+                                    event=sum(1 for h in holds if h["sleeve"] in ("event", "both")),
+                                    dividend=sum(1 for h in holds if h["sleeve"] == "dividend"))),
         strategy_config=dict(market="cn", selectors=["cn_smallcap_lowturn", "cn_rev_pead"],
                              gate="cn_breadth_crowding_optimized",
                              grader="cn_display_only", predictor="vol_scaled_rolling",
