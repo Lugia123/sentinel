@@ -79,9 +79,14 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
     }).catch(() => {})
   }, [snap])
   // 关注的置顶(保持各自组内原顺序)。策略推荐与「我的自选」分开成组。
-  const byWatch = (a: Holding, b: Holding) => (watch.has(b.ticker) ? 1 : 0) - (watch.has(a.ticker) ? 1 : 0)
-  const mainRows = shown.filter((h) => h.sleeve !== 'custom').sort(byWatch)
-  const customRows = shown.filter((h) => h.sleeve === 'custom').sort(byWatch)
+  // 排序:⭐关注置顶 → 档位高→低 → 预期20日中位收益高→低(和下方区间图一致,从好到差)
+  const medRet = (h: Holding) => h.prob?.['h20']?.median ?? -Infinity
+  const byRank = (a: Holding, b: Holding) =>
+    (watch.has(b.ticker) ? 1 : 0) - (watch.has(a.ticker) ? 1 : 0)
+    || b.grade - a.grade
+    || medRet(b) - medRet(a)
+  const mainRows = shown.filter((h) => h.sleeve !== 'custom').sort(byRank)
+  const customRows = shown.filter((h) => h.sleeve === 'custom').sort(byRank)
   const renderRow = (h: Holding) => {
     const b = h.prob?.['h20']
     const on = watch.has(h.ticker)
