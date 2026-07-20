@@ -132,6 +132,33 @@ def derive_analyst(rc_raw):
     return out
 
 
+# ────────────────── A股板块/中文名 → ticker_meta.json ──────────────────
+def refresh_cn_meta():
+    """从 tushare stock_basic 拉 A股 中文名+行业,合并进 engine/ticker_meta.json 的 A股条目
+    (格式 {code[sh.600000]: {cn, sector}},与美股共存)。前端「板块」列即有值。covers 新股。"""
+    df = ts("stock_basic", {"list_status": "L"}, "ts_code,name,industry")
+    if df is None or df.empty:
+        print("  ticker_meta: stock_basic 拉取失败,跳过", flush=True); return
+    meta_fp = os.path.join(HERE, "ticker_meta.json")
+    meta = {}
+    if os.path.exists(meta_fp):
+        try:
+            import json
+            meta = json.load(open(meta_fp, encoding="utf-8"))
+        except Exception:
+            meta = {}
+    def s(x):
+        return str(x).strip() if pd.notna(x) else ""
+    n = 0
+    for _, r in df.iterrows():
+        code = dotcode(r["ts_code"])                       # 600000.SH → sh.600000
+        meta[code] = {"cn": s(r.get("name")), "sector": s(r.get("industry")) or "其他"}
+        n += 1
+    import json
+    json.dump(meta, open(meta_fp, "w", encoding="utf-8"), ensure_ascii=False, indent=0)
+    print(f"  写 ticker_meta.json: A股 {n} 条(+美股保留),共 {len(meta)} 条", flush=True)
+
+
 # ────────────────── 合并落盘 ──────────────────
 def merge_write(path, new, keys):
     if new is None or new.empty:
@@ -183,6 +210,9 @@ def main():
         analyst = derive_analyst(pd.read_parquet(RAW_RC))
         analyst.to_parquet(os.path.join(ALT_DIR, "analyst.parquet"), index=False)
         print(f"  写 analyst.parquet: {len(analyst)} 行(调高{(analyst['评级变化']=='调高').sum()}/调低{(analyst['评级变化']=='调低').sum()})", flush=True)
+    # 4. A股 中文名+板块 → ticker_meta.json(前端「板块」列)
+    print("④ ticker_meta(A股板块)…", flush=True)
+    refresh_cn_meta()
     print("[ts_refresh] 完成", flush=True)
 
 
