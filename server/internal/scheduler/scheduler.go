@@ -132,7 +132,8 @@ func (s *Scheduler) runNews(full bool) {
 // run 每周期:逐市场 刷新数据(S3 接) + 跑引擎 + ingest(幂等 upsert)。
 func (s *Scheduler) run() {
 	for _, m := range MARKETS {
-		s.refreshData(m) // 增量刷新(新交易日才拉;S2/S3 实现)
+		s.refreshData(m) // 增量刷新行情(新交易日才拉;US=yfinance/CN=baostock)
+		s.refreshAlt(m)  // A股事件/红利腿的 tushare 另类数据增量刷新(仅 cn;失败不阻断)
 		res, err := pipeline.RunAndIngest(s.rn, s.st, s.dataDir, m, "latest", s.capital, true, nil)
 		if err != nil {
 			log.Printf("[scheduler] [%s] 运行失败:%v", m, err)
