@@ -325,8 +325,8 @@ def compute_snapshot_cn(asof=None, capital=100000.0):
         capital=capital, disclaimer=DISCLAIMER,
         rebalance_asof=rebalance_asof,   # 上次调仓日(周频持仓持续用,勿删)
         risk_light=dict(level=gate["level"], exposure=gate["exposure"], note=gate["note"],
-                        bench_breadth=gate["bench_breadth"], crowd_pct=gate["crowd_pct"],
-                        amount_ratio=gate["amount_ratio"], diverge=gate["diverge"]),
+                        bench_breadth=gate["bench_breadth"], breadth_ma=gate["breadth_ma"],
+                        crowd_pct=gate["crowd_pct"], amount_ratio=gate["amount_ratio"], diverge=gate["diverge"]),
         holdings=holds,
         portfolio=dict(n_holdings=len(holds), gross_exposure=gate["exposure"],
                        cash_pct=round(1 - gate["exposure"], 2),

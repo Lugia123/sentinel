@@ -26,7 +26,8 @@ func (a *API) riskHistory(w http.ResponseWriter, r *http.Request) {
 		SELECT asof::text AS asof, level, exposure, breadth, breadth_ma, crowd, amt_ratio, spy_vol, diverge FROM (
 		  SELECT DISTINCT ON (asof) asof, level, exposure, breadth, breadth_ma, crowd, amt_ratio, spy_vol, diverge
 		  FROM (
-		    SELECT asof, level, exposure, breadth, breadth_ma, crowd, amount_ratio AS amt_ratio, spy_vol, diverge, 1 AS pri
+		    -- 回补表(字段完整,含breadth_ma;A股值与快照一致)优先;快照补回补未覆盖的近日
+		    SELECT asof, level, exposure, breadth, breadth_ma, crowd, amount_ratio AS amt_ratio, spy_vol, diverge, 2 AS pri
 		    FROM risk_light_history WHERE market=?
 		    UNION ALL
 		    SELECT asof, risk_level AS level, exposure,
@@ -35,7 +36,7 @@ func (a *API) riskHistory(w http.ResponseWriter, r *http.Request) {
 		           (raw::json->'risk_light'->>'crowd_pct')::float8     AS crowd,
 		           (raw::json->'risk_light'->>'amount_ratio')::float8  AS amt_ratio,
 		           (raw::json->'risk_light'->>'spy_vol')::float8       AS spy_vol,
-		           (raw::json->'risk_light'->>'diverge')::bool         AS diverge, 2 AS pri
+		           (raw::json->'risk_light'->>'diverge')::bool         AS diverge, 1 AS pri
 		    FROM snapshots WHERE market=?
 		  ) u ORDER BY asof, pri DESC
 		) d ORDER BY asof DESC LIMIT 800`, market, market).Scan(&rows)
