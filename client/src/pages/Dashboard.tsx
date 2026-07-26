@@ -5,7 +5,7 @@ import type { TickerMeta } from '../api'
 import { pct, pct2, InfoDot, GradeBadge, SleeveBadge, actionColor, cnMarketAction } from '../ui'
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
-import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, fetchDropped, fetchStrategy, saveStrategy, fetchRiskHistory, type StrategyKey, type UniverseItem, type DroppedItem, type RiskHistItem } from '../api'
+import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, fetchDropped, fetchStrategy, saveStrategy, type StrategyKey, type UniverseItem, type DroppedItem } from '../api'
 
 // A股策略腿 → sleeve 集合(头号腿·微盘 与 红利低波·大资金 二选一)。custom 自选不属任何策略,始终显示。
 const STRAT_SLEEVES: Record<StrategyKey, Set<string>> = {
@@ -17,11 +17,12 @@ const STRAT_DESC: Record<StrategyKey, string> = {
   dividend: '高股息 × 低波动,size中性,容量亿级+、回撤更低——大资金替代腿(与头号腿二选一,非叠加)。',
 }
 
-export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onSelectDropped, onReload }: {
+export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onSelectDropped, onReload, onOpenRiskLight }: {
   snap: Snapshot; meta: TickerMeta; watch: Set<string>
   onToggleWatch: (t: string, on: boolean) => void; onSelect: (t: string) => void
   onSelectDropped: (d: DroppedItem) => void
   onReload: () => void
+  onOpenRiskLight: () => void
 }) {
   const chartRef = useRef<HTMLDivElement>(null)
   // 添加自定义股:两步(先选中→点添加,防误点);pending=正在算档位的(显示加载中行)
@@ -51,14 +52,6 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
   // 当前策略下可见的持仓:美股=全部;A股=选中策略腿 + 自选(custom 始终显示)
   const inStrategy = (sl: string) => !isCN || sl === 'custom' || STRAT_SLEEVES[strategy].has(sl)
   const shown = snap.holdings.filter((h) => inStrategy(h.sleeve))
-  // 风险灯历史(按需拉:展开时才请求)
-  const [showHist, setShowHist] = useState(false)
-  const [hist, setHist] = useState<RiskHistItem[]>([])
-  const toggleHist = () => {
-    const next = !showHist; setShowHist(next)
-    if (next && hist.length === 0) fetchRiskHistory().then(setHist).catch(() => {})
-  }
-  useEffect(() => { setShowHist(false); setHist([]) }, [snap.market])   // 切市场重置
   const CUR = isCN ? '¥' : '$'
   const money = (x: number) => `${CUR}${x.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
   const [capVal, setCapVal] = useState(String(snap.capital))
@@ -188,38 +181,12 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
         <div className="card">
           <div className="muted" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>风险灯 <InfoDot text="看整体市场波动大不大。绿=正常可满仓，黄=波动偏高建议降点仓，红=波动很大大幅降仓。它管的是总仓位，不针对单只股。" /></span>
-            <button className="ghost mini" onClick={toggleHist} title="看风险灯这段时间怎么变的">{showHist ? '收起' : '📈 历史'}</button>
+            <button className="ghost mini" onClick={onOpenRiskLight} title="查看风险灯历史演变与信号分解">详情 ›</button>
           </div>
           <div className="big"><span className={`light ${rl.level}`} />{rl.note}</div>
           {snap.market === 'cn'
             ? <div className="muted">市场宽度 {pct((rl as any).bench_breadth)} · 微盘拥挤度 {pct((rl as any).crowd_pct)}{(rl as any).diverge ? ' · 小盘背离⚠' : ''} · 建议总仓位 {pct(rl.exposure)}</div>
             : <div className="muted">大盘(SPY)年化波动 {pct(rl.spy_vol)} · 建议总仓位 {pct(rl.exposure)}</div>}
-          {showHist && (
-            <div className="risk-hist">
-              {hist.length === 0 ? <div className="muted" style={{ padding: '6px 0' }}>加载中…</div> : (() => {
-                const isCNh = snap.market === 'cn'
-                const vals = hist.map((d) => (isCNh ? d.breadth : d.spy_vol) ?? 0)
-                const mx = Math.max(...vals, 0.001)
-                return <>
-                  <div className="muted rh-cap">近 {hist.length} 天{isCNh ? '市场宽度' : 'SPY波动'}(条越长越{isCNh ? '强' : '高波动'})· 灯色=当日</div>
-                  <div className="rh-rows">
-                    {hist.map((d) => {
-                      const v = (isCNh ? d.breadth : d.spy_vol) ?? 0
-                      return (
-                        <div key={d.asof} className="rh-row">
-                          <span className="rh-date">{d.asof.slice(5)}</span>
-                          <span className={`light ${d.level}`} style={{ margin: '0 6px', boxShadow: 'none' }} />
-                          <span className="rh-bar-wrap"><span className="rh-bar" style={{ width: `${Math.round((v / mx) * 100)}%` }} /></span>
-                          <span className="rh-val">{pct(v)}</span>
-                          <span className="rh-expo">仓{pct(d.exposure)}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </>
-              })()}
-            </div>
-          )}
         </div>
         <div className="card">
           <div className="muted">策略建议组合{isCN && <span className="muted"> · {strategy === 'dividend' ? '红利低波' : '头号腿'}</span>}</div>

@@ -21,7 +21,6 @@ const NAV: { key: View; label: string; adminOnly?: boolean }[] = [
   { key: 'signals', label: '策略信号' },
   { key: 'positions', label: '我的持仓' },
   { key: 'trends', label: '分析走势' },
-  { key: 'risklight', label: '风险灯史' },
   { key: 'help', label: '帮助说明' },
   { key: 'admin', label: '系统管理', adminOnly: true },
 ]
@@ -145,11 +144,11 @@ export default function App() {
 
         {droppedH && droppedSel && <StockDetail h={droppedH} meta={meta} market={market} riskLight={snap?.risk_light} dropped={droppedSel} />}
         {!droppedH && detailH && <StockDetail h={detailH} meta={meta} market={market} riskLight={snap?.risk_light} />}
-        {!droppedH && !detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onSelectDropped={setDroppedSel} onReload={load} />}
+        {!droppedH && !detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onSelectDropped={setDroppedSel} onReload={load} onOpenRiskLight={() => goto('risklight')} />}
         {!droppedH && !detailH && view === 'positions' && <Positions market={market} />}
         {!droppedH && !detailH && view === 'trends' && <Trends meta={meta} watch={watch} market={market} />}
         {!droppedH && !detailH && view === 'news' && <News market={market} />}
-        {!droppedH && !detailH && view === 'risklight' && <RiskLight />}
+        {!droppedH && !detailH && view === 'risklight' && <RiskLight initialMarket={market} onBack={() => goto('signals')} />}
         {!droppedH && !detailH && view === 'help' && <Help market={market} />}
         {!droppedH && !detailH && view === 'admin' && isAdmin && <Admin />}
         {!droppedH && !detailH && view === 'signals' && !snap && !err && <div className="card">加载中…</div>}

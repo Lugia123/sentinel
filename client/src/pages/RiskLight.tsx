@@ -12,8 +12,8 @@ const LV: Record<string, { c: string; t: string }> = {
 const lvC = (l: string) => LV[l]?.c || 'var(--ink-mute)'
 const pctS = (x: number | null | undefined) => (x == null ? '—' : `${(x * 100).toFixed(1)}%`)
 
-export default function RiskLight() {
-  const [mkt, setMkt] = useState<Market>('cn')
+export default function RiskLight({ initialMarket = 'cn', onBack }: { initialMarket?: Market; onBack?: () => void }) {
+  const [mkt, setMkt] = useState<Market>(initialMarket)
   const [range, setRange] = useState<'ytd' | '90d' | 'all'>('ytd')
   const [raw, setRaw] = useState<RiskHistItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -116,7 +116,10 @@ export default function RiskLight() {
   return (
     <>
       <div className="rl-head">
-        <h2 style={{ margin: 0 }}>风险灯历史 <InfoDot text="市场级风险闸(Gate)的历史演变。A股看4维:宽度∧非拥挤∧成交额未枯竭∧非背离→绿/黄/红三档总仓位。这页看它这段时间怎么变、为什么。" /></h2>
+        <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+          {onBack && <button className="ghost mini" onClick={onBack} title="返回策略信号">‹ 返回</button>}
+          风险灯详情 <InfoDot text="市场级风险闸(Gate)的历史演变。A股看4维:宽度∧非拥挤∧成交额未枯竭∧非背离→绿/黄/红三档总仓位。这页看它这段时间怎么变、为什么。" />
+        </h2>
         <div className="rl-ctrls">
           <div className="seg">
             <button className={isCN ? 'on' : ''} onClick={() => setMkt('cn')}>A股</button>
