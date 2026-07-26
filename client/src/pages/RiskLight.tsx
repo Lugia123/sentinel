@@ -66,6 +66,7 @@ export default function RiskLight({ initialMarket = 'cn', onBack }: { initialMar
         {/* A 制度带 + 驱动图 + 统计(复用组件) */}
         <RiskRibbon market={mkt} range={range} rawData={asc} />
 
+        <div className="row rl-bc">
         {/* B 日历热力图 */}
         <div className="card">
           <h3>日历视图 <InfoDot text="每格一个交易日,颜色=当日风险灯。一眼看这段时间绿/黄/红怎么分布、有没有连续转向。" /></h3>
@@ -99,6 +100,7 @@ export default function RiskLight({ initialMarket = 'cn', onBack }: { initialMar
               </div>
             ))}
           </div>
+        </div>
         </div>
       </>}
     </>

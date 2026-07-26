@@ -93,6 +93,8 @@ tr.clickable:hover td { background: var(--gold-glow); }
 .rh-expo { color: var(--ink-mute); width: 52px; flex: none; text-align: right; }
 
 /* ── 风险灯历史页 ── */
+.rl-bc { align-items: start; }            /* 日历+信号并排,顶对齐(高度不同) */
+.rl-bc > .card { margin-bottom: 0; }
 .rl-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
 .rl-ctrls { display: flex; gap: 8px; flex-wrap: wrap; }
 /* A 制度带 */
