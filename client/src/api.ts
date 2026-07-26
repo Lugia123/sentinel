@@ -108,10 +108,11 @@ export async function fetchDropped(): Promise<DroppedItem[]> {
 // 风险灯历史(近60天):asof/等级/暴露/宽度(A股)/spy_vol(美股)
 export interface RiskHistItem {
   asof: string; level: string; exposure: number
-  breadth: number | null; crowd: number | null; amount_ratio: number | null; spy_vol: number | null; diverge: boolean | null
+  breadth: number | null; breadth_ma: number | null; crowd: number | null; amount_ratio: number | null; spy_vol: number | null; diverge: boolean | null
 }
-export async function fetchRiskHistory(): Promise<RiskHistItem[]> {
-  const r = await fetch(`/api/risklight/history${mq()}`)
+export async function fetchRiskHistory(market?: Market): Promise<RiskHistItem[]> {
+  const q = market ? `?market=${market}` : mq()   // 显式市场(历史页本地切换)或跟随全局
+  const r = await fetch(`/api/risklight/history${q}`)
   return r.ok ? (await r.json()).history || [] : []
 }
 

@@ -9,26 +9,35 @@ import (
 func (a *API) riskHistory(w http.ResponseWriter, r *http.Request) {
 	market := mktParam(r)
 	type row struct {
-		Asof     string   `json:"asof"`
-		Level    string   `json:"level"`
-		Exposure float64  `json:"exposure"`
-		Breadth  *float64 `json:"breadth"`
-		Crowd    *float64 `json:"crowd"`
-		AmtRatio *float64 `json:"amount_ratio"`
-		SpyVol   *float64 `json:"spy_vol"`
-		Diverge  *bool    `json:"diverge"`
+		Asof      string   `json:"asof"`
+		Level     string   `json:"level"`
+		Exposure  float64  `json:"exposure"`
+		Breadth   *float64 `json:"breadth"`
+		BreadthMA *float64 `json:"breadth_ma"`
+		Crowd     *float64 `json:"crowd"`
+		AmtRatio  *float64 `json:"amount_ratio"`
+		SpyVol    *float64 `json:"spy_vol"`
+		Diverge   *bool    `json:"diverge"`
 	}
 	var rows []row
-	// A股:宽度/拥挤度/成交额比/背离;美股:spy_vol。都从 raw 取,缺则 null。
+	// UNION:回补历史(risk_light_history)+ 每日live(snapshots.raw);同 asof 取 live(pri高)。
+	// A股:宽度/宽度MA/拥挤/成交额比/背离;美股:spy_vol。
 	a.gdb.Raw(`
-		SELECT asof::text AS asof,
-		       risk_level AS level,
-		       exposure,
-		       (raw::json->'risk_light'->>'bench_breadth')::float8 AS breadth,
-		       (raw::json->'risk_light'->>'crowd_pct')::float8     AS crowd,
-		       (raw::json->'risk_light'->>'amount_ratio')::float8  AS amt_ratio,
-		       (raw::json->'risk_light'->>'spy_vol')::float8       AS spy_vol,
-		       (raw::json->'risk_light'->>'diverge')::bool         AS diverge
-		FROM snapshots WHERE market=? ORDER BY asof DESC LIMIT 60`, market).Scan(&rows)
+		SELECT asof::text AS asof, level, exposure, breadth, breadth_ma, crowd, amt_ratio, spy_vol, diverge FROM (
+		  SELECT DISTINCT ON (asof) asof, level, exposure, breadth, breadth_ma, crowd, amt_ratio, spy_vol, diverge
+		  FROM (
+		    SELECT asof, level, exposure, breadth, breadth_ma, crowd, amount_ratio AS amt_ratio, spy_vol, diverge, 1 AS pri
+		    FROM risk_light_history WHERE market=?
+		    UNION ALL
+		    SELECT asof, risk_level AS level, exposure,
+		           (raw::json->'risk_light'->>'bench_breadth')::float8 AS breadth,
+		           (raw::json->'risk_light'->>'breadth_ma')::float8    AS breadth_ma,
+		           (raw::json->'risk_light'->>'crowd_pct')::float8     AS crowd,
+		           (raw::json->'risk_light'->>'amount_ratio')::float8  AS amt_ratio,
+		           (raw::json->'risk_light'->>'spy_vol')::float8       AS spy_vol,
+		           (raw::json->'risk_light'->>'diverge')::bool         AS diverge, 2 AS pri
+		    FROM snapshots WHERE market=?
+		  ) u ORDER BY asof, pri DESC
+		) d ORDER BY asof DESC LIMIT 800`, market, market).Scan(&rows)
 	writeJSON(w, http.StatusOK, map[string]any{"market": market, "history": rows})
 }
