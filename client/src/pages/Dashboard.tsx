@@ -5,7 +5,8 @@ import type { TickerMeta } from '../api'
 import { pct, pct2, InfoDot, GradeBadge, SleeveBadge, actionColor, cnMarketAction } from '../ui'
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
-import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, fetchDropped, fetchStrategy, saveStrategy, type StrategyKey, type UniverseItem, type DroppedItem } from '../api'
+import RiskRibbon from '../components/RiskRibbon'
+import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, fetchDropped, fetchStrategy, saveStrategy, type StrategyKey, type UniverseItem, type DroppedItem, type Market } from '../api'
 
 // A股策略腿 → sleeve 集合(头号腿·微盘 与 红利低波·大资金 二选一)。custom 自选不属任何策略,始终显示。
 const STRAT_SLEEVES: Record<StrategyKey, Set<string>> = {
@@ -177,12 +178,12 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
         <b>点任意一行</b>看它的详细指标 + AI 讲解「为什么选它」。这是研究工具，最终自己决定。
       </div>
 
+      {/* 市场风险灯:一进来先看市场处在什么体制(制度带+宽度vs阈值),再看个股 */}
+      <RiskRibbon market={(snap.market || 'us') as Market} onOpenDetail={onOpenRiskLight} title="市场风险灯" />
+
       <div className="row">
         <div className="card">
-          <div className="muted" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>风险灯 <InfoDot text="看整体市场波动大不大。绿=正常可满仓，黄=波动偏高建议降点仓，红=波动很大大幅降仓。它管的是总仓位，不针对单只股。" /></span>
-            <button className="ghost mini" onClick={onOpenRiskLight} title="查看风险灯历史演变与信号分解">详情 ›</button>
-          </div>
+          <div className="muted">当前风险灯 <InfoDot text="市场级总仓位闸。绿=可满仓,黄=半仓,红=空仓观望。管总仓位,不针对单只股;详情见上方风险灯。" /></div>
           <div className="big"><span className={`light ${rl.level}`} />{rl.note}</div>
           {snap.market === 'cn'
             ? <div className="muted">市场宽度 {pct((rl as any).bench_breadth)} · 微盘拥挤度 {pct((rl as any).crowd_pct)}{(rl as any).diverge ? ' · 小盘背离⚠' : ''} · 建议总仓位 {pct(rl.exposure)}</div>
