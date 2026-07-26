@@ -14,9 +14,10 @@ function mq(existing = ''): string {
   return existing ? `${existing}&market=cn` : '?market=cn'
 }
 
-export async function fetchSnapshot(date?: string): Promise<Snapshot> {
+export async function fetchSnapshot(date?: string, market?: Market): Promise<Snapshot> {
   const q = date && date !== 'latest' ? `?date=${date}` : ''
-  const r = await fetch(`/api/snapshot${mq(q)}`)
+  const mkq = market ? (q ? `${q}&market=${market}` : `?market=${market}`) : mq(q)
+  const r = await fetch(`/api/snapshot${mkq}`)
   if (!r.ok) throw new Error((await r.json()).error || '读取快照失败')
   return r.json()
 }
@@ -47,8 +48,9 @@ export async function savePositions(ps: Position[]): Promise<void> {
   if (!r.ok) throw new Error((await r.json()).error || '保存持仓失败')
 }
 
-export async function fetchHistory(ticker: string, n = 120): Promise<HistPoint[]> {
-  const r = await fetch(`/api/history?ticker=${ticker}&n=${n}${currentMarket==='cn'?'&market=cn':''}`)
+export async function fetchHistory(ticker: string, n = 120, market?: Market): Promise<HistPoint[]> {
+  const mk = market ?? currentMarket
+  const r = await fetch(`/api/history?ticker=${ticker}&n=${n}${mk === 'cn' ? '&market=cn' : ''}`)
   if (!r.ok) return []
   return (await r.json()).history || []
 }

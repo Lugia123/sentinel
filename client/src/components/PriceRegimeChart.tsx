@@ -20,20 +20,24 @@ export default function PriceRegimeChart({ market, regime }: { market: Market; r
   const [input, setInput] = useState('')
   const [err, setErr] = useState('')
 
-  // 推荐股 chips(取当前快照持仓前若干)
+  const isCN = market === 'cn'
+  // 切市场:重置选择(A股默认大盘,美股无A股指数→留空待选)
+  useEffect(() => { setSel(isCN ? ['hs300'] : []); setCache({}) }, [market])
+
+  // 推荐股 chips(取当前市场快照持仓前若干)
   useEffect(() => {
-    fetchSnapshot().then((s) => setRec((s.holdings || []).filter((h: any) => h.sleeve !== 'custom').slice(0, 6).map((h: any) => h.ticker))).catch(() => {})
+    fetchSnapshot(undefined, market).then((s) => setRec((s.holdings || []).filter((h: any) => h.sleeve !== 'custom').slice(0, 6).map((h: any) => h.ticker))).catch(() => {})
   }, [market])
 
-  // 拉缺失标的的历史(n 覆盖范围)
+  // 拉缺失标的的历史(n 覆盖范围;显式传市场)
   useEffect(() => {
     const need = sel.filter((t) => !cache[t])
     if (!need.length) return
     need.forEach((t) => {
-      fetchHistory(t, 500).then((h) => setCache((c) => ({ ...c, [t]: h.map((p) => ({ date: p.date, close: p.close })) })))
+      fetchHistory(t, 500, market).then((h) => setCache((c) => ({ ...c, [t]: h.map((p) => ({ date: p.date, close: p.close })) })))
         .catch(() => setErr(`${t} 无数据`))
     })
-  }, [sel])
+  }, [sel, market])
 
   const dates = useMemo(() => regime.map((d) => d.asof), [regime])
   const d0 = dates[0], d1 = dates[dates.length - 1]
@@ -119,8 +123,8 @@ export default function PriceRegimeChart({ market, regime }: { market: Market; r
     <div className="card">
       <h3 style={{ marginBottom: 8 }}>灯 vs 走势对照 <InfoDot text="价格线背后铺风险灯制度色带,直接看'红灯那段是不是真跌了'。多标的归一化到100可比。底部给红/绿灯期的日均收益,数字硬证灯准不准。" /></h3>
       <div className="prc-pick">
-        <span className="muted">大盘</span>
-        {IDX.map((i) => <button key={i.code} className={`chip ${sel.includes(i.code) ? 'on' : ''}`} onClick={() => toggle(i.code)}>{i.label}</button>)}
+        {isCN && <><span className="muted">大盘</span>
+        {IDX.map((i) => <button key={i.code} className={`chip ${sel.includes(i.code) ? 'on' : ''}`} onClick={() => toggle(i.code)}>{i.label}</button>)}</>}
         {rec.length > 0 && <><span className="muted" style={{ marginLeft: 6 }}>推荐股</span>
           {rec.map((t) => <button key={t} className={`chip ${sel.includes(t) ? 'on' : ''}`} onClick={() => toggle(t)}>{t.replace(/^(sh|sz)\./, '')}</button>)}</>}
         <input className="prc-input" value={input} placeholder="输代码 如600519" onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addInput()} />
