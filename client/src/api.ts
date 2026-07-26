@@ -105,6 +105,16 @@ export async function fetchDropped(): Promise<DroppedItem[]> {
   return r.ok ? (await r.json()).dropped || [] : []
 }
 
+// 风险灯历史(近60天):asof/等级/暴露/宽度(A股)/spy_vol(美股)
+export interface RiskHistItem {
+  asof: string; level: string; exposure: number
+  breadth: number | null; crowd: number | null; amount_ratio: number | null; spy_vol: number | null; diverge: boolean | null
+}
+export async function fetchRiskHistory(): Promise<RiskHistItem[]> {
+  const r = await fetch(`/api/risklight/history${mq()}`)
+  return r.ok ? (await r.json()).history || [] : []
+}
+
 import type { Holding } from './types'
 export async function fetchFocus(ticker: string): Promise<{ asof: string; ticker: string; holding: Holding }> {
   const r = await fetch(`/api/focus?ticker=${ticker.toUpperCase()}${currentMarket==='cn'?'&market=cn':''}`)

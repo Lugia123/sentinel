@@ -52,6 +52,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/datastatus", a.dataStatus)
 	mux.HandleFunc("/api/snapshot", a.snapshot)
 	mux.HandleFunc("/api/snapshot/dates", a.dates)
+	mux.HandleFunc("/api/risklight/history", a.riskHistory)
 	mux.HandleFunc("/api/run", auth.RequireAdmin(a.run)) // 重算仅管理员
 	mux.HandleFunc("/api/admin/settings/schedule", auth.RequireAdmin(a.schedule)) // 调度间隔(管理员维护)
 	mux.HandleFunc("/api/positions", a.positions)

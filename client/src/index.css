@@ -81,6 +81,17 @@ tr.clickable:hover td { background: var(--gold-glow); }
 .strat-desc { margin-top: 9px; font-size: 13px; line-height: 1.5; }
 .grp-row td { background: rgba(255,255,255,.02); border-top: 1px solid var(--border-2); padding-top: 11px; padding-bottom: 7px; text-align: left; }
 
+/* 风险灯历史迷你视图 */
+.risk-hist { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+.rh-cap { font-size: 11px; margin-bottom: 6px; }
+.rh-rows { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.rh-row { display: flex; align-items: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+.rh-date { color: var(--ink-mute); width: 38px; flex: none; }
+.rh-bar-wrap { flex: 1; height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; margin-right: 8px; }
+.rh-bar { display: block; height: 100%; background: linear-gradient(90deg, var(--gold-dim), var(--gold-hi)); border-radius: 4px; }
+.rh-val { color: var(--ink-soft); width: 46px; flex: none; text-align: right; }
+.rh-expo { color: var(--ink-mute); width: 52px; flex: none; text-align: right; }
+
 .light { width: 11px; height: 11px; border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 0 10px currentColor; }
 .light.green { background: var(--up); color: var(--up); }
 .light.amber { background: var(--gold); color: var(--gold); }
