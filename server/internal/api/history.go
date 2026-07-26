@@ -15,22 +15,31 @@ import (
 // 中间那条均线统一放 sma_mid(美股=50日,A股=60日),mid_window 告知窗口。
 func (a *API) history(w http.ResponseWriter, r *http.Request) {
 	market := mktParam(r)
-	ticker := normTicker(market, r.URL.Query().Get("ticker"))
-	if ticker == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
-		return
-	}
+	raw := r.URL.Query().Get("ticker")
 	n := 120
 	if v := r.URL.Query().Get("n"); v != "" {
-		if x, err := strconv.Atoi(v); err == nil && x > 0 && x <= 500 {
+		if x, err := strconv.Atoi(v); err == nil && x > 0 && x <= 800 {
 			n = x
 		}
 	}
-	path := filepath.Join(a.engineDir, "data", ticker+".csv")
+	// 指数分支:大盘走势(A股 data_cn_meta/index_*.csv,列 date,close)。前端传 ticker=hs300/zz500/zz800。
+	var path, ticker string
 	midWin := 50
-	if market == "cn" {
-		path = filepath.Join(a.engineDir, "data_cn", strings.ReplaceAll(ticker, ".", "_")+".csv")
+	if idx := indexName(raw); idx != "" {
+		path = filepath.Join(a.engineDir, "data_cn_meta", "index_"+idx+".csv")
+		ticker = idx
 		midWin = 60
+	} else {
+		ticker = normTicker(market, raw)
+		if ticker == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
+			return
+		}
+		path = filepath.Join(a.engineDir, "data", ticker+".csv")
+		if market == "cn" {
+			path = filepath.Join(a.engineDir, "data_cn", strings.ReplaceAll(ticker, ".", "_")+".csv")
+			midWin = 60
+		}
 	}
 	f, err := os.Open(path)
 	if err != nil {
@@ -93,6 +102,15 @@ func (a *API) history(w http.ResponseWriter, r *http.Request) {
 		out = append(out, pt{Date: dates[i], Close: closes[i], Sma20: sma(i, 20), SmaMid: sma(i, midWin), Sma200: sma(i, 200)})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ticker": ticker, "mid_window": midWin, "history": out})
+}
+
+// indexName 识别大盘指数代码(hs300沪深300/zz500中证500/zz800中证800),返回归一名;非指数返回 ""。
+func indexName(tk string) string {
+	switch strings.ToLower(strings.TrimPrefix(tk, "idx.")) {
+	case "hs300", "zz500", "zz800":
+		return strings.ToLower(strings.TrimPrefix(tk, "idx."))
+	}
+	return ""
 }
 
 // lastContiguous 返回最后一段连续数据的起始下标(相邻日期差>maxGapDays 视为断档;无断档返回 0)。

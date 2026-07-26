@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { fetchRiskHistory, type RiskHistItem, type Market } from '../api'
 import { InfoDot } from '../ui'
 import RiskRibbon, { LV, lvC, pctS, filterRange, type RLRange } from '../components/RiskRibbon'
+import PriceRegimeChart from '../components/PriceRegimeChart'
 
 // 风险灯详情页:A 制度带+驱动图(复用 RiskRibbon)/ B 日历热力图 / C 四信号分解。市场切换 + 时间范围。
 export default function RiskLight({ initialMarket = 'cn', onBack }: { initialMarket?: Market; onBack?: () => void }) {
@@ -65,6 +66,9 @@ export default function RiskLight({ initialMarket = 'cn', onBack }: { initialMar
       {loading ? <div className="card">加载中…</div> : !data.length ? <div className="card muted">暂无历史数据</div> : <>
         {/* A 制度带 + 驱动图 + 统计(复用组件) */}
         <RiskRibbon market={mkt} range={range} rawData={asc} />
+
+        {/* 灯 vs 走势对照(制度带 + 归一价格线 + 暴露 + 归因) */}
+        <PriceRegimeChart market={mkt} regime={data} />
 
         <div className="row rl-bc">
         {/* B 日历热力图 */}

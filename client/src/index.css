@@ -123,6 +123,14 @@ tr.clickable:hover td { background: var(--gold-glow); }
 .rl-sig-val { width: 90px; flex: none; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .rl-sig-hint { font-size: 12px; }
 @media (max-width: 640px) { .rl-sig-hint { display: none; } }
+/* 灯vs走势对照图 */
+.prc-pick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.chip { background: var(--surface-2); border: 1px solid var(--border-2); color: var(--ink-soft); font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; cursor: pointer; }
+.chip:hover { color: var(--gold-hi); }
+.chip.on { background: var(--gold-glow); color: var(--gold-hi); border-color: var(--gold-dim); }
+.prc-input { width: 120px; background: var(--surface-2); border: 1px solid var(--border-2); color: var(--ink); border-radius: 999px; padding: 3px 10px; font-size: 12px; }
+.prc-expo { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: 12px; color: var(--ink-mute); cursor: pointer; }
+.prc-attrib { font-size: 12px; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px; font-variant-numeric: tabular-nums; }
 
 .light { width: 11px; height: 11px; border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 0 10px currentColor; }
 .light.green { background: var(--up); color: var(--up); }
