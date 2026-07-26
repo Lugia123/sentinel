@@ -1,0 +1,42 @@
+# deps / build
+node_modules/
+dist/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+.env
+.env.local
+.idea/
+.vscode/
+
+# Claude Code 工具/配置(非产品,含本地路径,不公开)
+.claude/
+.mcp.json
+
+# go build 产物(二进制不入库)
+server/sentinel
+server/server
+server/sentinel-server
+server/mcp
+server/cmd/server/dist/
+*.bak-*
+
+# python venv
+engine/.venv/
+.venv/
+
+# 运行期数据 / 缓存(不入库)
+data/
+report/
+
+# 引擎数据(用户自行用 engine/lib/dl_*.py、refresh_data.py、ts_refresh.py 生成,不分发)
+# 默认目录 engine/data(可用 SENTINEL_DATA_DIR 覆盖);历史软链目录也一并忽略
+engine/data/
+engine/data_cache/
+engine/data_cn
+engine/data_cn_alt
+engine/data_cn_meta
+
+# 前端构建缓存
+client/tsconfig.tsbuildinfo

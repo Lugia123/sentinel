@@ -1,0 +1,2 @@
+ALTER TABLE watchlist DROP COLUMN IF EXISTS starred;
+ALTER TABLE watchlist DROP COLUMN IF EXISTS custom;

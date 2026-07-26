@@ -1,0 +1,116 @@
+// Package engine — 调度 Python 策略引擎(subprocess)产出每日快照。
+package engine
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+type Runner struct {
+	pythonBin string
+	engineDir string
+}
+
+func New(pythonBin, engineDir string) *Runner {
+	return &Runner{pythonBin: pythonBin, engineDir: engineDir}
+}
+
+// EngineDir 引擎目录(供调度器定位 refresh_data.py 等)。
+func (r *Runner) EngineDir() string { return r.engineDir }
+
+// RunPython 跑任意引擎脚本(供数据刷新);返回 stdout,超时 timeout。
+func (r *Runner) RunPython(script string, args []string, timeout time.Duration) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	full := append([]string{script}, args...)
+	cmd := exec.CommandContext(ctx, r.pythonBin, full...)
+	cmd.Dir = r.engineDir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		return out.String(), fmt.Errorf("%v | stderr: %s", err, errb.String())
+	}
+	return out.String(), nil
+}
+
+// RunDaily 跑 run_daily.py 产出/刷新快照。asof="latest" 或 YYYY-MM-DD。
+// 返回引擎 stdout(便于前端显示日志);超时 10 分钟(SY 腿较慢)。
+func (r *Runner) RunDaily(market string, asof string, capital string, withSY bool, track []string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	if market != "cn" {
+		market = "us"
+	}
+	args := []string{filepath.Join(r.engineDir, "run_daily.py"), "--market", market, "--asof", asof, "--capital", capital}
+	if !withSY {
+		args = append(args, "--no-sy")
+	}
+	if len(track) > 0 {
+		args = append(args, "--track", strings.Join(track, ","))
+	}
+	cmd := exec.CommandContext(ctx, r.pythonBin, args...)
+	cmd.Dir = r.engineDir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		return out.String(), fmt.Errorf("引擎运行失败: %v | stderr: %s", err, errb.String())
+	}
+	return out.String(), nil
+}
+
+// RunFocus 单股观察:按市场跑 focus.py / focus_cn.py TICKER,返回 stdout 最后一行 JSON。
+func (r *Runner) RunFocus(market, ticker, asof, capital string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	script := "focus.py"
+	if market == "cn" {
+		script = "focus_cn.py"
+	}
+	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, script),
+		ticker, "--asof", asof, "--capital", capital)
+	cmd.Dir = r.engineDir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("focus 运行失败: %v | %s", err, errb.String())
+	}
+	return lastJSON(out.String(), "focus")
+}
+
+// RunEarnings 按市场跑 earnings.py(美股 SEC)/ earnings_cn.py(A股新浪)TICKER,返回季度财报 JSON。
+func (r *Runner) RunEarnings(market, ticker string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	script := "earnings.py"
+	if market == "cn" {
+		script = "earnings_cn.py"
+	}
+	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, script), ticker)
+	cmd.Dir = r.engineDir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("earnings 运行失败: %v | %s", err, errb.String())
+	}
+	return lastJSON(out.String(), "earnings")
+}
+
+func lastJSON(s, name string) (string, error) {
+	lines := strings.Split(strings.TrimSpace(s), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.HasPrefix(strings.TrimSpace(lines[i]), "{") {
+			return strings.TrimSpace(lines[i]), nil
+		}
+	}
+	return "", fmt.Errorf("%s 无有效输出", name)
+}
