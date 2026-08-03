@@ -298,12 +298,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                   <td colSpan={7} className="muted">⏳ 加载中…正在算它的档位/概率(约几秒),算完自动显示</td>
                 </tr>
               ))}
-              {mainRows.map(renderRow)}
-              {mainRows.length === 0 && customRows.length === 0 && (
-                <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 20 }}>
-                  {isCN ? '当前策略今日无推荐(风险灯/数据所致),可切换策略或看自选。' : '今日无推荐持仓。'}
-                </td></tr>
-              )}
+              {/* 我的自选:置顶(你添加的追踪股) */}
               {customRows.length > 0 && (
                 <tr className="grp-row">
                   <td></td>
@@ -314,6 +309,22 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                 </tr>
               )}
               {customRows.map(renderRow)}
+              {/* 策略推荐 */}
+              {customRows.length > 0 && mainRows.length > 0 && (
+                <tr className="grp-row">
+                  <td></td>
+                  <td colSpan={8} className="muted">
+                    策略推荐 <span className="pill b-mom" style={{ marginLeft: 2 }}>{mainRows.length}</span>
+                    {isCN && <span style={{ marginLeft: 6, fontWeight: 400 }}>· {strategy === 'dividend' ? '红利低波' : '头号腿'}</span>}
+                  </td>
+                </tr>
+              )}
+              {mainRows.map(renderRow)}
+              {mainRows.length === 0 && customRows.length === 0 && (
+                <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 20 }}>
+                  {isCN ? '当前策略今日无推荐(风险灯/数据所致),可切换策略或看自选。' : '今日无推荐持仓。'}
+                </td></tr>
+              )}
             </tbody>
           </table>
         </div>}

@@ -333,12 +333,18 @@ func (a *API) personalizeSnapshot(uid int64, market string, raw json.RawMessage)
 		if tk == "" || held[strings.ToUpper(tk)] {
 			continue
 		}
-		if h := a.cachedFocus(uid, market, tk, asof); h != nil { // 只用缓存,不阻塞
+		if h := a.cachedFocus(uid, market, tk, asof); h != nil { // 命中缓存:完整档位
 			holdings = append(holdings, h)
 			held[strings.ToUpper(tk)] = true
 			changed = true
+		} else if lite := a.liteCustomHolding(market, tk, asof); lite != nil {
+			// 缓存冷(如新交易日):先放轻量占位(有价格,档位计算中)→ 自选股始终显示;同时后台预热完整档位
+			holdings = append(holdings, lite)
+			held[strings.ToUpper(tk)] = true
+			changed = true
+			go a.warmFocus(uid, market, tk, asof)
 		} else {
-			go a.warmFocus(uid, market, tk, asof) // 缓存冷(如新交易日):后台预热,本次跳过
+			go a.warmFocus(uid, market, tk, asof)
 		}
 	}
 
@@ -411,6 +417,26 @@ func (a *API) cachedFocus(uid int64, market, ticker, asof string) map[string]any
 		}
 	}
 	return nil
+}
+
+// liteCustomHolding 缓存冷时的轻量占位:只取最新收盘价+中文名,保证自选股立即显示(完整档位后台预热)。
+func (a *API) liteCustomHolding(market, ticker, asof string) map[string]any {
+	var price float64
+	a.gdb.Raw(`SELECT close FROM prices WHERE market=? AND ticker=? ORDER BY date DESC LIMIT 1`, market, ticker).Row().Scan(&price)
+	if price <= 0 {
+		return nil
+	}
+	name := ""
+	if market == "cn" {
+		name = a.cnNameMap()[ticker]
+	}
+	return map[string]any{
+		"ticker": ticker, "name": name, "sleeve": "custom", "price": price,
+		"grade": 0, "grade_label": "计算中", "action": "持有", "action_weight": 1.0,
+		"target_shares": 0.0, "target_value": 0.0, "base_weight": 0.0,
+		"prob":   map[string]any{},
+		"reason": "用户自定义 · 档位计算中,稍后刷新即完整",
+	}
 }
 
 // warmFocus 计算并缓存某用户某股在 asof 的档位(阻塞~3秒;加自定义股/后台预热用)。
