@@ -64,6 +64,16 @@ export async function fetchHistory(ticker: string, n = 120, market?: Market): Pr
   return (await r.json()).history || []
 }
 
+// 未来20日收益范围·逐日历史(详情页两图:收益% / 价格锥)。lo/hi=70%区间收益,mid=中位;仅A股。
+export interface BandHistPoint { date: string; close: number; lo: number; hi: number; mid: number }
+export async function fetchBandHist(ticker: string, n = 120, market?: Market): Promise<BandHistPoint[]> {
+  const mk = market ?? currentMarket
+  if (mk !== 'cn') return [] // 暂仅A股
+  const r = await fetch(`/api/bandhist?ticker=${ticker}&n=${n}&market=cn`)
+  if (!r.ok) return []
+  return (await r.json()).points || []
+}
+
 export interface WatchItem { ticker: string; starred: boolean; custom: boolean }
 export async function fetchWatchlist(): Promise<WatchItem[]> {
   const r = await fetch(`/api/watchlist${mq()}`)

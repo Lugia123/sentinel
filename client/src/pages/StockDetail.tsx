@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
-import { fetchHistory, fetchExplain, fetchInvestigate, fetchBlobHTML, fetchEarningsQuarters, fetchEarningsInterpret, fetchStockNews, type EarnQuarter, type StockNews } from '../api'
+import { fetchHistory, fetchExplain, fetchInvestigate, fetchBlobHTML, fetchEarningsQuarters, fetchEarningsInterpret, fetchStockNews, fetchBandHist, type EarnQuarter, type StockNews, type BandHistPoint } from '../api'
 import type { Holding, HistPoint, RiskLight } from '../types'
 import type { TickerMeta, Market, DroppedItem } from '../api'
 import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot, cnMarketAction } from '../ui'
@@ -55,10 +55,14 @@ export default function StockDetail({ h, meta, market = 'us', riskLight, dropped
   // 和背景调查一致:进入财报tab或切换季度时自动加载(已解读过的会秒回缓存,没解读的自动解读一次)
   useEffect(() => { if (tab === 'earnings' && qSel && !earnHtml && !earnLoading) loadEarn(false) }, [tab, qSel])
   const [hist, setHist] = useState<HistPoint[]>([])
+  const [band, setBand] = useState<BandHistPoint[]>([]) // 未来20日收益范围·逐日历史(仅A股)
   const [ai, setAi] = useState<string>(''); const [aiLoading, setAiLoading] = useState(true); const [aiErr, setAiErr] = useState('')
   const priceRef = useRef<HTMLDivElement>(null)
+  const bandPctRef = useRef<HTMLDivElement>(null)   // 图1:收益% 范围带
+  const bandPxRef = useRef<HTMLDivElement>(null)     // 图2:价格锥
 
   useEffect(() => { fetchHistory(h.ticker).then(setHist) }, [h.ticker])
+  useEffect(() => { if (isCN) fetchBandHist(h.ticker).then(setBand); else setBand([]) }, [h.ticker, isCN])
   const loadAI = (force = false) => {
     setAiLoading(true); setAiErr('')
     fetchExplain(h.ticker, force).then((e) => setAi(e.content)).catch((e) => setAiErr(String(e.message || e))).finally(() => setAiLoading(false))
@@ -83,6 +87,73 @@ export default function StockDetail({ h, meta, market = 'us', riskLight, dropped
     const onR = () => chart.resize(); window.addEventListener('resize', onR)
     return () => { window.removeEventListener('resize', onR); chart.dispose() }
   }, [hist, tab]) // 含 tab:从背调/财报切回概览时容器重新挂载,须重新 init(否则图空白)
+
+  // 图1:未来20日收益范围(%)—— 每天从当日起未来20交易日的70%收益区间(填充带)+中位线,0线基准。
+  // 带随波动率呼吸:变宽=波动放大。严格无前视,末点与上方概率带表一致。
+  useEffect(() => {
+    if (tab !== 'overview' || !bandPctRef.current || band.length === 0) return
+    const chart = echarts.init(bandPctRef.current)
+    const dates = band.map((p) => p.date.slice(5))
+    const loP = band.map((p) => +(p.lo * 100).toFixed(2))
+    const hiP = band.map((p) => +(p.hi * 100).toFixed(2))
+    const midP = band.map((p) => +(p.mid * 100).toFixed(2))
+    const spanP = band.map((p) => +((p.hi - p.lo) * 100).toFixed(2)) // 堆叠差=区间宽度
+    chart.setOption({
+      backgroundColor: 'transparent', grid: { left: 55, right: 15, top: 30, bottom: 30 },
+      legend: { data: ['中位', '70%区间'], textStyle: { color: '#bcae97' }, top: 0 },
+      tooltip: {
+        trigger: 'axis', backgroundColor: '#1f1913', borderColor: '#2c2418', textStyle: { color: '#f1e9da' },
+        formatter: (ps: any) => {
+          const i = ps[0].dataIndex
+          return `${band[i].date}<br/>区间 ${loP[i]}% ~ ${hiP[i]}%<br/>中位 ${midP[i]}%`
+        },
+      },
+      xAxis: { type: 'category', data: dates, axisLabel: { color: '#b0a488' }, axisLine: { lineStyle: { color: '#2c2418' } } },
+      yAxis: { type: 'value', axisLabel: { color: '#b0a488', formatter: '{value}%' }, splitLine: { lineStyle: { color: '#2c2418' } } },
+      series: [
+        // 堆叠填充带:下沿(透明线)+ 区间宽度(金色半透明面)
+        { name: '_lo', type: 'line', stack: 'band', data: loP, symbol: 'none', lineStyle: { opacity: 0 }, silent: true, z: 1 },
+        { name: '70%区间', type: 'line', stack: 'band', data: spanP, symbol: 'none', lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(200,162,83,.20)' }, z: 1 },
+        {
+          name: '中位', type: 'line', data: midP, symbol: 'none', lineStyle: { color: '#e6c878', width: 1.5 }, z: 2,
+          markLine: { silent: true, symbol: 'none', lineStyle: { color: '#6b5f3e', type: 'dashed' }, data: [{ yAxis: 0 }], label: { show: false } },
+        },
+      ],
+    })
+    const onR = () => chart.resize(); window.addEventListener('resize', onR)
+    return () => { window.removeEventListener('resize', onR); chart.dispose() }
+  }, [band, tab])
+
+  // 图2:价格锥 —— 同一组带换算成价位 close×(1+lo/hi),贴着收盘线的包络;可与上方价格图/后续真实走势对照。
+  useEffect(() => {
+    if (tab !== 'overview' || !bandPxRef.current || band.length === 0) return
+    const chart = echarts.init(bandPxRef.current)
+    const dates = band.map((p) => p.date.slice(5))
+    const close = band.map((p) => p.close)
+    const loP = band.map((p) => +(p.close * (1 + p.lo)).toFixed(2))
+    const spanP = band.map((p) => +(p.close * (p.hi - p.lo)).toFixed(2))
+    const hiP = band.map((p) => +(p.close * (1 + p.hi)).toFixed(2))
+    chart.setOption({
+      backgroundColor: 'transparent', grid: { left: 55, right: 15, top: 30, bottom: 30 },
+      legend: { data: ['收盘', '未来20日价位区间'], textStyle: { color: '#bcae97' }, top: 0 },
+      tooltip: {
+        trigger: 'axis', backgroundColor: '#1f1913', borderColor: '#2c2418', textStyle: { color: '#f1e9da' },
+        formatter: (ps: any) => {
+          const i = ps[0].dataIndex
+          return `${band[i].date}<br/>收盘 ${cur}${close[i]}<br/>区间 ${cur}${loP[i]} ~ ${cur}${hiP[i]}`
+        },
+      },
+      xAxis: { type: 'category', data: dates, axisLabel: { color: '#b0a488' }, axisLine: { lineStyle: { color: '#2c2418' } } },
+      yAxis: { type: 'value', scale: true, axisLabel: { color: '#b0a488' }, splitLine: { lineStyle: { color: '#2c2418' } } },
+      series: [
+        { name: '_lo', type: 'line', stack: 'px', data: loP, symbol: 'none', lineStyle: { opacity: 0 }, silent: true, z: 1 },
+        { name: '未来20日价位区间', type: 'line', stack: 'px', data: spanP, symbol: 'none', lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(123,167,176,.20)' }, z: 1 },
+        { name: '收盘', type: 'line', data: close, symbol: 'none', lineStyle: { color: '#f1e9da', width: 2 }, z: 2 },
+      ],
+    })
+    const onR = () => chart.resize(); window.addEventListener('resize', onR)
+    return () => { window.removeEventListener('resize', onR); chart.dispose() }
+  }, [band, tab])
 
   const ind = h.indicators
   const dChg = dropped && dropped.price_now > 0 && dropped.last_price > 0
@@ -271,6 +342,21 @@ export default function StockDetail({ h, meta, market = 'us', riskLight, dropped
 
       {/* 价格 + 均线 */}
       <div className="card"><h3>价格 + 均线（近120日）</h3><div ref={priceRef} style={{ height: 280 }} />{hist.length === 0 && <div className="muted">加载中/无数据…</div>}</div>
+
+      {/* 未来20日收益范围·逐日历史(仅A股):图1 收益% / 图2 价格锥 —— 与价格图 x 轴对齐 */}
+      {isCN && (
+        <div className="card">
+          <h3>未来20日收益范围 · 近120日 <InfoDot text="对过去每一天,用当日往前的数据估算「从那天起未来20交易日」收益的70%区间(严格无前视)。带变宽=那阵子波动放大。上图看收益百分比,下图换算成价位锥(可与价格走势对照)。末点与上方概率带一致。波动范围估计,非涨跌预测。" /></h3>
+          {band.length === 0
+            ? <div className="muted">加载中/数据不足(需≥120交易日)…</div>
+            : <>
+                <div className="muted" style={{ fontSize: 12, margin: '2px 0 6px' }}>① 收益视角(%)——70%区间随时间的宽窄变化</div>
+                <div ref={bandPctRef} style={{ height: 200 }} />
+                <div className="muted" style={{ fontSize: 12, margin: '10px 0 6px' }}>② 价格视角——区间换算成价位,贴着收盘线的包络</div>
+                <div ref={bandPxRef} style={{ height: 220 }} />
+              </>}
+        </div>
+      )}
 
       {/* 概率带 5/20/60 */}
       <div className="card">

@@ -68,6 +68,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/watchlist/star", a.watchStar)
 	mux.HandleFunc("/api/watchlist/custom", a.watchCustom)
 	mux.HandleFunc("/api/focus", a.focus)
+	mux.HandleFunc("/api/bandhist", a.bandHist)
 	mux.HandleFunc("/api/trend", a.trend)
 	mux.HandleFunc("/api/trend/tickers", a.trendTickers)
 	mux.HandleFunc("/api/dropped", a.dropped)
@@ -170,6 +171,30 @@ func (a *API) focus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, err := a.runner.RunFocus(mkt, tk, q(r, "asof", "latest"), q(r, "capital", "4000"))
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_, _ = w.Write([]byte(out))
+}
+
+// bandHist A股【未来20日收益范围】逐日历史(详情页价格图下方两图:收益% / 价格锥)。
+// 单票现算(~0.5s,值永久不变故不缓存);当前仅 cn。
+func (a *API) bandHist(w http.ResponseWriter, r *http.Request) {
+	mkt := mktParam(r)
+	tk := normTicker(mkt, r.URL.Query().Get("ticker"))
+	if tk == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
+		return
+	}
+	n := 120
+	if v := r.URL.Query().Get("n"); v != "" {
+		if x, err := strconv.Atoi(v); err == nil && x >= 20 && x <= 500 {
+			n = x
+		}
+	}
+	out, err := a.runner.RunBandHist(mkt, tk, q(r, "asof", "latest"), n)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
