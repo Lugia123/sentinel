@@ -19,14 +19,21 @@ export const SLEEVE: Record<string, { label: string; hint: string; cls: string }
 }
 
 export const gradeCls = (g: number) => (g >= 2 ? 'g-3' : g >= 0 ? 'g-1' : g === -1 ? 'g-neg1' : 'g-neg2')
-export const actionColor = (a: string) => (a.includes('清仓') ? 'var(--down)' : a.includes('减') ? 'var(--warn)' : 'var(--up)')
+// 买卖动作跟随用户涨跌配色(买/持=涨色、清仓=跌色,契合A股「买入红卖出绿」);减仓=固定琥珀。
+export const actionColor = (a: string) => (a.includes('清仓') ? 'var(--fall)' : a.includes('减') ? 'var(--warn)' : 'var(--rise)')
+
+// 读取当前生效的 CSS 变量(图表需具体色值时用;涨跌配色切换后随之变)。
+export const cssVar = (name: string) =>
+  (typeof window !== 'undefined' ? getComputedStyle(document.documentElement).getPropertyValue(name).trim() : '') || ''
+export const riseColor = () => cssVar('--rise') || '#cf6f5d'
+export const fallColor = () => cssVar('--fall') || '#6fae86'
 
 // A股单票不减仓(反转市,逐票减仓有害·R36),动作由【市场级风险灯】统一决定——
 // 引擎里 action 恒"持有"只是占位,展示时必须翻译成市场级指令,否则用户会以为无论如何都拿着。
 export const cnMarketAction = (level: string): { text: string; color: string } =>
-  level === 'red' ? { text: '清仓观望', color: 'var(--down)' }
+  level === 'red' ? { text: '清仓观望', color: 'var(--fall)' }
   : level === 'amber' ? { text: '减至半仓', color: 'var(--warn)' }
-  : { text: '持有', color: 'var(--up)' }
+  : { text: '持有', color: 'var(--rise)' }
 export const verdictCls = (v: string) => (v === '多' ? 'up' : v === '空' ? 'down' : 'muted')
 
 // 悬浮说明小圆点 —— tooltip 用 fixed 定位跟随触发点,绝不被表格 overflow 裁掉

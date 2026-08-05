@@ -11,7 +11,7 @@ import RiskLight from './pages/RiskLight'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
 import Modal from './components/Modal'
-import { installFetchAuth, fetchMe, logout, changePassword, type AuthUser } from './auth'
+import { installFetchAuth, fetchMe, logout, changePassword, setColorPref, getColorScheme, type AuthUser, type ColorScheme } from './auth'
 
 installFetchAuth() // 全局 fetch 带 token
 
@@ -41,7 +41,16 @@ export default function App() {
   const [pwOpen, setPwOpen] = useState(false)
   const [market, setMarketState] = useState<Market>(getMarket())
   const [altStatus, setAltStatus] = useState<AltStatus | null>(null) // A股数据源健康(tushare token过期→红条)
+  const [colorUp, setColorUp] = useState<ColorScheme>(getColorScheme()) // 涨跌配色(用户隔离)
   const isAdmin = me?.role === 'admin'
+
+  // 切换涨跌配色:写回后端(用户隔离)+ 本地即时生效;重载确保图表(ECharts 已渲染色值)一并刷新
+  const switchColor = async (v: ColorScheme) => {
+    if (v === colorUp) return
+    setColorUp(v)
+    try { await setColorPref(v) } catch { /* 本地已生效,后端失败下次同步 */ }
+    window.location.reload()
+  }
 
   // 切换市场:设全局市场 → 重载快照/关注(元数据 us 用中文名映射,cn 用快照内 name)
   const switchMarket = async (m: Market) => {
@@ -53,7 +62,7 @@ export default function App() {
 
   // 启动:查当前登录用户
   useEffect(() => {
-    fetchMe().then((u) => { setMe(u); setAuthReady(true) })
+    fetchMe().then((u) => { setMe(u); setAuthReady(true); setColorUp(getColorScheme()) })
     const onUnauth = () => setMe(null)
     window.addEventListener('sentinel-unauth', onUnauth)
     return () => window.removeEventListener('sentinel-unauth', onUnauth)
@@ -96,7 +105,7 @@ export default function App() {
   const droppedH: Holding | null = droppedSel ? (() => { try { return JSON.parse(droppedSel.context) } catch { return null } })() : null
 
   if (!authReady) return <div className="login-wrap"><div className="muted">加载中…</div></div>
-  if (!me) return <Login onLogin={(u) => setMe(u)} />
+  if (!me) return <Login onLogin={(u) => { setMe(u); setColorUp(getColorScheme()) }} />
 
   const nav = NAV.filter((n) => !n.adminOnly || isAdmin)
 
@@ -126,6 +135,11 @@ export default function App() {
               {userMenu && (
                 <div className="user-pop" onMouseLeave={() => setUserMenu(false)}>
                   <div className="user-pop-email">{me.email}{isAdmin && <span className="gold"> · 管理员</span>}</div>
+                  <div className="pop-sec">涨跌配色</div>
+                  <div className="color-toggle">
+                    <button className={colorUp === 'red' ? 'on' : ''} onClick={() => switchColor('red')}>红涨绿跌</button>
+                    <button className={colorUp === 'green' ? 'on' : ''} onClick={() => switchColor('green')}>绿涨红跌</button>
+                  </div>
                   <button onClick={() => { setPwOpen(true); setUserMenu(false) }}>修改密码</button>
                   <button onClick={() => { logout(); setMe(null) }}>退出登录</button>
                 </div>
