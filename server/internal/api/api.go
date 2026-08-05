@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -50,6 +51,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/health", a.health)
 	mux.HandleFunc("/api/version", a.version)
 	mux.HandleFunc("/api/datastatus", a.dataStatus)
+	mux.HandleFunc("/api/altstatus", a.altStatus)
 	mux.HandleFunc("/api/snapshot", a.snapshot)
 	mux.HandleFunc("/api/snapshot/dates", a.dates)
 	mux.HandleFunc("/api/risklight/history", a.riskHistory)
@@ -257,6 +259,42 @@ func (a *API) dataStatus(w http.ResponseWriter, r *http.Request) {
 		"note":         "历史至2026-06-25;实时刷新(yfinance)待接",
 	}
 	writeJSON(w, http.StatusOK, status)
+}
+
+// altStatus A股【事件/红利腿 tushare】数据源健康,供前端顶部故障红条判断。
+// tushare 是唯一需 token(月卡会过期)的源,仅影响 A股 事件/红利/板块;美股与 A股头号腿(baostock)不涉及。
+// ok=false 当:①上次成功刷新已陈旧(超 3× 调度间隔,至少12h)——数据接口很可能故障;或 ②从未成功且已报错。
+// 全新部署尚未跑过(无成功记录且无错误)→ ok=true,不误报。
+func (a *API) altStatus(w http.ResponseWriter, r *http.Request) {
+	lastOK := a.store.GetSetting(scheduler.AltLastOKKey)
+	errMark := a.store.GetSetting(scheduler.AltErrKey)
+	interval := 4
+	if v := a.store.GetSetting(scheduler.SettingKey); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= 24 {
+			interval = n
+		}
+	}
+	staleHours := float64(3 * interval) // 容忍几个周期抖动,避免单次网络抖动误报
+	if staleHours < 12 {
+		staleHours = 12
+	}
+	resp := map[string]any{"ok": true, "source": "A股事件/红利数据"}
+	if lastOK != "" {
+		if sec, err := strconv.ParseInt(lastOK, 10, 64); err == nil {
+			ageH := time.Since(time.Unix(sec, 0)).Hours()
+			resp["last_ok"] = time.Unix(sec, 0).Format("2006-01-02 15:04")
+			resp["stale_hours"] = int(ageH)
+			if ageH > staleHours {
+				resp["ok"] = false
+			}
+		}
+	} else if errMark != "" {
+		resp["ok"] = false // 从未成功且已报错 = 确实故障
+	}
+	if errMark != "" {
+		resp["last_error"] = errMark
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (a *API) snapshot(w http.ResponseWriter, r *http.Request) {

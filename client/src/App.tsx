@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchSnapshot, runEngine, fetchVersion, fetchMeta, fetchWatchlist, setStar, getMarket, setMarket, type Market, type TickerMeta, type DroppedItem } from './api'
+import { fetchSnapshot, runEngine, fetchVersion, fetchMeta, fetchWatchlist, setStar, getMarket, setMarket, fetchAltStatus, type Market, type TickerMeta, type DroppedItem, type AltStatus } from './api'
 import type { Snapshot, Holding } from './types'
 import Dashboard from './pages/Dashboard'
 import Positions from './pages/Positions'
@@ -40,6 +40,7 @@ export default function App() {
   const [userMenu, setUserMenu] = useState(false)
   const [pwOpen, setPwOpen] = useState(false)
   const [market, setMarketState] = useState<Market>(getMarket())
+  const [altStatus, setAltStatus] = useState<AltStatus | null>(null) // A股数据源健康(tushare token过期→红条)
   const isAdmin = me?.role === 'admin'
 
   // 切换市场:设全局市场 → 重载快照/关注(元数据 us 用中文名映射,cn 用快照内 name)
@@ -69,6 +70,16 @@ export default function App() {
     load(); fetchVersion().then((v) => setVer(v.version)); fetchMeta().then(setMeta); loadWatch()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me])
+
+  // A股数据源健康:仅 A股视图轮询(tushare 只影响 A股),每5分钟一次;非 A股清空
+  useEffect(() => {
+    if (!me || market !== 'cn') { setAltStatus(null); return }
+    let alive = true
+    const tick = () => fetchAltStatus().then((s) => { if (alive) setAltStatus(s) })
+    tick()
+    const id = setInterval(tick, 5 * 60 * 1000)
+    return () => { alive = false; clearInterval(id) }
+  }, [me, market])
 
   const toggleWatch = async (tk: string, on: boolean) => {
     await setStar(tk, on)
@@ -125,6 +136,11 @@ export default function App() {
       </div>
 
       <div className="wrap">
+        {market === 'cn' && altStatus && !altStatus.ok && (
+          <div className="data-alert" role="alert">
+            ⚠ {altStatus.source || '数据'}接口故障，相关指标可能未更新
+          </div>
+        )}
         <div className="sub" style={{ marginBottom: 14 }}>
           {market === 'cn' ? 'A股' : '美股'}{snap ? ` · 数据截至 ${snap.asof} 收盘` : '策略决策支持'} · 研究工具，非投资建议
         </div>

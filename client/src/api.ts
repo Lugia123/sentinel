@@ -27,6 +27,15 @@ export async function fetchVersion(): Promise<Version> {
   return r.ok ? r.json() : { version: 'dev', branch: '', commit: '' }
 }
 
+// AltStatus A股事件/红利数据源(tushare,需token会过期)健康。ok=false 时前端顶部红条告警。
+export type AltStatus = { ok: boolean; source?: string; last_ok?: string; stale_hours?: number; last_error?: string }
+export async function fetchAltStatus(): Promise<AltStatus> {
+  try {
+    const r = await fetch('/api/altstatus')
+    return r.ok ? r.json() : { ok: true } // 拿不到状态时不误报
+  } catch { return { ok: true } }
+}
+
 export async function runEngine(withSY = true): Promise<string> {
   const r = await fetch(`/api/run${mq(`?sy=${withSY ? 1 : 0}`)}`, { method: 'POST' })
   const j = await r.json()
