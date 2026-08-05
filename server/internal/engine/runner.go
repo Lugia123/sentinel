@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -84,6 +85,26 @@ func (r *Runner) RunFocus(market, ticker, asof, capital string) (string, error) 
 		return "", fmt.Errorf("focus 运行失败: %v | %s", err, errb.String())
 	}
 	return lastJSON(out.String(), "focus")
+}
+
+// RunBandHist 跑 bandhist_cn.py TICKER —— A股【未来20日收益范围】逐日历史序列(详情页两图数据源)。
+// 单票 CSV 重算,~0.5s;返回单行 JSON {ticker,asof,points}。当前仅 A股(cn),其余市场返回空。
+func (r *Runner) RunBandHist(market, ticker, asof string, n int) (string, error) {
+	if market != "cn" {
+		return "", fmt.Errorf("bandhist 暂仅支持 A股")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, "bandhist_cn.py"),
+		ticker, "--asof", asof, "--n", strconv.Itoa(n))
+	cmd.Dir = r.engineDir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("bandhist 运行失败: %v | %s", err, errb.String())
+	}
+	return lastJSON(out.String(), "bandhist")
 }
 
 // RunEarnings 按市场跑 earnings.py(美股 SEC)/ earnings_cn.py(A股新浪)TICKER,返回季度财报 JSON。
