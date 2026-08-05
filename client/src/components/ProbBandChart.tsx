@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as echarts from 'echarts'
 import type { Holding } from '../types'
+import { riseColor, fallColor } from '../ui'
 
 // 概率带可视化:5/20/60日 70%收益区间(横条)+ 中位(竖线),把概率表变成一眼看懂的图。
 export default function ProbBandChart({ prob }: { prob: Holding['prob'] }) {
@@ -33,7 +34,7 @@ export default function ProbBandChart({ prob }: { prob: Holding['prob'] }) {
           const lo = api.coord([api.value(1), cat]); const hi = api.coord([api.value(2), cat]); const med = api.coord([api.value(3), cat])
           const bh = 16, y = lo[1] - bh / 2
           const up = api.value(3) >= 0
-          const color = up ? '#6fae86' : '#cf6f5d'
+          const color = up ? riseColor() : fallColor()
           return { type: 'group', children: [
             { type: 'rect', shape: { x: lo[0], y, width: hi[0] - lo[0], height: bh }, style: { fill: '#c8a253', opacity: 0.28 } },
             { type: 'line', shape: { x1: med[0], y1: y - 2, x2: med[0], y2: y + bh + 2 }, style: { stroke: color, lineWidth: 2 } },

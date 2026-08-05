@@ -7,6 +7,15 @@ export const getToken = () => localStorage.getItem(KEY) || ''
 export const setToken = (t: string) => localStorage.setItem(KEY, t)
 export const clearToken = () => localStorage.removeItem(KEY)
 
+// ── 涨跌配色偏好(用户隔离,随 /me 下发)。默认 red(A股:红涨绿跌);green=绿涨红跌(西式)。──
+export type ColorScheme = 'green' | 'red'
+const CKEY = 'sentinel_color_up'
+export const getColorScheme = (): ColorScheme => (localStorage.getItem(CKEY) === 'green' ? 'green' : 'red')
+export function applyColorScheme(v: ColorScheme) {
+  localStorage.setItem(CKEY, v)
+  if (typeof document !== 'undefined') document.documentElement.dataset.updown = v
+}
+
 // 安装一次全局 fetch 拦截器
 let installed = false
 export function installFetchAuth() {
@@ -38,13 +47,21 @@ async function post(path: string, body: any) {
 export async function login(email: string, password: string): Promise<AuthUser> {
   const j = await post('/api/auth/login', { email, password })
   setToken(j.token)
+  if (j.color_up) applyColorScheme(j.color_up)
   return j.user
 }
 export function logout() { clearToken() }
 export async function fetchMe(): Promise<AuthUser | null> {
   const r = await fetch('/api/auth/me')
   if (!r.ok) return null
-  return (await r.json()).user
+  const j = await r.json()
+  if (j.color_up) applyColorScheme(j.color_up) // 登录态随用户偏好落地(用户隔离)
+  return j.user
+}
+// 保存涨跌配色偏好(写回后端 + 本地即时生效)
+export async function setColorPref(v: ColorScheme) {
+  await post('/api/pref/color', { color_up: v })
+  applyColorScheme(v)
 }
 export async function changePassword(current: string, next: string) {
   return post('/api/auth/change-password', { current, new: next })

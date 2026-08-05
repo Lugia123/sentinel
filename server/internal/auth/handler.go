@@ -18,6 +18,7 @@ func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/auth/login", s.hLogin)
 	mux.HandleFunc("/api/auth/me", s.hMe)
 	mux.HandleFunc("/api/auth/change-password", RequireAuth(s.hChangePassword))
+	mux.HandleFunc("/api/pref/color", RequireAuth(s.hColorPref))
 	mux.HandleFunc("/api/auth/forgot", s.hForgot)
 	mux.HandleFunc("/api/auth/reset", s.hReset)
 	mux.HandleFunc("/api/admin/users", RequireAdmin(s.hUsers))
@@ -33,7 +34,7 @@ func (s *Service) hLogin(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnauthorized, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"token": tok, "user": u})
+	writeJSON(w, http.StatusOK, map[string]any{"token": tok, "user": u, "color_up": s.ColorUp(u.ID)})
 }
 
 func (s *Service) hMe(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +48,24 @@ func (s *Service) hMe(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusUnauthorized, "未登录")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": u})
+	writeJSON(w, http.StatusOK, map[string]any{"user": u, "color_up": s.ColorUp(uid)})
+}
+
+// hColorPref 设置涨跌配色偏好(用户隔离):{"color_up":"green"|"red"}。
+func (s *Service) hColorPref(w http.ResponseWriter, r *http.Request) {
+	var b struct {
+		ColorUp string `json:"color_up"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&b)
+	if b.ColorUp != "green" && b.ColorUp != "red" {
+		fail(w, http.StatusBadRequest, "color_up 仅 green/red")
+		return
+	}
+	if err := s.SetPref(UserID(r), "color_up", b.ColorUp); err != nil {
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "color_up": b.ColorUp})
 }
 
 func (s *Service) hChangePassword(w http.ResponseWriter, r *http.Request) {

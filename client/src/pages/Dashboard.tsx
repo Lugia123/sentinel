@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import type { Snapshot, Holding } from '../types'
 import type { TickerMeta } from '../api'
-import { pct, pct2, InfoDot, GradeBadge, SleeveBadge, actionColor, cnMarketAction } from '../ui'
+import { pct, pct2, InfoDot, GradeBadge, SleeveBadge, actionColor, cnMarketAction, riseColor, fallColor } from '../ui'
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
 import RiskRibbon from '../components/RiskRibbon'
@@ -156,7 +156,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
           const cat = api.value(0)
           const lo = api.coord([api.value(1), cat]); const hi = api.coord([api.value(2), cat]); const med = api.coord([api.value(3), cat])
           const g = bands[params.dataIndex].grade
-          const color = g >= 2 ? '#6fae86' : g >= -1 ? '#c8a253' : '#cf6f5d' // 颜色=档位健康度
+          const color = g >= 2 ? riseColor() : g >= -1 ? '#c8a253' : fallColor() // 颜色=档位强弱(随涨跌配色)
           const bh = 13, y = lo[1] - bh / 2
           return { type: 'group', children: [
             { type: 'rect', shape: { x: lo[0], y, width: hi[0] - lo[0], height: bh }, style: { fill: color, opacity: 0.32 } },
@@ -325,9 +325,9 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
           <div ref={chartRef} style={{ height: chartH }} />
         </div>
         <div className="chart-legend">
-          <span><i className="lg" style={{ background: '#6fae86' }} />绿=偏强(+2~+3)</span>
-          <span><i className="lg" style={{ background: '#c8a253' }} />金=中性/转弱(-1~+1)</span>
-          <span><i className="lg" style={{ background: '#cf6f5d' }} />红=跌势(-2~-3)</span>
+          <span><i className="lg" style={{ background: 'var(--rise)' }} />偏强(+2~+3)</span>
+          <span><i className="lg" style={{ background: '#c8a253' }} />中性/转弱(-1~+1)</span>
+          <span><i className="lg" style={{ background: 'var(--fall)' }} />跌势(-2~-3)</span>
         </div>
         <div className="muted" style={{ marginTop: 6 }}>
           <b>每行一只股</b>(按档位从高到低排),<b>颜色=档位健康度</b>,<b>横条长度=波动大小</b>——两者独立:红色不代表条短,只代表趋势转弱。股票多时可在框内滚动。这是波动范围,非涨跌预测。

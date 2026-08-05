@@ -211,6 +211,27 @@ func (s *Service) SetStrategy(uid int64, market string, strategy string) error {
 		uid, market, strategy).Error
 }
 
+// ── 用户通用偏好(用户隔离,KV)──
+// GetPref 读某用户某键;无记录返回空。SetPref upsert。目前用途:color_up 涨跌配色。
+func (s *Service) GetPref(uid int64, key string) string {
+	var v string
+	s.db.Raw(`SELECT value FROM user_pref WHERE user_id=? AND key=?`, uid, key).Scan(&v)
+	return v
+}
+func (s *Service) SetPref(uid int64, key, value string) error {
+	return s.db.Exec(`INSERT INTO user_pref(user_id,key,value,updated_at) VALUES(?,?,?,now())
+		ON CONFLICT (user_id,key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()`,
+		uid, key, value).Error
+}
+
+// ColorUp 涨跌配色偏好:'green'(绿涨红跌)或 'red'(红涨绿跌)。默认 'red'(A股习惯)。
+func (s *Service) ColorUp(uid int64) string {
+	if s.GetPref(uid, "color_up") == "green" {
+		return "green"
+	}
+	return "red"
+}
+
 // ── 系统设置(键值)──
 func (s *Service) GetSetting(key string) string {
 	var v string
