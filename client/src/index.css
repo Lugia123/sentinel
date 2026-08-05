@@ -159,6 +159,11 @@ tr.clickable:hover td { background: var(--gold-glow); }
 .err-card { border-color: rgba(207,111,93,.4); }
 .err-card b { color: var(--down); }
 
+/* 数据源故障红条:醒目但简短(顶部通栏) */
+.data-alert { margin-bottom: 12px; padding: 10px 14px; border-radius: 9px;
+  background: rgba(207,111,93,.14); border: 1px solid rgba(207,111,93,.5);
+  color: var(--down); font-size: 13px; font-weight: 600; letter-spacing: .2px; }
+
 /* 详情页 */
 .detail-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 .dh-tk { font-size: 24px; font-weight: 800; color: var(--ink); }

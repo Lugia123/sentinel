@@ -8,7 +8,8 @@
 凭证:SENTINEL_TS_URL / SENTINEL_TS_TOKEN(回退 TS_URL / TS_TOKEN)。数据目录:SENTINEL_ALT_DIR。
 用法:
   python ts_refresh.py --full            # 全历史重建(首次迁移;~37min)
-  python ts_refresh.py --days 180        # 增量(最近N天,定时刷新调用;默认180)
+  python ts_refresh.py --days 180        # 增量(最近N交易日,定时刷新调用;默认180)
+  python ts_refresh.py --since 20260701  # 增量(自 20260701 起的全部交易日;补断档用,优先于 --days)
 """
 import os, sys, time, argparse
 import requests
@@ -178,7 +179,8 @@ def merge_write(path, new, keys):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--full", action="store_true", help="全历史重建(2016+)")
-    ap.add_argument("--days", type=int, default=180, help="增量:最近N天(默认180)")
+    ap.add_argument("--days", type=int, default=180, help="增量:最近N交易日(默认180)")
+    ap.add_argument("--since", default="", help="增量:自该日(YYYYMMDD)起的全部交易日;补断档用,优先于 --days")
     ap.add_argument("--start", default="20160101")
     a = ap.parse_args()
     os.makedirs(ALT_DIR, exist_ok=True)
@@ -187,8 +189,14 @@ def main():
         start = a.start
         dates = trade_dates(start)
         periods = periods_between(start)
+    elif a.since:
+        # 断档自愈:自上次成功日起,重拉全部交易日(不受45天窗口限制)。merge 幂等去重,重叠无害。
+        since = "".join(ch for ch in a.since if ch.isdigit())[:8] or "20260101"
+        dates = trade_dates(since)
+        start = dates[0] if dates else since
+        periods = periods_between((pd.Timestamp(start) - pd.Timedelta(days=200)).strftime("%Y%m%d"))
     else:
-        # 增量:最近 N 天(报告期取最近2季)。无 Date.now → 用交易日历末端回退。
+        # 增量:最近 N 交易日(报告期取最近2季)。无 Date.now → 用交易日历末端回退。
         alld = trade_dates("20260101")
         dates = alld[-min(a.days, len(alld)):] if alld else []
         start = dates[0] if dates else "20260101"
