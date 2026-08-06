@@ -97,6 +97,17 @@ export async function fetchSectorFlow(): Promise<SectorFlow | null> {
   return j.error ? null : j
 }
 
+// 大盘 + 北向资金流(A股,纯展示)。单位亿元;流入为正。
+export interface NorthPoint { date: string; north: number | null; south: number | null }
+export interface MarketPoint { date: string; net: number | null; pct_sh: number | null; pct_sz: number | null }
+export interface MacroFlow { asof: string; north: NorthPoint[]; market: MarketPoint[]; summary: { north_today: number | null; north_5d: number | null; market_today: number | null; market_5d: number | null; pct_sh: number | null } }
+export async function fetchMacroFlow(): Promise<MacroFlow | null> {
+  const r = await fetch('/api/moneyflow/macro')
+  if (!r.ok) return null
+  const j = await r.json()
+  return j.error ? null : j
+}
+
 export interface WatchItem { ticker: string; starred: boolean; custom: boolean }
 export async function fetchWatchlist(): Promise<WatchItem[]> {
   const r = await fetch(`/api/watchlist${mq()}`)

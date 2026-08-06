@@ -73,6 +73,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/bandhist", a.bandHist)
 	mux.HandleFunc("/api/moneyflow", a.moneyFlow)
 	mux.HandleFunc("/api/moneyflow/sector", a.sectorFlow)
+	mux.HandleFunc("/api/moneyflow/macro", a.macroFlow)
 	mux.HandleFunc("/api/trend", a.trend)
 	mux.HandleFunc("/api/trend/tickers", a.trendTickers)
 	mux.HandleFunc("/api/dropped", a.dropped)
@@ -237,6 +238,11 @@ var sectorCache struct {
 	at   time.Time
 	body string
 }
+var macroCache struct {
+	sync.Mutex
+	at   time.Time
+	body string
+}
 
 // warmSector 拉一次板块资金流填入缓存(供后台预热,让用户永远命中热缓存)。
 func (a *API) warmSector() {
@@ -251,16 +257,58 @@ func (a *API) warmSector() {
 	sectorCache.Unlock()
 }
 
-// StartSectorWarmer 启动即预热 + 每 25 分钟刷新板块资金流缓存(非阻塞)。
+// warmMacro 拉一次大盘+北向资金流填入缓存。
+func (a *API) warmMacro() {
+	out, err := a.runner.RunMacroFlow(20)
+	if err != nil {
+		log.Printf("[macroflow] 预热失败(继续用旧缓存): %v", err)
+		return
+	}
+	macroCache.Lock()
+	macroCache.body = out
+	macroCache.at = time.Now()
+	macroCache.Unlock()
+}
+
+// StartSectorWarmer 启动即预热 + 每 25 分钟刷新资金流(板块+大盘北向)缓存(非阻塞)。
 func (a *API) StartSectorWarmer() {
 	go func() {
 		a.warmSector()
+		a.warmMacro()
 		t := time.NewTicker(25 * time.Minute)
 		defer t.Stop()
 		for range t.C {
 			a.warmSector()
+			a.warmMacro()
 		}
 	}()
+}
+
+// macroFlow A股【大盘 + 北向】资金流(纯展示)。全站共享、每日更新,缓存30分钟 + 后台预热。
+func (a *API) macroFlow(w http.ResponseWriter, r *http.Request) {
+	macroCache.Lock()
+	fresh := macroCache.body != "" && time.Since(macroCache.at) < 30*time.Minute
+	body := macroCache.body
+	macroCache.Unlock()
+	if !fresh {
+		out, err := a.runner.RunMacroFlow(20)
+		if err != nil {
+			if body != "" {
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				_, _ = w.Write([]byte(body))
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		macroCache.Lock()
+		macroCache.body = out
+		macroCache.at = time.Now()
+		macroCache.Unlock()
+		body = out
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_, _ = w.Write([]byte(body))
 }
 
 func (a *API) sectorFlow(w http.ResponseWriter, r *http.Request) {

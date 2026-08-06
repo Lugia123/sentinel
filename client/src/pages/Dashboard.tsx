@@ -6,6 +6,7 @@ import { pct, pct2, InfoDot, GradeBadge, SleeveBadge, actionColor, cnMarketActio
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
 import RiskRibbon from '../components/RiskRibbon'
+import MacroFlow from '../components/MacroFlow'
 import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, fetchDropped, fetchStrategy, saveStrategy, type StrategyKey, type UniverseItem, type DroppedItem, type Market } from '../api'
 
 // A股策略腿 → sleeve 集合(头号腿·微盘 与 红利低波·大资金 二选一)。custom 自选不属任何策略,始终显示。
@@ -18,12 +19,13 @@ const STRAT_DESC: Record<StrategyKey, string> = {
   dividend: '高股息 × 低波动,size中性,容量亿级+、回撤更低——大资金替代腿(与头号腿二选一,非叠加)。',
 }
 
-export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onSelectDropped, onReload, onOpenRiskLight }: {
+export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, onSelectDropped, onReload, onOpenRiskLight, onOpenMoneyflow }: {
   snap: Snapshot; meta: TickerMeta; watch: Set<string>
   onToggleWatch: (t: string, on: boolean) => void; onSelect: (t: string) => void
   onSelectDropped: (d: DroppedItem) => void
   onReload: () => void
   onOpenRiskLight: () => void
+  onOpenMoneyflow?: () => void
 }) {
   const chartRef = useRef<HTMLDivElement>(null)
   // 添加自定义股:两步(先选中→点添加,防误点);pending=正在算档位的(显示加载中行)
@@ -180,6 +182,9 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
 
       {/* 市场风险灯:一进来先看市场处在什么体制(制度带+宽度vs阈值),再看个股 */}
       <RiskRibbon market={(snap.market || 'us') as Market} onOpenDetail={onOpenRiskLight} title="市场风险灯" />
+
+      {/* A股:大盘+北向资金流 精简 ribbon(点击进资金流全景)*/}
+      {snap.market === 'cn' && <MacroFlow compact onOpen={onOpenMoneyflow} />}
 
       <div className="row">
         <div className="card">
