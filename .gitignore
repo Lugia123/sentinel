@@ -1,3 +1,14 @@
+# ── 敏感/本地工具:绝不入库、绝不进公开仓(含服务器 IP/域名/凭据)──
+# 注:.gitignore 的注释必须单独成行,行内 # 不是注释!
+# .claude/ = Claude Code 工具与部署 skill(含服务器地址+管理员密码)
+.claude/
+# .mcp.json / server/mcp = MCP 配置与二进制
+.mcp.json
+server/mcp
+# 内部文档(含服务器信息)
+docs/mcp.md
+docs/status-v1.5.md
+
 # deps / build
 node_modules/
 dist/
