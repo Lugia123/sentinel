@@ -206,9 +206,9 @@ tr.clickable:hover td { background: var(--gold-glow); }
 .sa-fhint { color: var(--ink-mute); opacity: .7; }
 .sa-heat-scroll { max-height: 520px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
 .sa-heat-scroll canvas { width: 100%; display: block; }
-/* hover 浮层 */
-.sa-tip-box { position: absolute; z-index: 50; pointer-events: none; transform: translate(14px, 10px); max-width: 240px;
-  background: #1f1913; border: 1px solid var(--border-2); border-radius: 8px; padding: 7px 10px; font-size: 12px; line-height: 1.6;
+/* hover 浮层:固定定位(不撑高页面/不换行/近边翻转)*/
+.sa-tip-box { position: fixed; z-index: 200; pointer-events: none; white-space: nowrap;
+  background: #1f1913; border: 1px solid var(--border-2); border-radius: 8px; padding: 7px 11px; font-size: 12px; line-height: 1.65;
   color: var(--ink); box-shadow: var(--shadow); font-variant-numeric: tabular-nums; }
 
 /* 资金流页(板块热力)*/
