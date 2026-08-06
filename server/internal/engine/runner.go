@@ -107,6 +107,26 @@ func (r *Runner) RunBandHist(market, ticker, asof string, n int) (string, error)
 	return lastJSON(out.String(), "bandhist")
 }
 
+// RunMoneyflow 跑 moneyflow_cn.py TICKER —— A股【资金流·量能】展示卡数据(仅 cn,纯展示)。
+// tushare moneyflow(主力/散户/四单)+ 本地量能;单票 ~1s;返回单行 JSON。
+func (r *Runner) RunMoneyflow(market, ticker string, days int) (string, error) {
+	if market != "cn" {
+		return "", fmt.Errorf("moneyflow 暂仅支持 A股")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, "moneyflow_cn.py"),
+		ticker, "--days", strconv.Itoa(days))
+	cmd.Dir = r.engineDir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("moneyflow 运行失败: %v | %s", err, errb.String())
+	}
+	return lastJSON(out.String(), "moneyflow")
+}
+
 // RunEarnings 按市场跑 earnings.py(美股 SEC)/ earnings_cn.py(A股新浪)TICKER,返回季度财报 JSON。
 func (r *Runner) RunEarnings(market, ticker string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

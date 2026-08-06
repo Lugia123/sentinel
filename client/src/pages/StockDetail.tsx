@@ -7,6 +7,7 @@ import { pct2, GradeBadge, SleeveBadge, actionColor, verdictCls, InfoDot, cnMark
 import Select, { type SelectOption } from '../components/Select'
 import EarningsChart from '../components/EarningsChart'
 import ProbBandChart from '../components/ProbBandChart'
+import MoneyFlowCard from '../components/MoneyFlowCard'
 import NewsItemModal from '../components/NewsItemModal'
 
 export default function StockDetail({ h, meta, market = 'us', riskLight, dropped }: { h: Holding; meta: TickerMeta; market?: Market; riskLight?: RiskLight; dropped?: DroppedItem }) {
@@ -381,6 +382,9 @@ export default function StockDetail({ h, meta, market = 'us', riskLight, dropped
           </table>
         </div>
       </div>
+
+      {/* 资金流·量能(仅A股,纯展示)*/}
+      {isCN && <MoneyFlowCard ticker={h.ticker} />}
       </>)}
     </>
   )
