@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import * as echarts from 'echarts'
 import { fetchSectorFlow, fetchSectorHistory, type SectorFlow, type SectorItem, type SectorHistory } from '../api'
 import { InfoDot, riseColor, fallColor, cssVar } from '../ui'
@@ -57,6 +58,7 @@ export default function SectorAnalysis() {
   const [tip, setTip] = useState<Tip>({ show: false, x: 0, y: 0, html: '' })
 
   const wrapRef = useRef<HTMLDivElement>(null)
+  const tipRef = useRef<HTMLDivElement>(null)
   const treeRef = useRef<HTMLDivElement>(null)
   const heatRef = useRef<HTMLCanvasElement>(null)
   const cumRef = useRef<HTMLCanvasElement>(null)
@@ -77,9 +79,17 @@ export default function SectorAnalysis() {
     if (nMode === 'range') { const a = Math.max(1, Math.min(lo, hi)), b = Math.max(lo, hi); return ranked.slice(a - 1, b) }
     return ranked.slice(0, topN)
   }
-  // hover 浮层:存视口坐标(fixed 定位,渲染时按视口边界翻转)
+  // hover 浮层:存视口坐标(fixed 定位)
   const showTip = (e: MouseEvent, html: string) => setTip({ show: true, x: e.clientX, y: e.clientY, html })
   const hideTip = () => setTip((t) => (t.show ? { ...t, show: false } : t))
+  // 渲染后实测浮层尺寸,精确贴到光标旁并夹进视口(不瞎估,不越界撑页)
+  useLayoutEffect(() => {
+    const el = tipRef.current; if (!el || !tip.show) return
+    const r = el.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight
+    let left = tip.x + 16; if (left + r.width > vw - 6) left = tip.x - r.width - 16; if (left < 6) left = 6
+    let top = tip.y + 14; if (top + r.height > vh - 6) top = tip.y - r.height - 12; if (top < 6) top = 6
+    el.style.left = `${left}px`; el.style.top = `${top}px`
+  }, [tip])
 
   // ── 今日全景 treemap ──
   useEffect(() => {
@@ -111,9 +121,8 @@ export default function SectorAnalysis() {
     const last = hist.dates.length - 1
     const inds = pick(hist.industries, (it) => it.net[last]).sort((a, b) => b.net[last] - a.net[last]) // 选:按|当前净额|;排列:有符号(流入红在上/流出绿在下)
     const dates = hist.dates.slice(-N)
-    const rowH = Math.max(8, Math.min(20, Math.floor(520 / inds.length)))
-    const font = rowH >= 15 ? 12 : rowH >= 11 ? 11 : rowH >= 9 ? 10 : 8.5
-    const padL = 92, padT = 4, padB = 16, padR = 8
+    const rowH = 16, font = 12   // 固定行高/字号(不随行数缩小,字始终可读);行多→画布变高,整页滚动
+    const padL = 120, padT = 4, padB = 18, padR = 8
     const H = padT + padB + inds.length * rowH
     const s = setup(cv, H); const x = s.x, W = s.w
     const iw = W - padL - padR, cw = iw / N
@@ -316,8 +325,8 @@ export default function SectorAnalysis() {
       </>)}
 
       {view === 'heat' && (histLoading || !hist ? <div className="muted">历史矩阵加载中…（首次约 1 分钟，之后秒开）</div> : <>
-        <div className="sf-sub">日期 × 行业 · 主力净流入热力（红入绿出，85分位标度）· 悬停看数值</div>
-        <div className="sa-heat-scroll"><canvas ref={heatRef} /></div>
+        <div className="sf-sub">日期 × 行业 · 主力净流入热力（红入绿出，85分位标度）· 悬停看数值 · 行多时整页下滑查看</div>
+        <canvas ref={heatRef} style={{ width: '100%' }} />
       </>)}
 
       {view === 'cum' && (histLoading || !hist ? <div className="muted">历史矩阵加载中…</div> : <>
@@ -335,14 +344,9 @@ export default function SectorAnalysis() {
         </div>
       </>)}
 
-      {tip.show && (() => {
-        const W = 250, H = 260 // 估计上界,用于近边翻转
-        const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
-        const vh = typeof window !== 'undefined' ? window.innerHeight : 800
-        const left = tip.x + 16 + W > vw ? Math.max(8, tip.x - W - 12) : tip.x + 16
-        const top = tip.y + 12 + H > vh ? Math.max(8, vh - H - 8) : tip.y + 12
-        return <div className="sa-tip-box" style={{ left, top }} dangerouslySetInnerHTML={{ __html: tip.html }} />
-      })()}
+      {tip.show && createPortal(
+        <div ref={tipRef} className="sa-tip-box" style={{ left: tip.x + 16, top: tip.y + 14 }} dangerouslySetInnerHTML={{ __html: tip.html }} />,
+        document.body)}
     </div>
   )
 }
