@@ -187,15 +187,29 @@ tr.clickable:hover td { background: var(--gold-glow); }
 .mac-rb-sep { width: 1px; background: var(--border); margin: 0 16px; }
 .mac-rb-more { font-size: 11px; color: var(--gold); margin-top: 4px; }
 
-/* 板块资金分析:四视图切换 */
-.sa-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.sa-bar .seg { display: inline-flex; gap: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
-.sa-bar .seg button { font-size: 12.5px; padding: 5px 13px; border-radius: 6px; border: 0; background: transparent; color: var(--ink-mute); cursor: pointer; }
-.sa-bar .seg button.on { background: rgba(200,162,83,.12); color: var(--gold-hi); font-weight: 700; }
-.sa-bar .win button { cursor: pointer; }
-.sa-tip { float: right; color: var(--gold-hi); font-weight: 600; font-variant-numeric: tabular-nums; }
-.sa-heat-scroll { max-height: 460px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+/* 板块资金分析:四视图切换 + 筛选 + hover */
+.sa-wrap { position: relative; }
+.sa-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+/* 统一分段控件(视图/时间窗/数量共用) */
+.seg { display: inline-flex; gap: 3px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+.seg button { font-size: 12.5px; padding: 5px 13px; border-radius: 6px; border: 0; background: transparent; color: var(--ink-mute); cursor: pointer; transition: color .12s, background .12s; }
+.seg button:hover { color: var(--ink-soft); }
+.seg button.on { background: rgba(200,162,83,.14); color: var(--gold-hi); font-weight: 700; }
+.seg.sm button { font-size: 11.5px; padding: 4px 10px; }
+/* 数量/范围筛选行 */
+.sa-filter { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; font-size: 12px; color: var(--ink-mute); }
+.sa-flabel { color: var(--ink-soft); }
+.sa-range { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-mute); }
+.sa-range input { width: 46px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; color: var(--ink); padding: 3px 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.sa-range button { font-size: 11.5px; border: 1px solid var(--border-2); background: transparent; color: var(--ink-mute); border-radius: 5px; padding: 3px 9px; cursor: pointer; }
+.sa-range button.on { color: var(--gold-hi); border-color: var(--gold-dim); background: rgba(200,162,83,.1); }
+.sa-fhint { color: var(--ink-mute); opacity: .7; }
+.sa-heat-scroll { max-height: 520px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
 .sa-heat-scroll canvas { width: 100%; display: block; }
+/* hover 浮层 */
+.sa-tip-box { position: absolute; z-index: 50; pointer-events: none; transform: translate(14px, 10px); max-width: 240px;
+  background: #1f1913; border: 1px solid var(--border-2); border-radius: 8px; padding: 7px 10px; font-size: 12px; line-height: 1.6;
+  color: var(--ink); box-shadow: var(--shadow); font-variant-numeric: tabular-nums; }
 
 /* 资金流页(板块热力)*/
 .sf-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
