@@ -88,7 +88,7 @@ export async function fetchMoneyflow(ticker: string, days = 40, market?: Market)
 }
 
 // 板块资金热力(A股行业,纯展示)。net=今日主力净流入(亿),net5=近5日累计。
-export interface SectorItem { name: string; net: number; net5: number; pct: number | null; rate: number | null; lead: string }
+export interface SectorItem { name: string; level: number; net: number; net5: number; pct: number | null; rate: number | null; amount: number | null; lead: string }
 export interface SectorFlow { asof: string; days: number; industries: SectorItem[] }
 export async function fetchSectorFlow(): Promise<SectorFlow | null> {
   const r = await fetch('/api/moneyflow/sector')
@@ -109,7 +109,7 @@ export async function fetchMacroFlow(): Promise<MacroFlow | null> {
 }
 
 // 板块历史矩阵(全部行业×逐日,纯展示)。net=逐日主力净流入(亿),cum=逐日累计。按最终累计降序。
-export interface SectorSeries { name: string; net: number[]; cum: number[] }
+export interface SectorSeries { name: string; level: number; net: number[]; cum: number[]; rate: number | null; amount: number | null }
 export interface SectorHistory { asof: string; dates: string[]; industries: SectorSeries[] }
 export async function fetchSectorHistory(): Promise<SectorHistory | null> {
   const r = await fetch('/api/moneyflow/sector/history')
