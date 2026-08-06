@@ -74,6 +74,19 @@ export async function fetchBandHist(ticker: string, n = 120, market?: Market): P
   return (await r.json()).points || []
 }
 
+// 个股资金流·量能(仅A股,纯展示)。金额单位亿元;流入为正。
+export interface MFPoint { date: string; main: number | null; retail: number | null; net: number | null; elg: number | null; lg: number | null; md: number | null; sm: number | null; vol_ratio: number | null; turn: number | null; pct: number | null; close: number | null }
+export interface MFSummary { main_5d: number | null; main_20d: number | null; retail_5d: number | null; consec: number; vol_ratio: number | null; turn: number | null; pct: number | null; buckets_today: { elg: number | null; lg: number | null; md: number | null; sm: number | null }; state: string; tone: string; divergence: string; has_moneyflow: boolean }
+export interface MoneyFlow { ticker: string; asof: string; summary: MFSummary; points: MFPoint[] }
+export async function fetchMoneyflow(ticker: string, days = 40, market?: Market): Promise<MoneyFlow | null> {
+  const mk = market ?? currentMarket
+  if (mk !== 'cn') return null // 暂仅A股
+  const r = await fetch(`/api/moneyflow?ticker=${ticker}&days=${days}&market=cn`)
+  if (!r.ok) return null
+  const j = await r.json()
+  return j.error ? null : j
+}
+
 export interface WatchItem { ticker: string; starred: boolean; custom: boolean }
 export async function fetchWatchlist(): Promise<WatchItem[]> {
   const r = await fetch(`/api/watchlist${mq()}`)

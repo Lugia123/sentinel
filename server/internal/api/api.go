@@ -69,6 +69,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/watchlist/custom", a.watchCustom)
 	mux.HandleFunc("/api/focus", a.focus)
 	mux.HandleFunc("/api/bandhist", a.bandHist)
+	mux.HandleFunc("/api/moneyflow", a.moneyFlow)
 	mux.HandleFunc("/api/trend", a.trend)
 	mux.HandleFunc("/api/trend/tickers", a.trendTickers)
 	mux.HandleFunc("/api/dropped", a.dropped)
@@ -195,6 +196,29 @@ func (a *API) bandHist(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out, err := a.runner.RunBandHist(mkt, tk, q(r, "asof", "latest"), n)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_, _ = w.Write([]byte(out))
+}
+
+// moneyFlow A股个股【资金流·量能】展示卡数据(纯展示,不进策略)。单票现算 ~1s;仅 cn。
+func (a *API) moneyFlow(w http.ResponseWriter, r *http.Request) {
+	mkt := mktParam(r)
+	tk := normTicker(mkt, r.URL.Query().Get("ticker"))
+	if tk == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "缺 ticker"})
+		return
+	}
+	days := 40
+	if v := r.URL.Query().Get("days"); v != "" {
+		if x, err := strconv.Atoi(v); err == nil && x >= 10 && x <= 120 {
+			days = x
+		}
+	}
+	out, err := a.runner.RunMoneyflow(mkt, tk, days)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
