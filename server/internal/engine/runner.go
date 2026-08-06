@@ -127,6 +127,23 @@ func (r *Runner) RunMoneyflow(market, ticker string, days int) (string, error) {
 	return lastJSON(out.String(), "moneyflow")
 }
 
+// RunSectorFlow 跑 moneyflow_sector_cn.py —— A股【板块资金热力】(行业净流入排行/近N日累计,纯展示)。
+// 多次 tushare 调用 ~5s,故上层缓存;返回单行 JSON {asof,industries}。
+func (r *Runner) RunSectorFlow(days int) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, "moneyflow_sector_cn.py"),
+		"--days", strconv.Itoa(days))
+	cmd.Dir = r.engineDir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("sector flow 运行失败: %v | %s", err, errb.String())
+	}
+	return lastJSON(out.String(), "sectorflow")
+}
+
 // RunEarnings 按市场跑 earnings.py(美股 SEC)/ earnings_cn.py(A股新浪)TICKER,返回季度财报 JSON。
 func (r *Runner) RunEarnings(market, ticker string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

@@ -8,6 +8,7 @@ import StockDetail from './pages/StockDetail'
 import Trends from './pages/Trends'
 import News from './pages/News'
 import RiskLight from './pages/RiskLight'
+import MoneyFlowPage from './pages/MoneyFlowPage'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
 import Modal from './components/Modal'
@@ -15,10 +16,11 @@ import { installFetchAuth, fetchMe, logout, changePassword, setColorPref, getCol
 
 installFetchAuth() // 全局 fetch 带 token
 
-type View = 'signals' | 'positions' | 'trends' | 'news' | 'risklight' | 'help' | 'admin'
-const NAV: { key: View; label: string; adminOnly?: boolean }[] = [
+type View = 'signals' | 'positions' | 'trends' | 'news' | 'risklight' | 'moneyflow' | 'help' | 'admin'
+const NAV: { key: View; label: string; adminOnly?: boolean; cnOnly?: boolean }[] = [
   { key: 'news', label: '今日要闻' },
   { key: 'signals', label: '策略信号' },
+  { key: 'moneyflow', label: '资金流', cnOnly: true },
   { key: 'positions', label: '我的持仓' },
   { key: 'trends', label: '分析走势' },
   { key: 'help', label: '帮助说明' },
@@ -55,6 +57,7 @@ export default function App() {
   // 切换市场:设全局市场 → 重载快照/关注(元数据 us 用中文名映射,cn 用快照内 name)
   const switchMarket = async (m: Market) => {
     if (m === market) return
+    if (m !== 'cn' && view === 'moneyflow') setView('signals') // 资金流仅A股,切美股回退
     setMarket(m); setMarketState(m); setSel(null); setDroppedSel(null); setSnap(null); setErr('')
     try { setSnap(await fetchSnapshot()) } catch (e: any) { setErr(String(e.message || e)) }
     loadWatch()
@@ -107,7 +110,7 @@ export default function App() {
   if (!authReady) return <div className="login-wrap"><div className="muted">加载中…</div></div>
   if (!me) return <Login onLogin={(u) => { setMe(u); setColorUp(getColorScheme()) }} />
 
-  const nav = NAV.filter((n) => !n.adminOnly || isAdmin)
+  const nav = NAV.filter((n) => (!n.adminOnly || isAdmin) && (!n.cnOnly || market === 'cn'))
 
   return (
     <>
@@ -179,6 +182,7 @@ export default function App() {
         {!droppedH && !detailH && view === 'trends' && <Trends meta={meta} watch={watch} market={market} />}
         {!droppedH && !detailH && view === 'news' && <News market={market} />}
         {!droppedH && !detailH && view === 'risklight' && <RiskLight initialMarket={market} onBack={() => goto('signals')} />}
+        {!droppedH && !detailH && view === 'moneyflow' && market === 'cn' && <MoneyFlowPage />}
         {!droppedH && !detailH && view === 'help' && <Help market={market} />}
         {!droppedH && !detailH && view === 'admin' && isAdmin && <Admin />}
         {!droppedH && !detailH && view === 'signals' && !snap && !err && <div className="card">加载中…</div>}

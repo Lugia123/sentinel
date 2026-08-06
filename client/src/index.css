@@ -166,6 +166,21 @@ tr.clickable:hover td { background: var(--gold-glow); }
 .err-card { border-color: rgba(207,111,93,.4); }
 .err-card b { color: var(--down); }
 
+/* 资金流页(板块热力)*/
+.sf-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sf-head h3 { margin: 0; }
+.sf-soon { color: var(--ink-mute); font-size: 13px; text-align: center; border-style: dashed; }
+.sf-sub { font-size: 11.5px; color: var(--ink-mute); letter-spacing: .3px; margin: 14px 0 8px; }
+.sf-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 8px; }
+@media (max-width: 680px) { .sf-cols { grid-template-columns: 1fr; } }
+.sf-rank { display: flex; flex-direction: column; gap: 6px; }
+.sf-row { display: grid; grid-template-columns: 96px 1fr 62px; align-items: center; gap: 8px; font-size: 12px; }
+.sf-name { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sf-track { position: relative; height: 14px; background: var(--elevated); border-radius: 3px; }
+.sf-track::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border-2); }
+.sf-bar { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+.sf-amt { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+
 /* 资金流·量能卡 */
 .mf-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .mf-head h3 { margin: 0; }
