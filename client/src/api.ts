@@ -87,6 +87,16 @@ export async function fetchMoneyflow(ticker: string, days = 40, market?: Market)
   return j.error ? null : j
 }
 
+// 板块资金热力(A股行业,纯展示)。net=今日主力净流入(亿),net5=近5日累计。
+export interface SectorItem { name: string; net: number; net5: number; pct: number | null; rate: number | null; lead: string }
+export interface SectorFlow { asof: string; days: number; industries: SectorItem[] }
+export async function fetchSectorFlow(): Promise<SectorFlow | null> {
+  const r = await fetch('/api/moneyflow/sector')
+  if (!r.ok) return null
+  const j = await r.json()
+  return j.error ? null : j
+}
+
 export interface WatchItem { ticker: string; starred: boolean; custom: boolean }
 export async function fetchWatchlist(): Promise<WatchItem[]> {
   const r = await fetch(`/api/watchlist${mq()}`)

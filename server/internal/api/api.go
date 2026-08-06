@@ -3,9 +3,11 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
@@ -70,6 +72,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/focus", a.focus)
 	mux.HandleFunc("/api/bandhist", a.bandHist)
 	mux.HandleFunc("/api/moneyflow", a.moneyFlow)
+	mux.HandleFunc("/api/moneyflow/sector", a.sectorFlow)
 	mux.HandleFunc("/api/trend", a.trend)
 	mux.HandleFunc("/api/trend/tickers", a.trendTickers)
 	mux.HandleFunc("/api/dropped", a.dropped)
@@ -225,6 +228,65 @@ func (a *API) moneyFlow(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_, _ = w.Write([]byte(out))
+}
+
+// sectorFlow A股【板块资金热力】(行业净流入排行 + 近5日累计,纯展示)。全站共享、每日更新,
+// 引擎 ~5s → 进程内缓存 30 分钟(免每次访问都拉 tushare)。
+var sectorCache struct {
+	sync.Mutex
+	at   time.Time
+	body string
+}
+
+// warmSector 拉一次板块资金流填入缓存(供后台预热,让用户永远命中热缓存)。
+func (a *API) warmSector() {
+	out, err := a.runner.RunSectorFlow(5)
+	if err != nil {
+		log.Printf("[sectorflow] 预热失败(继续用旧缓存): %v", err)
+		return
+	}
+	sectorCache.Lock()
+	sectorCache.body = out
+	sectorCache.at = time.Now()
+	sectorCache.Unlock()
+}
+
+// StartSectorWarmer 启动即预热 + 每 25 分钟刷新板块资金流缓存(非阻塞)。
+func (a *API) StartSectorWarmer() {
+	go func() {
+		a.warmSector()
+		t := time.NewTicker(25 * time.Minute)
+		defer t.Stop()
+		for range t.C {
+			a.warmSector()
+		}
+	}()
+}
+
+func (a *API) sectorFlow(w http.ResponseWriter, r *http.Request) {
+	sectorCache.Lock()
+	fresh := sectorCache.body != "" && time.Since(sectorCache.at) < 30*time.Minute
+	body := sectorCache.body
+	sectorCache.Unlock()
+	if !fresh {
+		out, err := a.runner.RunSectorFlow(5)
+		if err != nil {
+			if body != "" { // 拉取失败但有旧缓存:返回旧的(降级),不报错
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				_, _ = w.Write([]byte(body))
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		sectorCache.Lock()
+		sectorCache.body = out
+		sectorCache.at = time.Now()
+		sectorCache.Unlock()
+		body = out
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_, _ = w.Write([]byte(body))
 }
 
 // strategies 返回当天启用的策略组合(从最新快照的 strategy_config 提取)。

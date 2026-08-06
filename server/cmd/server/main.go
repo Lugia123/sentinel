@@ -58,6 +58,7 @@ func main() {
 		log.Printf("默认管理员: %s(密码见 SENTINEL_ADMIN_PASSWORD,默认 admin123)", adminEmail)
 	}
 	a := api.New(st, rn, pf, ex, inv, earn, al, au, bs, gdb, aic, cfg.DataDir, cfg.EngineDir, ver)
+	a.StartSectorWarmer() // 后台预热板块资金流缓存(用户永远命中热缓存)
 
 	// 后台定时任务:每日定点自动跑引擎+ingest;启动时若库中无快照则自愈补跑
 	scheduler.New(rn, st, cfg.DataDir, cfg.Capital, cfg.Schedule).Start()
