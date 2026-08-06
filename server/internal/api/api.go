@@ -74,6 +74,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/moneyflow", a.moneyFlow)
 	mux.HandleFunc("/api/moneyflow/sector", a.sectorFlow)
 	mux.HandleFunc("/api/moneyflow/macro", a.macroFlow)
+	mux.HandleFunc("/api/moneyflow/sector/history", a.sectorHistory)
 	mux.HandleFunc("/api/trend", a.trend)
 	mux.HandleFunc("/api/trend/tickers", a.trendTickers)
 	mux.HandleFunc("/api/dropped", a.dropped)
@@ -243,6 +244,11 @@ var macroCache struct {
 	at   time.Time
 	body string
 }
+var sectorHistCache struct {
+	sync.Mutex
+	at   time.Time
+	body string
+}
 
 // warmSector 拉一次板块资金流填入缓存(供后台预热,让用户永远命中热缓存)。
 func (a *API) warmSector() {
@@ -270,18 +276,61 @@ func (a *API) warmMacro() {
 	macroCache.Unlock()
 }
 
-// StartSectorWarmer 启动即预热 + 每 25 分钟刷新资金流(板块+大盘北向)缓存(非阻塞)。
+// warmSectorHist 拉一次板块历史矩阵(60日,全部行业)填入缓存(~90s,故必须预热)。
+func (a *API) warmSectorHist() {
+	out, err := a.runner.RunSectorHistory(60)
+	if err != nil {
+		log.Printf("[sectorhist] 预热失败(继续用旧缓存): %v", err)
+		return
+	}
+	sectorHistCache.Lock()
+	sectorHistCache.body = out
+	sectorHistCache.at = time.Now()
+	sectorHistCache.Unlock()
+}
+
+// StartSectorWarmer 启动即预热 + 每 25 分钟刷新资金流(板块+大盘北向+板块历史)缓存(非阻塞)。
 func (a *API) StartSectorWarmer() {
 	go func() {
 		a.warmSector()
 		a.warmMacro()
+		a.warmSectorHist()
 		t := time.NewTicker(25 * time.Minute)
 		defer t.Stop()
 		for range t.C {
 			a.warmSector()
 			a.warmMacro()
+			a.warmSectorHist()
 		}
 	}()
+}
+
+// sectorHistory A股【板块历史矩阵】(全部行业×逐日净额+累计,纯展示)。60日全量,缓存30分钟+预热;
+// 前端切片到 20/40/60 窗口喂 热力/累计/RRG 三视图。
+func (a *API) sectorHistory(w http.ResponseWriter, r *http.Request) {
+	sectorHistCache.Lock()
+	fresh := sectorHistCache.body != "" && time.Since(sectorHistCache.at) < 30*time.Minute
+	body := sectorHistCache.body
+	sectorHistCache.Unlock()
+	if !fresh {
+		out, err := a.runner.RunSectorHistory(60)
+		if err != nil {
+			if body != "" {
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				_, _ = w.Write([]byte(body))
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		sectorHistCache.Lock()
+		sectorHistCache.body = out
+		sectorHistCache.at = time.Now()
+		sectorHistCache.Unlock()
+		body = out
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_, _ = w.Write([]byte(body))
 }
 
 // macroFlow A股【大盘 + 北向】资金流(纯展示)。全站共享、每日更新,缓存30分钟 + 后台预热。

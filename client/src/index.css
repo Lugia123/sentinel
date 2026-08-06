@@ -187,6 +187,16 @@ tr.clickable:hover td { background: var(--gold-glow); }
 .mac-rb-sep { width: 1px; background: var(--border); margin: 0 16px; }
 .mac-rb-more { font-size: 11px; color: var(--gold); margin-top: 4px; }
 
+/* 板块资金分析:四视图切换 */
+.sa-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.sa-bar .seg { display: inline-flex; gap: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+.sa-bar .seg button { font-size: 12.5px; padding: 5px 13px; border-radius: 6px; border: 0; background: transparent; color: var(--ink-mute); cursor: pointer; }
+.sa-bar .seg button.on { background: rgba(200,162,83,.12); color: var(--gold-hi); font-weight: 700; }
+.sa-bar .win button { cursor: pointer; }
+.sa-tip { float: right; color: var(--gold-hi); font-weight: 600; font-variant-numeric: tabular-nums; }
+.sa-heat-scroll { max-height: 460px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.sa-heat-scroll canvas { width: 100%; display: block; }
+
 /* 资金流页(板块热力)*/
 .sf-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .sf-head h3 { margin: 0; }

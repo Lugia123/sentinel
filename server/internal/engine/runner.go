@@ -160,6 +160,23 @@ func (r *Runner) RunMacroFlow(days int) (string, error) {
 	return lastJSON(out.String(), "macroflow")
 }
 
+// RunSectorHistory 跑 moneyflow_sector_history_cn.py —— A股【板块历史矩阵】(全部行业×逐日净额+累计)。
+// 逐日循环 ~60 次调用(慢,~90s),故上层缓存+预热;超时给足 5 分钟。
+func (r *Runner) RunSectorHistory(days int) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, "moneyflow_sector_history_cn.py"),
+		"--days", strconv.Itoa(days))
+	cmd.Dir = r.engineDir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("sector history 运行失败: %v | %s", err, errb.String())
+	}
+	return lastJSON(out.String(), "sectorhist")
+}
+
 // RunEarnings 按市场跑 earnings.py(美股 SEC)/ earnings_cn.py(A股新浪)TICKER,返回季度财报 JSON。
 func (r *Runner) RunEarnings(market, ticker string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
