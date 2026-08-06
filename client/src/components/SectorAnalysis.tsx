@@ -10,6 +10,10 @@ type View = 'today' | 'heat' | 'cum' | 'rrg'
 const PAL = ['#e6c878', '#7ba7b0', '#9a8ec4', '#d19a66', '#84b6c4', '#c8a253', '#b98ec4', '#8ab0a0', '#cbb26a', '#79a7b8', '#d3a95f', '#93b5c6']
 const yi1 = (x: number) => `${x >= 0 ? '+' : ''}${x.toFixed(1)}亿`
 const yi0 = (x: number) => `${x >= 0 ? '+' : ''}${x.toFixed(0)}亿`
+const amtStr = (a: number | null | undefined) => (a == null ? '—' : a >= 10000 ? `${(a / 10000).toFixed(2)}万亿` : `${a.toFixed(0)}亿`)
+// hover 里"盘子总额 + 主力占比"一行(成交额=盘子大小,占比=资金进攻强度)
+const potLine = (amount: number | null, rate: number | null) =>
+  `<span style="color:#bcae97">今日成交额 ${amtStr(amount)}${rate != null ? ` · 主力占比 ${rate}%` : ''}</span>`
 
 function RankBars({ items, field }: { items: SectorItem[]; field: 'net' | 'net5' }) {
   const max = Math.max(...items.map((i) => Math.abs(i[field])), 0.01)
@@ -41,6 +45,7 @@ type Tip = { show: boolean; x: number; y: number; html: string }
 
 export default function SectorAnalysis() {
   const [view, setView] = useState<View>('today')
+  const [level, setLevel] = useState(1)   // 行业层级 1/2/3(申万);默认一级,消除父子重叠
   const [win, setWin] = useState(40)
   const [nMode, setNMode] = useState<'top' | 'range'>('top')
   const [topN, setTopN] = useState(30)
@@ -64,9 +69,11 @@ export default function SectorAnalysis() {
     }
   }, [view, hist, histLoading])
 
-  // 按【当前时刻净额】排位后取子集(前N 或 第lo-hi名)。curOf 取当日净额。
-  function pick<T>(list: T[], curOf: (t: T) => number): T[] {
-    const ranked = [...list].sort((a, b) => curOf(b) - curOf(a)) // 净额降序:#1=最大流入
+  // 先按【层级】过滤(默认一级,消除父子重叠),再按【当前净额大小|绝对值|】排位取子集(前N 或 第lo-hi名)。
+  // 绝对值排位 → 前N 同时含最大流入(红)与最大流出(绿)。
+  function pick<T extends { level: number }>(list: T[], curOf: (t: T) => number): T[] {
+    const inLv = list.filter((x) => x.level === level)
+    const ranked = inLv.sort((a, b) => Math.abs(curOf(b)) - Math.abs(curOf(a)))
     if (nMode === 'range') { const a = Math.max(1, Math.min(lo, hi)), b = Math.max(lo, hi); return ranked.slice(a - 1, b) }
     return ranked.slice(0, topN)
   }
@@ -85,16 +92,19 @@ export default function SectorAnalysis() {
     const sel = pick(sf.industries, (i) => i.net)
     chart.setOption({
       backgroundColor: 'transparent',
-      tooltip: { backgroundColor: '#1f1913', borderColor: '#2c2418', textStyle: { color: '#f1e9da' }, formatter: (p: any) => p.name.replace('\n', ' ') },
+      tooltip: {
+        backgroundColor: '#1f1913', borderColor: '#2c2418', textStyle: { color: '#f1e9da' },
+        formatter: (p: any) => { const d = p.data || {}; return `<b>${d.nm}</b><br/><span style="color:${d.net >= 0 ? rise : fall}">主力净额 ${yi1(d.net)}</span><br/>今日成交额 ${amtStr(d.amt)}${d.rate != null ? ` · 主力占比 ${d.rate}%` : ''}` },
+      },
       series: [{
         type: 'treemap', roam: false, nodeClick: false, breadcrumb: { show: false }, width: '100%', height: '100%', top: 2, left: 2, right: 2, bottom: 2,
         label: { color: '#0c0a07', fontSize: 11, fontWeight: 600, overflow: 'truncate' }, itemStyle: { borderColor: border, borderWidth: 2, gapWidth: 2 },
-        data: sel.map((i) => ({ name: `${i.name}\n${yi0(i.net)}`, value: Math.abs(i.net) || 0.01, itemStyle: { color: i.net >= 0 ? rise : fall } })),
+        data: sel.map((i) => ({ name: `${i.name}\n${yi0(i.net)}`, value: Math.abs(i.net) || 0.01, itemStyle: { color: i.net >= 0 ? rise : fall }, nm: i.name, net: i.net, amt: i.amount, rate: i.rate })),
       }],
     })
     const onR = () => chart.resize(); window.addEventListener('resize', onR)
     return () => { window.removeEventListener('resize', onR); chart.dispose() }
-  }, [view, sf, nMode, topN, lo, hi])
+  }, [view, sf, level, nMode, topN, lo, hi])
 
   // ── 历史热力矩阵 ──
   useEffect(() => {
@@ -102,7 +112,7 @@ export default function SectorAnalysis() {
     const cv = heatRef.current
     const N = Math.min(win, hist.dates.length)
     const last = hist.dates.length - 1
-    const inds = pick(hist.industries, (it) => it.net[last])   // 按当前净额排位
+    const inds = pick(hist.industries, (it) => it.net[last]).sort((a, b) => b.net[last] - a.net[last]) // 选:按|当前净额|;排列:有符号(流入红在上/流出绿在下)
     const dates = hist.dates.slice(-N)
     const rowH = Math.max(8, Math.min(20, Math.floor(520 / inds.length)))
     const font = rowH >= 15 ? 12 : rowH >= 11 ? 11 : rowH >= 9 ? 10 : 8.5
@@ -134,13 +144,13 @@ export default function SectorAnalysis() {
       const rect = cv.getBoundingClientRect(); const mx = e.clientX - rect.left, my = e.clientY - rect.top
       const i = Math.floor((my - padT) / rowH), d = Math.floor((mx - padL) / cw)
       if (i >= 0 && i < inds.length && d >= 0 && d < N) {
-        const v = inds[i].net.slice(-N)[d]
-        showTip(e, `<b>${inds[i].name}</b><br/>${dates[d]}<br/><span style="color:${v >= 0 ? rise : fall}">主力净额 ${yi1(v)}</span>`)
+        const it = inds[i], v = it.net.slice(-N)[d]
+        showTip(e, `<b>${it.name}</b><br/>${dates[d]}<br/><span style="color:${v >= 0 ? rise : fall}">主力净额 ${yi1(v)}</span><br/>${potLine(it.amount, it.rate)}`)
       } else hideTip()
     }
     cv.addEventListener('mousemove', onMove); cv.addEventListener('mouseleave', hideTip)
     return () => { cv.removeEventListener('mousemove', onMove); cv.removeEventListener('mouseleave', hideTip) }
-  }, [view, hist, win, nMode, topN, lo, hi])
+  }, [view, hist, win, level, nMode, topN, lo, hi])
 
   // ── 累计吸金曲线 ──
   useEffect(() => {
@@ -149,7 +159,7 @@ export default function SectorAnalysis() {
     const N = Math.min(win, hist.dates.length)
     const last = hist.dates.length - 1
     const sel = pick(hist.industries, (it) => it.net[last])
-    const series = sel.map((it) => { const seg = it.cum.slice(-N); const base = seg[0]; return { name: it.name, v: seg.map((c) => c - base) } })
+    const series = sel.map((it) => { const seg = it.cum.slice(-N); const base = seg[0]; return { name: it.name, v: seg.map((c) => c - base), amount: it.amount, rate: it.rate } })
     const padL = 46, padR = 92, padT = 12, padB = 24, iw = W - padL - padR, ih = H - padT - padB
     let mn = 0, mx = 0; for (const s2 of series) for (const v of s2.v) { mn = Math.min(mn, v); mx = Math.max(mx, v) }
     const X = (d: number) => padL + (d / (N - 1)) * iw, Y = (v: number) => padT + ih - ((v - mn) / (mx - mn || 1)) * ih
@@ -181,11 +191,11 @@ export default function SectorAnalysis() {
       series.forEach((s2, k) => { const dy = Math.abs(Y(s2.v[d]) - my); if (dy < bd) { bd = dy; best = k } })
       if (best < 0) { hideTip(); return }
       const rows = series.map((s2, k) => `<span style="color:${PAL[k % PAL.length]}">${k === best ? '▶ ' : ''}${s2.name}: ${yi1(s2.v[d])}</span>`).slice(0, 12).join('<br/>')
-      showTip(e, `<b>${dates[d]}</b><br/>${rows}`)
+      showTip(e, `<b>${dates[d]}</b> · <span style="color:#bcae97">${series[best].name} 成交额 ${amtStr(series[best].amount)}</span><br/>${rows}`)
     }
     cv.addEventListener('mousemove', onMove); cv.addEventListener('mouseleave', hideTip)
     return () => { cv.removeEventListener('mousemove', onMove); cv.removeEventListener('mouseleave', hideTip) }
-  }, [view, hist, win, nMode, topN, lo, hi])
+  }, [view, hist, win, level, nMode, topN, lo, hi])
 
   // ── 轮动 RRG ──
   useEffect(() => {
@@ -214,7 +224,7 @@ export default function SectorAnalysis() {
     const pts = sel.map((it) => {
       const tail: [number, number][] = []
       for (let t = Math.max(start, K); t < T; t++) tail.push([zx[t](rsAt(it, t)), zy[t](momAt(it, t))])
-      return { name: it.name, tail: tail.slice(-5), net: it.net[last] }
+      return { name: it.name, tail: tail.slice(-5), net: it.net[last], amount: it.amount, rate: it.rate }
     })
     const pad = 40, iw = W - pad * 2, ih = H - pad * 2, cx = pad + iw / 2, cy = pad + ih / 2
     const X = (v: number) => cx + v * (iw / 2) * 0.92, Y = (v: number) => cy - v * (ih / 2) * 0.92
@@ -225,7 +235,7 @@ export default function SectorAnalysis() {
     x.textAlign = 'right'; x.fillText('领先', pad + iw - 6, pad + 4); x.fillText('走弱', pad + iw - 6, pad + ih - 16)
     x.textAlign = 'left'; x.fillText('落后', pad + 6, pad + ih - 16); x.fillText('改善', pad + 6, pad + 4)
     x.fillStyle = '#8a7e66'; x.font = '9px sans-serif'; x.textAlign = 'center'; x.fillText('← 相对强度 →', cx, pad + ih + 14)
-    const dots: { x: number; y: number; name: string; net: number }[] = []
+    const dots: { x: number; y: number; name: string; net: number; amount: number | null; rate: number | null }[] = []
     pts.forEach((p, k) => {
       const col = PAL[k % PAL.length], tl = p.tail; if (!tl.length) return
       x.strokeStyle = col; x.lineWidth = 1.5; x.beginPath(); tl.forEach(([a, b], i) => { const xx = X(a), yy = Y(b); i ? x.lineTo(xx, yy) : x.moveTo(xx, yy) }); x.stroke()
@@ -234,7 +244,7 @@ export default function SectorAnalysis() {
       x.fillStyle = col; x.beginPath(); x.arc(dx, dy, 4.5, 0, 7); x.fill()
       x.fillStyle = '#f1e9da'; x.font = '11px sans-serif'; x.textAlign = 'left'; x.textBaseline = 'middle'
       x.fillText(p.name.length > 6 ? p.name.slice(0, 6) : p.name, dx + 7, dy)
-      dots.push({ x: dx, y: dy, name: p.name, net: p.net })
+      dots.push({ x: dx, y: dy, name: p.name, net: p.net, amount: p.amount, rate: p.rate })
     })
     const onMove = (e: MouseEvent) => {
       const rect = cv.getBoundingClientRect(); const mx = e.clientX - rect.left, my = e.clientY - rect.top
@@ -242,11 +252,11 @@ export default function SectorAnalysis() {
       for (const d of dots) { const dd = (d.x - mx) ** 2 + (d.y - my) ** 2; if (dd < bd) { bd = dd; best = d } }
       if (!best) { hideTip(); return }
       const quad = best.x >= cx ? (best.y <= cy ? '领先' : '走弱') : (best.y <= cy ? '改善' : '落后')
-      showTip(e, `<b>${best.name}</b><br/>象限 ${quad}<br/><span style="color:${best.net >= 0 ? riseColor() : fallColor()}">今日净额 ${yi1(best.net)}</span>`)
+      showTip(e, `<b>${best.name}</b><br/>象限 ${quad}<br/><span style="color:${best.net >= 0 ? riseColor() : fallColor()}">今日净额 ${yi1(best.net)}</span><br/>${potLine(best.amount, best.rate)}`)
     }
     cv.addEventListener('mousemove', onMove); cv.addEventListener('mouseleave', hideTip)
     return () => { cv.removeEventListener('mousemove', onMove); cv.removeEventListener('mouseleave', hideTip) }
-  }, [view, hist, win, nMode, topN, lo, hi])
+  }, [view, hist, win, level, nMode, topN, lo, hi])
 
   const TABS: [View, string][] = [['today', '今日全景'], ['heat', '历史热力'], ['cum', '累计吸金'], ['rrg', '轮动 RRG']]
   const total = sf ? sf.industries.length : (hist ? hist.industries.length : 0)
@@ -261,7 +271,12 @@ export default function SectorAnalysis() {
 
       <div className="sa-bar">
         <div className="seg">{TABS.map(([v, t]) => <button key={v} className={view === v ? 'on' : ''} onClick={() => setView(v)}>{t}</button>)}</div>
-        {view !== 'today' && <div className="seg sm">{[20, 40, 60].map((d) => <button key={d} className={win === d ? 'on' : ''} onClick={() => setWin(d)}>{d}日</button>)}</div>}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div className="seg sm" title="行业层级:一级(大类)/二级/三级(细分)。同级不重叠。">
+            {[[1, '一级'], [2, '二级'], [3, '三级']].map(([lv, t]) => <button key={lv} className={level === lv ? 'on' : ''} onClick={() => setLevel(lv as number)}>{t}</button>)}
+          </div>
+          {view !== 'today' && <div className="seg sm">{[20, 40, 60].map((d) => <button key={d} className={win === d ? 'on' : ''} onClick={() => setWin(d)}>{d}日</button>)}</div>}
+        </div>
       </div>
 
       {/* 行业数量/范围筛选(按当前净额排位)*/}
@@ -276,7 +291,7 @@ export default function SectorAnalysis() {
           – <input type="number" min={1} value={hi} onChange={(e) => setHi(+e.target.value || 1)} /> 名
           <button className={nMode === 'range' ? 'on' : ''} onClick={() => setNMode('range')}>应用</button>
         </span>
-        <span className="sa-fhint">按当前净额排位</span>
+        <span className="sa-fhint">按当前净额大小排位(含最大流入与流出)</span>
       </div>
 
       {view === 'today' && (!sf ? <div className="muted">加载中…</div> : <>

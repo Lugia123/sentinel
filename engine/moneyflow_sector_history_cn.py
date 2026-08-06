@@ -13,6 +13,7 @@ import os, sys, json, argparse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ts_refresh import trade_dates
 from moneyflow_sector_cn import pull_day   # 同口径:content_type='行业',数值已转 float
+from sw_levels import name_to_level
 
 
 def build(days=60):
@@ -33,22 +34,30 @@ def build(days=60):
     n = len(collected)
     dates = [f"{dt[:4]}-{dt[4:6]}-{dt[6:]}" for dt, _ in collected]
 
-    sect = {}  # name -> [逐日净额(亿)]
+    sect = {}          # name -> [逐日净额(亿)]
+    rate_today = {}     # name -> 今日主力净额占比%(取最新日)
     for di, (_, df) in enumerate(collected):
+        last_day = di == n - 1
         for _, r in df.iterrows():
             nm = r["name"]
             if nm not in sect:
                 sect[nm] = [0.0] * n
             v = r["net_amount"]
             sect[nm][di] = round(float(v) / 1e8, 2) if v == v else 0.0  # NaN→0
+            if last_day:
+                rt = r["net_amount_rate"]
+                rate_today[nm] = None if rt != rt else round(float(rt), 2)
 
+    lv = name_to_level()  # 行业名 → 申万层级(1/2/3);未命中默认 3
     out = []
     for nm, nets in sect.items():
         cum, c = [], 0.0
         for v in nets:
             c += (v or 0.0)
             cum.append(round(c, 2))
-        out.append({"name": nm, "net": nets, "cum": cum})
+        rate = rate_today.get(nm)
+        amount = round(nets[-1] / (rate / 100.0), 0) if (rate and abs(rate) > 1e-6) else None  # 今日成交额(盘子总额,亿)
+        out.append({"name": nm, "level": lv.get(nm, 3), "net": nets, "cum": cum, "rate": rate, "amount": amount})
     out.sort(key=lambda o: o["cum"][-1], reverse=True)
     return {"asof": dates[-1], "dates": dates, "industries": out}
 

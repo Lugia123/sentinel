@@ -13,6 +13,17 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ts_refresh import ts, trade_dates
+from sw_levels import name_to_level
+
+
+def _amount_yi(net_yi, rate):
+    """成交额(盘子总额,亿)= 主力净额 / 主力净额占比。rate=占成交额百分比。"""
+    try:
+        if rate and abs(rate) > 1e-6:
+            return round(net_yi / (rate / 100.0), 0)
+    except Exception:
+        pass
+    return None
 
 
 def pull_day(dt):
@@ -48,15 +59,20 @@ def build(days=5):
         for _, r in d.iterrows():
             cum[r["name"]] = cum.get(r["name"], 0.0) + (r["net_amount"] or 0.0)
 
+    lv = name_to_level()  # 行业名 → 申万层级(1/2/3);未命中默认 3(细分)
     out = []
     for _, r in dtoday.iterrows():
         nm = r["name"]
+        net = round(float(r["net_amount"] or 0.0) / 1e8, 2)
+        rate = None if pd.isna(r["net_amount_rate"]) else round(float(r["net_amount_rate"]), 2)
         out.append({
             "name": nm,
-            "net": round(float(r["net_amount"] or 0.0) / 1e8, 2),        # 今日主力净流入(亿)
+            "level": lv.get(nm, 3),                                       # 层级
+            "net": net,                                                   # 今日主力净流入(亿)
             "net5": round(float(cum.get(nm, 0.0)) / 1e8, 2),             # 近N日累计(亿)
             "pct": None if pd.isna(r["pct_change"]) else round(float(r["pct_change"]), 2),
-            "rate": None if pd.isna(r["net_amount_rate"]) else round(float(r["net_amount_rate"]), 2),
+            "rate": rate,                                                 # 主力净额占成交额%
+            "amount": _amount_yi(net, rate),                             # 成交额(盘子总额,亿)
             "lead": str(r.get("buy_sm_amount_stock") or "").strip(),
         })
     out.sort(key=lambda x: x["net"], reverse=True)
