@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import { fetchSectorFlow, type SectorFlow, type SectorItem } from '../api'
 import { InfoDot, riseColor, fallColor, cssVar } from '../ui'
+import MacroFlow from '../components/MacroFlow'
 
 // 「资金流」页 —— 三尺度资金全景(纯展示,不进策略)。
 // P2 板块资金热力(本文件):行业净流入排行 + 全景 treemap + 近5日持续吸金榜。
@@ -83,8 +84,8 @@ export default function MoneyFlowPage() {
         资金流全景 · 数据截至 {sf.asof} · 纯展示，非投资建议
       </div>
 
-      {/* P3 占位:大盘 + 北向 将接入此处 */}
-      <div className="card sf-soon">🚧 大盘资金 · 北向资金（P3）即将接入本页顶部</div>
+      {/* 大盘 + 北向(P3)*/}
+      <MacroFlow />
 
       <div className="card">
         <div className="sf-head">

@@ -177,7 +177,7 @@ export default function App() {
 
         {droppedH && droppedSel && <StockDetail h={droppedH} meta={meta} market={market} riskLight={snap?.risk_light} dropped={droppedSel} />}
         {!droppedH && detailH && <StockDetail h={detailH} meta={meta} market={market} riskLight={snap?.risk_light} />}
-        {!droppedH && !detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onSelectDropped={setDroppedSel} onReload={load} onOpenRiskLight={() => goto('risklight')} />}
+        {!droppedH && !detailH && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={setSel} onSelectDropped={setDroppedSel} onReload={load} onOpenRiskLight={() => goto('risklight')} onOpenMoneyflow={() => goto('moneyflow')} />}
         {!droppedH && !detailH && view === 'positions' && <Positions market={market} />}
         {!droppedH && !detailH && view === 'trends' && <Trends meta={meta} watch={watch} market={market} />}
         {!droppedH && !detailH && view === 'news' && <News market={market} />}

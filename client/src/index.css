@@ -166,6 +166,27 @@ tr.clickable:hover td { background: var(--gold-glow); }
 .err-card { border-color: rgba(207,111,93,.4); }
 .err-card b { color: var(--down); }
 
+/* 大盘+北向 面板 / 首屏 ribbon */
+.mac-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+@media (max-width: 680px) { .mac-panels { grid-template-columns: 1fr; } }
+.mac-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.mac-head h3 { margin: 0; }
+.mac-tag { font-size: 11px; color: var(--gold-hi); background: rgba(200,162,83,.1); border: 1px solid var(--gold-dim); border-radius: 20px; padding: 1px 8px; font-weight: 600; }
+.mac-hero { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.mac-lbl { font-size: 11.5px; color: var(--ink-mute); }
+.mac-big { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mac-sub2 { font-size: 12px; color: var(--ink-mute); }
+.mac-sub2 b { font-variant-numeric: tabular-nums; }
+.mac-cap { font-size: 11px; color: var(--ink-mute); margin: 8px 0 2px; }
+.mac-ribbon { display: flex; align-items: stretch; gap: 0; padding: 12px 16px; cursor: pointer; transition: border-color .15s; }
+.mac-ribbon:hover { border-color: var(--gold-dim); }
+.mac-rb-item { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
+.mac-rb-lbl { font-size: 11.5px; color: var(--ink-mute); }
+.mac-rb-item b { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mac-spark { height: 22px; margin-top: 3px; }
+.mac-rb-sep { width: 1px; background: var(--border); margin: 0 16px; }
+.mac-rb-more { font-size: 11px; color: var(--gold); margin-top: 4px; }
+
 /* 资金流页(板块热力)*/
 .sf-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .sf-head h3 { margin: 0; }
