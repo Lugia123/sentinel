@@ -108,6 +108,16 @@ export async function fetchMacroFlow(): Promise<MacroFlow | null> {
   return j.error ? null : j
 }
 
+// 板块历史矩阵(全部行业×逐日,纯展示)。net=逐日主力净流入(亿),cum=逐日累计。按最终累计降序。
+export interface SectorSeries { name: string; net: number[]; cum: number[] }
+export interface SectorHistory { asof: string; dates: string[]; industries: SectorSeries[] }
+export async function fetchSectorHistory(): Promise<SectorHistory | null> {
+  const r = await fetch('/api/moneyflow/sector/history')
+  if (!r.ok) return null
+  const j = await r.json()
+  return j.error ? null : j
+}
+
 export interface WatchItem { ticker: string; starred: boolean; custom: boolean }
 export async function fetchWatchlist(): Promise<WatchItem[]> {
   const r = await fetch(`/api/watchlist${mq()}`)
