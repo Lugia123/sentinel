@@ -77,11 +77,8 @@ export default function SectorAnalysis() {
     if (nMode === 'range') { const a = Math.max(1, Math.min(lo, hi)), b = Math.max(lo, hi); return ranked.slice(a - 1, b) }
     return ranked.slice(0, topN)
   }
-  // hover 浮层坐标(相对卡片)
-  const showTip = (e: MouseEvent, html: string) => {
-    const r = wrapRef.current?.getBoundingClientRect(); if (!r) return
-    setTip({ show: true, x: e.clientX - r.left, y: e.clientY - r.top, html })
-  }
+  // hover 浮层:存视口坐标(fixed 定位,渲染时按视口边界翻转)
+  const showTip = (e: MouseEvent, html: string) => setTip({ show: true, x: e.clientX, y: e.clientY, html })
   const hideTip = () => setTip((t) => (t.show ? { ...t, show: false } : t))
 
   // ── 今日全景 treemap ──
@@ -152,49 +149,56 @@ export default function SectorAnalysis() {
     return () => { cv.removeEventListener('mousemove', onMove); cv.removeEventListener('mouseleave', hideTip) }
   }, [view, hist, win, level, nMode, topN, lo, hi])
 
-  // ── 累计吸金曲线 ──
+  // ── 累计吸金曲线(最多10条 · 去极值缩放 · hover 高亮某条)──
   useEffect(() => {
     if (view !== 'cum' || !cumRef.current || !hist) return
     const cv = cumRef.current; const s = setup(cv, 320); const x = s.x, W = s.w, H = s.h
     const N = Math.min(win, hist.dates.length)
     const last = hist.dates.length - 1
-    const sel = pick(hist.industries, (it) => it.net[last])
+    const sel = pick(hist.industries, (it) => it.net[last]).slice(0, 10)  // 最多10条,避免过密
     const series = sel.map((it) => { const seg = it.cum.slice(-N); const base = seg[0]; return { name: it.name, v: seg.map((c) => c - base), amount: it.amount, rate: it.rate } })
-    const padL = 46, padR = 92, padT = 12, padB = 24, iw = W - padL - padR, ih = H - padT - padB
-    let mn = 0, mx = 0; for (const s2 of series) for (const v of s2.v) { mn = Math.min(mn, v); mx = Math.max(mx, v) }
-    const X = (d: number) => padL + (d / (N - 1)) * iw, Y = (v: number) => padT + ih - ((v - mn) / (mx - mn || 1)) * ih
-    // 网格
-    x.strokeStyle = '#241d15'; x.lineWidth = 1
-    x.beginPath(); x.moveTo(padL, Y(0)); x.lineTo(W - padR, Y(0)); x.stroke()
-    x.fillStyle = '#8a7e66'; x.font = '9px sans-serif'; x.textAlign = 'right'; x.textBaseline = 'middle'; x.fillText('0亿', padL - 4, Y(0))
-    const labelSlots: number[] = []
-    series.forEach((s2, k) => {
-      const col = PAL[k % PAL.length]
-      x.strokeStyle = col; x.lineWidth = k < 3 ? 2.2 : 1.3; x.beginPath()
-      s2.v.forEach((v, d) => { const xx = X(d), yy = Y(v); d ? x.lineTo(xx, yy) : x.moveTo(xx, yy) }); x.stroke()
-      let ly = Y(s2.v[s2.v.length - 1])
-      while (labelSlots.some((s3) => Math.abs(s3 - ly) < 11)) ly += 11  // 防标签重叠
-      labelSlots.push(ly)
-      x.fillStyle = col; x.beginPath(); x.arc(X(N - 1), Y(s2.v[s2.v.length - 1]), 2.4, 0, 7); x.fill()
-      x.font = '10.5px sans-serif'; x.textAlign = 'left'; x.textBaseline = 'middle'
-      x.fillText(`${s2.name.length > 6 ? s2.name.slice(0, 6) : s2.name} ${yi0(s2.v[s2.v.length - 1])}`, W - padR + 5, ly)
-    })
-    x.fillStyle = '#8a7e66'; x.font = '9.5px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'top'
-    x.fillText(`${N}日前`, padL + 16, H - 13); x.fillText('今日', W - padR - 16, H - 13)
+    const padL = 52, padR = 96, padT = 12, padB = 24, iw = W - padL - padR, ih = H - padT - padB
+    // 去极值缩放:纵轴取全部值的 4~96 分位,离群线(如电子−5000亿)裁到边缘,其余波动才看得见
+    const allv = series.flatMap((s2) => s2.v).sort((a, b) => a - b)
+    const pctl = (p: number) => allv.length ? allv[Math.max(0, Math.min(allv.length - 1, Math.floor(allv.length * p)))] : 0
+    let mn = Math.min(0, pctl(0.04)), mx = Math.max(0, pctl(0.96)); if (mx - mn < 1) mx = mn + 1
+    const X = (d: number) => padL + (d / (N - 1)) * iw
+    const Y = (v: number) => Math.max(padT, Math.min(padT + ih, padT + ih - ((v - mn) / (mx - mn)) * ih)) // 夹到画布内
     const dates = hist.dates.slice(-N)
+    const draw = (hi: number, hoverD = -1) => {
+      x.clearRect(0, 0, W, H)
+      x.strokeStyle = '#241d15'; x.lineWidth = 1; x.beginPath(); x.moveTo(padL, Y(0)); x.lineTo(W - padR, Y(0)); x.stroke()
+      x.fillStyle = '#8a7e66'; x.font = '9px sans-serif'; x.textAlign = 'right'; x.textBaseline = 'middle'; x.fillText('0亿', padL - 5, Y(0))
+      if (hoverD >= 0) { x.strokeStyle = '#3a2f1e'; x.lineWidth = 1; x.beginPath(); x.moveTo(X(hoverD), padT); x.lineTo(X(hoverD), padT + ih); x.stroke() }
+      const slots: number[] = []
+      series.forEach((s2, k) => {
+        const col = PAL[k % PAL.length], on = hi < 0 || k === hi
+        x.globalAlpha = on ? 1 : 0.16; x.strokeStyle = col; x.lineWidth = k === hi ? 3 : (k < 3 ? 2 : 1.3)
+        x.beginPath(); s2.v.forEach((v, d) => { const xx = X(d), yy = Y(v); d ? x.lineTo(xx, yy) : x.moveTo(xx, yy) }); x.stroke()
+        let ly = Y(s2.v[s2.v.length - 1]); while (slots.some((s3) => Math.abs(s3 - ly) < 12)) ly += 12
+        slots.push(ly)
+        x.beginPath(); x.arc(X(N - 1), Y(s2.v[s2.v.length - 1]), 2.4, 0, 7); x.fillStyle = col; x.fill()
+        x.font = `${k === hi ? 'bold ' : ''}10.5px sans-serif`; x.textAlign = 'left'; x.textBaseline = 'middle'; x.fillStyle = col
+        x.fillText(`${s2.name.length > 6 ? s2.name.slice(0, 6) : s2.name} ${yi0(s2.v[s2.v.length - 1])}`, W - padR + 5, ly)
+        x.globalAlpha = 1
+      })
+      x.fillStyle = '#8a7e66'; x.font = '9.5px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'top'
+      x.fillText(`${N}日前`, padL + 16, H - 13); x.fillText('今日', W - padR - 16, H - 13)
+    }
+    draw(-1)
     const onMove = (e: MouseEvent) => {
-      const rect = cv.getBoundingClientRect(); const mx = e.clientX - rect.left, my = e.clientY - rect.top
-      if (mx < padL || mx > W - padR) { hideTip(); return }
-      const d = Math.max(0, Math.min(N - 1, Math.round((mx - padL) / iw * (N - 1))))
-      // 找最近的线
+      const rect = cv.getBoundingClientRect(); const mx2 = e.clientX - rect.left, my = e.clientY - rect.top
+      if (mx2 < padL || mx2 > W - padR) { draw(-1); hideTip(); return }
+      const d = Math.max(0, Math.min(N - 1, Math.round((mx2 - padL) / iw * (N - 1))))
       let best = -1, bd = 1e9
       series.forEach((s2, k) => { const dy = Math.abs(Y(s2.v[d]) - my); if (dy < bd) { bd = dy; best = k } })
-      if (best < 0) { hideTip(); return }
-      const rows = series.map((s2, k) => `<span style="color:${PAL[k % PAL.length]}">${k === best ? '▶ ' : ''}${s2.name}: ${yi1(s2.v[d])}</span>`).slice(0, 12).join('<br/>')
-      showTip(e, `<b>${dates[d]}</b> · <span style="color:#bcae97">${series[best].name} 成交额 ${amtStr(series[best].amount)}</span><br/>${rows}`)
+      if (best < 0) { draw(-1); hideTip(); return }
+      draw(best, d)
+      const b = series[best]
+      showTip(e, `<b>${dates[d]}</b><br/><b style="color:${PAL[best % PAL.length]}">${b.name}</b> 累计 ${yi1(b.v[d])}<br/><span style="color:#bcae97">今日成交额 ${amtStr(b.amount)}${b.rate != null ? ` · 主力占比 ${b.rate}%` : ''}</span>`)
     }
-    cv.addEventListener('mousemove', onMove); cv.addEventListener('mouseleave', hideTip)
-    return () => { cv.removeEventListener('mousemove', onMove); cv.removeEventListener('mouseleave', hideTip) }
+    cv.addEventListener('mousemove', onMove); cv.addEventListener('mouseleave', () => { draw(-1); hideTip() })
+    return () => { cv.removeEventListener('mousemove', onMove) }
   }, [view, hist, win, level, nMode, topN, lo, hi])
 
   // ── 轮动 RRG ──
@@ -215,9 +219,10 @@ export default function SectorAnalysis() {
       const sd = Math.sqrt(cl.reduce((a, b) => a + (b - m) * (b - m), 0) / cl.length) || 1
       return (v: number) => Math.max(-2.6, Math.min(2.6, (Math.max(p5, Math.min(p95, v)) - m) / sd)) / 2.6
     }
-    // 选股:按当前净额取子集(跨流入/流出),数量随筛选
+    // 选股:当前层级里,按相对强度取【最强5 + 最弱5】,才能横跨 领先↔落后(纯按净额选会全挤一侧)
     const last = T - 1
-    const sel = pick(inds, (it) => Math.abs(it.net[last]))  // RRG 用 |当前净额| 取最活跃
+    const byRs = inds.filter((it) => it.level === level).sort((a, b) => rsAt(b, last) - rsAt(a, last))
+    const sel = byRs.length <= 10 ? byRs : [...byRs.slice(0, 5), ...byRs.slice(-5)]
     const zx: Record<number, (v: number) => number> = {}, zy: Record<number, (v: number) => number> = {}
     const start = Math.max(0, T - N)
     for (let t = Math.max(start, K); t < T; t++) { zx[t] = winsorZ(inds.map((it) => rsAt(it, t))); zy[t] = winsorZ(inds.map((it) => momAt(it, t))) }
@@ -235,16 +240,27 @@ export default function SectorAnalysis() {
     x.textAlign = 'right'; x.fillText('领先', pad + iw - 6, pad + 4); x.fillText('走弱', pad + iw - 6, pad + ih - 16)
     x.textAlign = 'left'; x.fillText('落后', pad + 6, pad + ih - 16); x.fillText('改善', pad + 6, pad + 4)
     x.fillStyle = '#8a7e66'; x.font = '9px sans-serif'; x.textAlign = 'center'; x.fillText('← 相对强度 →', cx, pad + ih + 14)
-    const dots: { x: number; y: number; name: string; net: number; amount: number | null; rate: number | null }[] = []
+    const dots: { x: number; y: number; col: string; name: string; net: number; amount: number | null; rate: number | null }[] = []
+    // 1) 先画尾巴 + 端点
     pts.forEach((p, k) => {
       const col = PAL[k % PAL.length], tl = p.tail; if (!tl.length) return
       x.strokeStyle = col; x.lineWidth = 1.5; x.beginPath(); tl.forEach(([a, b], i) => { const xx = X(a), yy = Y(b); i ? x.lineTo(xx, yy) : x.moveTo(xx, yy) }); x.stroke()
       tl.forEach(([a, b], i) => { x.fillStyle = col; x.globalAlpha = 0.28 + 0.14 * i; x.beginPath(); x.arc(X(a), Y(b), 2, 0, 7); x.fill() }); x.globalAlpha = 1
       const [la, lb] = tl[tl.length - 1]; const dx = X(la), dy = Y(lb)
       x.fillStyle = col; x.beginPath(); x.arc(dx, dy, 4.5, 0, 7); x.fill()
-      x.fillStyle = '#f1e9da'; x.font = '11px sans-serif'; x.textAlign = 'left'; x.textBaseline = 'middle'
-      x.fillText(p.name.length > 6 ? p.name.slice(0, 6) : p.name, dx + 7, dy)
-      dots.push({ x: dx, y: dy, name: p.name, net: p.net, amount: p.amount, rate: p.rate })
+      dots.push({ x: dx, y: dy, col, name: p.name, net: p.net, amount: p.amount, rate: p.rate })
+    })
+    // 2) 再单独一遍画标签:纵向避让(近处的推开)+ 偏移大时连引线
+    const placed: { x: number; y: number; w: number }[] = []
+    x.font = '11px sans-serif'; x.textBaseline = 'middle'
+    ;[...dots].sort((a, b) => a.y - b.y).forEach((d) => {
+      const lbl = d.name.length > 6 ? d.name.slice(0, 6) : d.name
+      const w = lbl.length * 11 + 4, lx = d.x + 8
+      let ly = d.y, guard = 0
+      while (placed.some((p) => Math.abs(p.y - ly) < 13 && !(lx > p.x + p.w || lx + w < p.x)) && guard++ < 24) ly += 13
+      if (Math.abs(ly - d.y) > 3) { x.strokeStyle = '#5a4d33'; x.lineWidth = 0.6; x.beginPath(); x.moveTo(d.x + 5, d.y); x.lineTo(lx, ly); x.stroke() }
+      x.fillStyle = d.col; x.textAlign = 'left'; x.fillText(lbl, lx, ly)
+      placed.push({ x: lx, y: ly, w })
     })
     const onMove = (e: MouseEvent) => {
       const rect = cv.getBoundingClientRect(); const mx = e.clientX - rect.left, my = e.clientY - rect.top
@@ -305,17 +321,28 @@ export default function SectorAnalysis() {
       </>)}
 
       {view === 'cum' && (histLoading || !hist ? <div className="muted">历史矩阵加载中…</div> : <>
-        <div className="sf-sub">各行业累计主力净流入（近{win}日，以窗口起点为0）· 线升=持续吸金 · 悬停看某日各行业</div>
+        <div className="sf-sub">各行业累计主力净流入（近{win}日，以窗口起点为0，最多10条）· 线升=持续吸金 · 悬停高亮某条并看数值</div>
         <canvas ref={cumRef} style={{ width: '100%' }} />
+        <div className="legend" style={{ fontSize: 11, color: 'var(--ink-mute)', marginTop: 4 }}>纵轴已去极值缩放:个别巨额行业(如电子)的线会裁到边缘,好让其余行业的起伏看得清(端点数字仍是真实值)。</div>
       </>)}
 
       {view === 'rrg' && (histLoading || !hist ? <div className="muted">历史矩阵加载中…</div> : <>
-        <div className="sf-sub">板块相对轮动（X=相对强度 · Y=强度动量 · 尾巴=近5日路径）· 悬停看板块</div>
+        <div className="sf-sub">板块相对轮动 · 最强5 + 最弱5 行业（悬停看板块）</div>
         <canvas ref={rrgRef} style={{ width: '100%' }} />
-        <div className="legend" style={{ fontSize: 11, color: 'var(--ink-mute)', marginTop: 6 }}>点在「领先」且向右上=资金强且在增强;轮动通常顺时针:改善→领先→走弱→落后。仅相对轮动,非资金转移。</div>
+        <div className="legend" style={{ fontSize: 11, color: 'var(--ink-mute)', marginTop: 6, lineHeight: 1.7 }}>
+          <b style={{ color: 'var(--ink-soft)' }}>怎么读</b>:横轴=该行业资金强度 vs 全市场(右=更强),纵轴=强度在变强还是变弱(上=变强)。<br />
+          <b style={{ color: 'var(--ink-soft)' }}>四象限</b>:右上<b>领先</b>(强且更强)→ 右下<b>走弱</b>(强但转弱)→ 左下<b>落后</b>(弱且更弱)→ 左上<b>改善</b>(弱但转强),通常按此顺时针轮动。尾巴=近5日走过的路径。仅相对轮动,非资金转移。
+        </div>
       </>)}
 
-      {tip.show && <div className="sa-tip-box" style={{ left: tip.x, top: tip.y }} dangerouslySetInnerHTML={{ __html: tip.html }} />}
+      {tip.show && (() => {
+        const W = 250, H = 260 // 估计上界,用于近边翻转
+        const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
+        const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+        const left = tip.x + 16 + W > vw ? Math.max(8, tip.x - W - 12) : tip.x + 16
+        const top = tip.y + 12 + H > vh ? Math.max(8, vh - H - 8) : tip.y + 12
+        return <div className="sa-tip-box" style={{ left, top }} dangerouslySetInnerHTML={{ __html: tip.html }} />
+      })()}
     </div>
   )
 }
