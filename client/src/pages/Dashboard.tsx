@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import type { Snapshot, Holding } from '../types'
-import type { TickerMeta } from '../api'
+import type { TickerMeta, MarketStock, MarketTable } from '../api'
 import { pct, pct2, InfoDot, GradeBadge, SleeveBadge, actionColor, cnMarketAction, riseColor, fallColor } from '../ui'
 import SearchSelect, { type SearchOption } from '../components/SearchSelect'
 import AllocateModal from '../components/AllocateModal'
 import RiskRibbon from '../components/RiskRibbon'
 import MacroFlow from '../components/MacroFlow'
-import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, fetchDropped, fetchStrategy, saveStrategy, type StrategyKey, type UniverseItem, type DroppedItem, type Market } from '../api'
+import Pagination from '../components/Pagination'
+import { fetchUniverse, saveCapital, fetchPnL, addCustom, removeCustom, fetchDropped, fetchStrategy, saveStrategy, fetchMarket, type StrategyKey, type UniverseItem, type DroppedItem, type Market } from '../api'
 
 // A股策略腿 → sleeve 集合(头号腿·微盘 与 红利低波·大资金 二选一)。custom 自选不属任何策略,始终显示。
 const STRAT_SLEEVES: Record<StrategyKey, Set<string>> = {
@@ -91,6 +92,84 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
     || medRet(b) - medRet(a)
   const mainRows = shown.filter((h) => h.sleeve !== 'custom').sort(byRank)
   const customRows = shown.filter((h) => h.sleeve === 'custom').sort(byRank)
+
+  // ── 建议持仓列表:子 tab(推荐 / 自选 / 各板块)+ 全局搜索 + 分页 ──
+  // 板块 tab 用「全市场档位表」(A股,全用户共享缓存);推荐/自选仍用 snapshot。
+  const [market, setMarket] = useState<MarketTable | null>(null)
+  useEffect(() => { if (isCN) fetchMarket().then(setMarket).catch(() => {}); else setMarket(null) }, [isCN, snap.asof])
+  const [subTab, setSubTab] = useState<string>('rec')   // 'rec' | 'custom' | 板块名
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  useEffect(() => { setPage(1) }, [subTab, search, strategy, snap.asof])   // 换 tab/搜索/策略/日期 → 回第1页
+
+  // 推荐集(当前策略腿的策略推荐 ticker):板块 tab 里置顶 + 打「推荐」徽标
+  const recSet = useMemo(() => new Set(mainRows.map((h) => h.ticker)), [mainRows])
+  const customSet = useMemo(() => new Set(customRows.map((h) => h.ticker)), [customRows])
+  // 板块列表:含推荐股的板块在前(按推荐数降序),其余按个股数降序;「其他」置末
+  const sectors = useMemo(() => {
+    if (!market) return [] as { name: string; n: number; rec: number }[]
+    const byS = new Map<string, { name: string; n: number; rec: number }>()
+    for (const s of market.stocks) {
+      const e = byS.get(s.sector) || { name: s.sector, n: 0, rec: 0 }
+      e.n++; if (recSet.has(s.code)) e.rec++
+      byS.set(s.sector, e)
+    }
+    return [...byS.values()].sort((a, b) =>
+      (a.name === '其他' ? 1 : 0) - (b.name === '其他' ? 1 : 0)
+      || b.rec - a.rec || b.n - a.n)
+  }, [market, recSet])
+
+  // 当前视图的 market 行(板块 tab 或搜索):搜索跨全市场,不限当前板块
+  const marketView = useMemo(() => {
+    if (!market) return [] as MarketStock[]
+    const q = search.trim().toLowerCase()
+    let rows = market.stocks
+    if (q) rows = rows.filter((s) => s.code.toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q))
+    else if (subTab !== 'rec' && subTab !== 'custom') rows = rows.filter((s) => s.sector === subTab)
+    // 排序:推荐置顶 → 档位高→低 → 成交额高→低
+    return [...rows].sort((a, b) =>
+      (recSet.has(b.code) ? 1 : 0) - (recSet.has(a.code) ? 1 : 0)
+      || b.grade - a.grade || (b.amount || 0) - (a.amount || 0))
+  }, [market, search, subTab, recSet])
+
+  // 当前 tab 的总行数(用于分页)
+  const usingMarket = !!search.trim() || (subTab !== 'rec' && subTab !== 'custom')
+  const holdingRows = subTab === 'custom' ? customRows : mainRows
+  const totalRows = usingMarket ? marketView.length : holdingRows.length
+  const pageStart = (page - 1) * pageSize
+  const pagedHoldings = holdingRows.slice(pageStart, pageStart + pageSize)
+  const pagedMarket = marketView.slice(pageStart, pageStart + pageSize)
+
+  // 板块/搜索 tab 的行渲染(MarketStock):推荐股富标记,点行进详情(任意股可下钻)
+  const renderMarketRow = (s: MarketStock) => {
+    const on = watch.has(s.code)
+    const isRec = recSet.has(s.code); const isCustom = customSet.has(s.code)
+    const b = s.h20
+    return (
+      <tr key={s.code} className="clickable" onClick={() => onSelect(s.code)}>
+        <td onClick={(e) => { e.stopPropagation(); onToggleWatch(s.code, !on) }} style={{ cursor: 'pointer', textAlign: 'center' }}>
+          <span className={on ? 'star on' : 'star'}>{on ? '★' : '☆'}</span>
+        </td>
+        <td>
+          <b>{s.code}</b>{s.name && <span className="cn">{s.name}</span>}
+          {isRec && <span className="pill b-mom" style={{ marginLeft: 6 }}>推荐</span>}
+          {isCustom && <span className="pill b-custom" style={{ marginLeft: 4 }}>自选</span>}
+          {s.st && <span className="pill g-neg1" style={{ marginLeft: 4 }}>ST</span>}
+          <span className="go"> ›</span>
+        </td>
+        <td className="muted">{s.sector}</td>
+        <td>{CUR}{s.price}</td>
+        <td style={{ color: s.pct == null ? 'var(--neutral)' : s.pct >= 0 ? riseColor() : fallColor(), fontWeight: 600 }}>
+          {s.pct == null ? '—' : `${s.pct >= 0 ? '+' : ''}${s.pct.toFixed(2)}%`}</td>
+        <td className="muted">{s.turn == null ? '—' : `${s.turn.toFixed(1)}%`}</td>
+        <td className="muted">{s.amount == null ? '—' : `${s.amount.toFixed(1)}亿`}</td>
+        <td><GradeBadge g={s.grade} label={s.gl} /></td>
+        <td className="muted">{b ? <>{pct2(b.lo)} ~ {pct2(b.hi)}</> : '—'}</td>
+      </tr>
+    )
+  }
+
   const renderRow = (h: Holding) => {
     const b = h.prob?.['h20']
     const on = watch.has(h.ticker)
@@ -245,7 +324,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
             <InfoDot text="掉出推荐=曾被策略选中、连续2个交易日不再满足入选条件的股票(30天后自动清理;连续2日重新入选会自动回归)。点行看 AI 分析掉出原因。" />
             {listTab === 'rec' && <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>· 点行看详情 · ★关注置顶</span>}
           </h3>
-          {listTab === 'rec' && <div className="pos-add" style={{ margin: 0 }}>
+          {listTab === 'rec' && (!isCN || subTab === 'custom') && <div className="pos-add" style={{ margin: 0 }}>
             {picked
               ? <span className="picked-chip">{picked}{meta[picked]?.cn ? ' ' + meta[picked].cn : ''}<button onClick={() => setPicked('')} aria-label="取消">×</button></span>
               : <SearchSelect options={addable} onPick={setPicked}
@@ -280,7 +359,60 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
             </table>
           </div>
         )}
-        {listTab === 'rec' && <div className="tbl-scroll">
+        {/* A股:推荐/自选/各板块 子tab + 全市场搜索 + 分页;美股:保持原分组表 */}
+        {listTab === 'rec' && isCN && (
+          <div className="list-tabs">
+            <div className="lt-scroll">
+              <button className={'lt' + (!search && subTab === 'rec' ? ' on' : '')} onClick={() => { setSubTab('rec'); setSearch('') }}>推荐 <em>{mainRows.length}</em></button>
+              <button className={'lt' + (!search && subTab === 'custom' ? ' on' : '')} onClick={() => { setSubTab('custom'); setSearch('') }}>自选 <em>{customRows.length}</em></button>
+              <span className="lt-div" />
+              {sectors.map((s) => (
+                <button key={s.name} className={'lt' + (!search && subTab === s.name ? ' on' : '')} onClick={() => { setSubTab(s.name); setSearch('') }} title={s.rec > 0 ? `${s.rec} 只推荐` : undefined}>
+                  {s.name} <em>{s.n}</em>{s.rec > 0 && <i className="lt-rec">{s.rec}</i>}
+                </button>
+              ))}
+            </div>
+            <div className="lt-search">
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 搜全市场:代码/名称" />
+              {search && <button className="lt-clear" onClick={() => setSearch('')} aria-label="清除搜索">×</button>}
+            </div>
+          </div>
+        )}
+        {listTab === 'rec' && isCN && search && (
+          <div className="muted" style={{ fontSize: 13, margin: '2px 2px 6px' }}>搜索「{search}」· 全市场 {marketView.length} 个匹配(跨板块,不限当前 tab)</div>
+        )}
+        {listTab === 'rec' && isCN && usingMarket && !market && (
+          <div className="muted" style={{ padding: 12 }}>⏳ 全市场档位表加载中…(首次约 25 秒,之后走缓存)</div>
+        )}
+
+        {/* A股 板块/搜索 tab:全市场行情+档位表 */}
+        {listTab === 'rec' && isCN && usingMarket && (<>
+          <div className="tbl-scroll">
+            <table>
+              <thead><tr>
+                <th></th>
+                <th>标的</th>
+                <th>板块</th>
+                <th>现价</th>
+                <th>涨跌%</th>
+                <th>换手</th>
+                <th>成交额 <InfoDot text="当日成交额(盘子大小,亿元)。" /></th>
+                <th>档位 <InfoDot text="趋势健康度 -3到+3,由站上20/60/200日线合成。全市场每只都算,推荐股置顶——可直观对比没进推荐的实际档位。" /></th>
+                <th>未来20日区间 <InfoDot text="未来20天收益的70%概率范围(15%~85%分位)。波动范围估计,非涨跌预测。" /></th>
+              </tr></thead>
+              <tbody>
+                {pagedMarket.map(renderMarketRow)}
+                {market && pagedMarket.length === 0 && (
+                  <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 20 }}>{search ? '全市场无匹配股票' : '该板块暂无股票'}</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <Pagination total={totalRows} page={page} size={pageSize} onPage={setPage} onSize={(s) => { setPageSize(s); setPage(1) }} />
+        </>)}
+
+        {/* A股 推荐/自选 tab(用 snapshot 富数据)+ 美股(原样,不分板块/分页) */}
+        {listTab === 'rec' && (!isCN || !usingMarket) && <div className="tbl-scroll">
           <table>
             <thead>
               <tr>
@@ -296,43 +428,52 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
               </tr>
             </thead>
             <tbody>
-              {[...pending].map((tk) => (
-                <tr key={'pending-' + tk} className="pending-row">
-                  <td></td>
-                  <td><b>{tk}</b>{meta[tk]?.cn && <span className="cn">{meta[tk].cn}</span>}</td>
-                  <td colSpan={7} className="muted">⏳ 加载中…正在算它的档位/概率(约几秒),算完自动显示</td>
-                </tr>
-              ))}
-              {/* 我的自选:置顶(你添加的追踪股) */}
-              {customRows.length > 0 && (
-                <tr className="grp-row">
-                  <td></td>
-                  <td colSpan={8} className="muted">
+              {/* A股:分 tab(推荐/自选各自分页);美股:保持原分组(自选+策略推荐同表) */}
+              {isCN ? (<>
+                {subTab === 'custom' && [...pending].map((tk) => (
+                  <tr key={'pending-' + tk} className="pending-row">
+                    <td></td>
+                    <td><b>{tk}</b>{meta[tk]?.cn && <span className="cn">{meta[tk].cn}</span>}</td>
+                    <td colSpan={7} className="muted">⏳ 加载中…正在算它的档位/概率(约几秒),算完自动显示</td>
+                  </tr>
+                ))}
+                {pagedHoldings.map(renderRow)}
+                {pagedHoldings.length === 0 && (subTab !== 'custom' || pending.size === 0) && (
+                  <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 20 }}>
+                    {subTab === 'custom' ? '还没有自选股,右上角搜索添加。' : '当前策略今日无推荐(风险灯/数据所致),可切换策略或看板块。'}
+                  </td></tr>
+                )}
+              </>) : (<>
+                {[...pending].map((tk) => (
+                  <tr key={'pending-' + tk} className="pending-row">
+                    <td></td>
+                    <td><b>{tk}</b>{meta[tk]?.cn && <span className="cn">{meta[tk].cn}</span>}</td>
+                    <td colSpan={7} className="muted">⏳ 加载中…正在算它的档位/概率(约几秒),算完自动显示</td>
+                  </tr>
+                ))}
+                {customRows.length > 0 && (
+                  <tr className="grp-row"><td></td><td colSpan={8} className="muted">
                     我的自选 <span className="pill b-custom" style={{ marginLeft: 2 }}>{customRows.length}</span>
                     <span style={{ marginLeft: 6, fontWeight: 400 }}>· 你添加的追踪股,不占策略仓位、建议股数为 0</span>
-                  </td>
-                </tr>
-              )}
-              {customRows.map(renderRow)}
-              {/* 策略推荐 */}
-              {customRows.length > 0 && mainRows.length > 0 && (
-                <tr className="grp-row">
-                  <td></td>
-                  <td colSpan={8} className="muted">
+                  </td></tr>
+                )}
+                {customRows.map(renderRow)}
+                {customRows.length > 0 && mainRows.length > 0 && (
+                  <tr className="grp-row"><td></td><td colSpan={8} className="muted">
                     策略推荐 <span className="pill b-mom" style={{ marginLeft: 2 }}>{mainRows.length}</span>
-                    {isCN && <span style={{ marginLeft: 6, fontWeight: 400 }}>· {strategy === 'dividend' ? '红利低波' : '头号腿'}</span>}
-                  </td>
-                </tr>
-              )}
-              {mainRows.map(renderRow)}
-              {mainRows.length === 0 && customRows.length === 0 && (
-                <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 20 }}>
-                  {isCN ? '当前策略今日无推荐(风险灯/数据所致),可切换策略或看自选。' : '今日无推荐持仓。'}
-                </td></tr>
-              )}
+                  </td></tr>
+                )}
+                {mainRows.map(renderRow)}
+                {mainRows.length === 0 && customRows.length === 0 && (
+                  <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 20 }}>今日无推荐持仓。</td></tr>
+                )}
+              </>)}
             </tbody>
           </table>
         </div>}
+        {listTab === 'rec' && isCN && !usingMarket && totalRows > pageSize && (
+          <Pagination total={totalRows} page={page} size={pageSize} onPage={setPage} onSize={(s) => { setPageSize(s); setPage(1) }} />
+        )}
       </div>
 
       <div className="card">
