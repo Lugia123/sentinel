@@ -118,6 +118,27 @@ export async function fetchSectorHistory(): Promise<SectorHistory | null> {
   return j.error ? null : j
 }
 
+// 全市场档位表(A股,纯展示):每只活跃股 行业+行情+档位+20日区间。建议持仓列表「板块」tab 用。
+// 全用户共享、缓存;前端做行业过滤/排序/搜索/分页。code 同 holding.ticker(如 sh.600000)。
+export interface MarketStock {
+  code: string; name: string; sector: string
+  price: number; pct: number | null; turn: number | null
+  amount: number | null; fmc: number | null; st: boolean
+  grade: number; gl: string
+  h20: { median: number; lo: number; hi: number } | null
+}
+export interface MarketTable { asof: string; count: number; stocks: MarketStock[] }
+let _marketCache: MarketTable | null = null
+export async function fetchMarket(): Promise<MarketTable | null> {
+  if (_marketCache) return _marketCache
+  const r = await fetch('/api/market')
+  if (!r.ok) return null
+  const j = await r.json()
+  if (j.error) return null
+  _marketCache = j
+  return j
+}
+
 export interface WatchItem { ticker: string; starred: boolean; custom: boolean }
 export async function fetchWatchlist(): Promise<WatchItem[]> {
   const r = await fetch(`/api/watchlist${mq()}`)

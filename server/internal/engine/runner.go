@@ -177,6 +177,22 @@ func (r *Runner) RunSectorHistory(days int) (string, error) {
 	return lastJSON(out.String(), "sectorhist")
 }
 
+// RunMarketGrade 跑 market_grade_cn.py —— A股【全市场档位表】(行业+行情+档位+区间,纯展示)。
+// 瓶颈是全市场面板载入(读~5000 CSV,生产 4GB 机较慢),全市场逐股档位仅~3s;上层缓存+预热,超时给足 5 分钟。
+func (r *Runner) RunMarketGrade() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, r.pythonBin, filepath.Join(r.engineDir, "market_grade_cn.py"))
+	cmd.Dir = r.engineDir
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("market grade 运行失败: %v | %s", err, errb.String())
+	}
+	return lastJSON(out.String(), "marketgrade")
+}
+
 // RunEarnings 按市场跑 earnings.py(美股 SEC)/ earnings_cn.py(A股新浪)TICKER,返回季度财报 JSON。
 func (r *Runner) RunEarnings(market, ticker string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

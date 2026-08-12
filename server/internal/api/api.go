@@ -2,6 +2,7 @@
 package api
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -75,6 +76,7 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/moneyflow/sector", a.sectorFlow)
 	mux.HandleFunc("/api/moneyflow/macro", a.macroFlow)
 	mux.HandleFunc("/api/moneyflow/sector/history", a.sectorHistory)
+	mux.HandleFunc("/api/market", a.market) // 全市场档位表(建议持仓列表·板块tab)
 	mux.HandleFunc("/api/trend", a.trend)
 	mux.HandleFunc("/api/trend/tickers", a.trendTickers)
 	mux.HandleFunc("/api/dropped", a.dropped)
@@ -250,6 +252,13 @@ var sectorHistCache struct {
 	body string
 }
 
+// marketCache A股【全市场档位表】(行情+档位+区间,~5300只,全用户共享)。重活(~25s)故缓存+预热。
+var marketCache struct {
+	sync.Mutex
+	at   time.Time
+	body string
+}
+
 // warmSector 拉一次板块资金流填入缓存(供后台预热,让用户永远命中热缓存)。
 func (a *API) warmSector() {
 	out, err := a.runner.RunSectorFlow(5)
@@ -289,20 +298,70 @@ func (a *API) warmSectorHist() {
 	sectorHistCache.Unlock()
 }
 
-// StartSectorWarmer 启动即预热 + 每 25 分钟刷新资金流(板块+大盘北向+板块历史)缓存(非阻塞)。
+// warmMarket 拉一次全市场档位表填入缓存(~25s,故必须预热)。
+func (a *API) warmMarket() {
+	out, err := a.runner.RunMarketGrade()
+	if err != nil {
+		log.Printf("[market] 预热失败(继续用旧缓存): %v", err)
+		return
+	}
+	marketCache.Lock()
+	marketCache.body = out
+	marketCache.at = time.Now()
+	marketCache.Unlock()
+}
+
+// StartSectorWarmer 启动即预热 + 每 25 分钟刷新资金流(板块+大盘北向+板块历史)+全市场档位表缓存(非阻塞)。
 func (a *API) StartSectorWarmer() {
 	go func() {
 		a.warmSector()
 		a.warmMacro()
 		a.warmSectorHist()
+		a.warmMarket()
 		t := time.NewTicker(25 * time.Minute)
 		defer t.Stop()
 		for range t.C {
 			a.warmSector()
 			a.warmMacro()
 			a.warmSectorHist()
+			a.warmMarket()
 		}
 	}()
+}
+
+// market A股【全市场档位表】(纯展示)。全用户共享,缓存30分钟+预热;前端做行业过滤/排序/搜索/分页。
+func (a *API) market(w http.ResponseWriter, r *http.Request) {
+	marketCache.Lock()
+	fresh := marketCache.body != "" && time.Since(marketCache.at) < 30*time.Minute
+	body := marketCache.body
+	marketCache.Unlock()
+	if !fresh {
+		out, err := a.runner.RunMarketGrade()
+		if err != nil {
+			if body != "" {
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				_, _ = w.Write([]byte(body))
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+		marketCache.Lock()
+		marketCache.body = out
+		marketCache.at = time.Now()
+		marketCache.Unlock()
+		body = out
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	// 全市场表 ~1.2MB,客户端支持则 gzip(→~210KB)
+	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		defer gz.Close()
+		_, _ = gz.Write([]byte(body))
+		return
+	}
+	_, _ = w.Write([]byte(body))
 }
 
 // sectorHistory A股【板块历史矩阵】(全部行业×逐日净额+累计,纯展示)。60日全量,缓存30分钟+预热;
@@ -572,19 +631,26 @@ func (a *API) personalizeSnapshot(uid int64, market string, raw json.RawMessage)
 			}
 		}
 	}
+	// ★关注=自选(统一):合并该用户所有关注/自选股(custom 或 starred)。已在推荐 holdings 里的(如关注的推荐股)由下方 held 去重跳过,不重复。
 	var customTk []string
-	a.gdb.Raw(`SELECT ticker FROM watchlist WHERE user_id=? AND market=? AND custom=true`, uid, market).Scan(&customTk)
+	a.gdb.Raw(`SELECT ticker FROM watchlist WHERE user_id=? AND market=? AND (custom=true OR starred=true)`, uid, market).Scan(&customTk)
 	for _, tk := range customTk {
 		tk = normTicker(market, tk)
 		if tk == "" || held[strings.ToUpper(tk)] {
 			continue
 		}
-		if h := a.cachedFocus(uid, market, tk, asof); h != nil { // 只用缓存,不阻塞
+		if h := a.cachedFocus(uid, market, tk, asof); h != nil { // 命中缓存:完整档位
 			holdings = append(holdings, h)
 			held[strings.ToUpper(tk)] = true
 			changed = true
+		} else if lite := a.liteCustomHolding(market, tk, asof); lite != nil {
+			// 缓存冷(如新交易日):先放轻量占位(有价格,档位计算中)→ 自选股始终显示;同时后台预热完整档位
+			holdings = append(holdings, lite)
+			held[strings.ToUpper(tk)] = true
+			changed = true
+			go a.warmFocus(uid, market, tk, asof)
 		} else {
-			go a.warmFocus(uid, market, tk, asof) // 缓存冷(如新交易日):后台预热,本次跳过
+			go a.warmFocus(uid, market, tk, asof)
 		}
 	}
 
@@ -657,6 +723,26 @@ func (a *API) cachedFocus(uid int64, market, ticker, asof string) map[string]any
 		}
 	}
 	return nil
+}
+
+// liteCustomHolding 缓存冷时的轻量占位:只取最新收盘价+中文名,保证自选股立即显示(完整档位后台预热)。
+func (a *API) liteCustomHolding(market, ticker, asof string) map[string]any {
+	var price float64
+	a.gdb.Raw(`SELECT close FROM prices WHERE market=? AND ticker=? ORDER BY date DESC LIMIT 1`, market, ticker).Row().Scan(&price)
+	if price <= 0 {
+		return nil
+	}
+	name := ""
+	if market == "cn" {
+		name = a.cnNameMap()[ticker]
+	}
+	return map[string]any{
+		"ticker": ticker, "name": name, "sleeve": "custom", "price": price,
+		"grade": 0, "grade_label": "计算中", "action": "持有", "action_weight": 1.0,
+		"target_shares": 0.0, "target_value": 0.0, "base_weight": 0.0,
+		"prob":   map[string]any{},
+		"reason": "用户自定义 · 档位计算中,稍后刷新即完整",
+	}
 }
 
 // warmFocus 计算并缓存某用户某股在 asof 的档位(阻塞~3秒;加自定义股/后台预热用)。

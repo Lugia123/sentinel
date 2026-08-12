@@ -30,7 +30,8 @@ func (a *API) watchlist(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"watchlist": rows})
 }
 
-// watchStar POST ?ticker=&on=1|0 — 关注/取消关注(不影响自定义追踪)。
+// watchStar POST ?ticker=&on=1|0 — 关注/取消关注。★关注=自选(统一):关注即入自选列表,
+// 取消关注则彻底移除(同时清 custom,避免残留"非关注但仍 custom"的隐形跟踪股)。
 func (a *API) watchStar(w http.ResponseWriter, r *http.Request) {
 	uid := auth.UserID(r)
 	mkt := mktParam(r)
@@ -43,7 +44,7 @@ func (a *API) watchStar(w http.ResponseWriter, r *http.Request) {
 		a.gdb.Exec(`INSERT INTO watchlist(user_id,market,ticker,starred) VALUES(?,?,?,true)
 			ON CONFLICT(user_id,market,ticker) DO UPDATE SET starred=true`, uid, mkt, tk)
 	} else {
-		a.gdb.Exec(`UPDATE watchlist SET starred=false WHERE user_id=? AND market=? AND ticker=?`, uid, mkt, tk)
+		a.gdb.Exec(`UPDATE watchlist SET starred=false, custom=false WHERE user_id=? AND market=? AND ticker=?`, uid, mkt, tk)
 		a.gdb.Exec(`DELETE FROM watchlist WHERE user_id=? AND market=? AND ticker=? AND NOT starred AND NOT custom`, uid, mkt, tk)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "ticker": tk})
@@ -65,11 +66,13 @@ func (a *API) watchCustom(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": tk + " 不在数据池,无法追踪"})
 			return
 		}
-		a.gdb.Exec(`INSERT INTO watchlist(user_id,market,ticker,custom) VALUES(?,?,?,true)
-			ON CONFLICT(user_id,market,ticker) DO UPDATE SET custom=true`, uid, mkt, tk)
+		// 自选 ⟹ ★关注(统一:自选即关注,前端只按 ★ 一层置顶,不再有独立自选排序层)
+		a.gdb.Exec(`INSERT INTO watchlist(user_id,market,ticker,custom,starred) VALUES(?,?,?,true,true)
+			ON CONFLICT(user_id,market,ticker) DO UPDATE SET custom=true, starred=true`, uid, mkt, tk)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "ticker": tk})
 	case http.MethodDelete:
-		a.gdb.Exec(`UPDATE watchlist SET custom=false WHERE user_id=? AND market=? AND ticker=?`, uid, mkt, tk)
+		// 自选=关注统一:移除自选即取消关注(清两标志),彻底出列表
+		a.gdb.Exec(`UPDATE watchlist SET custom=false, starred=false WHERE user_id=? AND market=? AND ticker=?`, uid, mkt, tk)
 		a.gdb.Exec(`DELETE FROM watchlist WHERE user_id=? AND market=? AND ticker=? AND NOT starred AND NOT custom`, uid, mkt, tk)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "ticker": tk})
 	default:
