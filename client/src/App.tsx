@@ -211,7 +211,7 @@ export default function App() {
           : <div className="card"><div className="muted" style={{ padding: 20 }}>
               {focusErr ? `⚠ 无法加载 ${sel} 的详情:${focusErr}` : `⏳ 正在计算 ${sel} 的完整档位/概率(约几秒)…`}
             </div></div>)}
-        {!droppedH && !inDetail && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={openStock} onSelectDropped={setDroppedSel} onReload={load} onOpenRiskLight={() => goto('risklight')} onOpenMoneyflow={() => goto('moneyflow')} />}
+        {!droppedH && !inDetail && view === 'signals' && snap && <Dashboard snap={snap} meta={meta} watch={watch} onToggleWatch={toggleWatch} onSelect={openStock} onSelectDropped={setDroppedSel} onReload={async () => { await load(); await loadWatch() }} onOpenRiskLight={() => goto('risklight')} onOpenMoneyflow={() => goto('moneyflow')} />}
         {!droppedH && !inDetail && view === 'positions' && <Positions market={market} />}
         {!droppedH && !inDetail && view === 'trends' && <Trends meta={meta} watch={watch} market={market} />}
         {!droppedH && !inDetail && view === 'news' && <News market={market} />}

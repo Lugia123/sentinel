@@ -105,21 +105,20 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
 
   // 推荐集(当前策略腿的策略推荐 ticker):板块 tab 里置顶 + 打「推荐」徽标
   const recSet = useMemo(() => new Set(mainRows.map((h) => h.ticker)), [mainRows])
-  const customSet = useMemo(() => new Set(customRows.map((h) => h.ticker)), [customRows])
-  // 板块列表排序优先级:①「其他」永远置末 ②含用户自选股的板块最前(按自选数降序,最贴个人关注)
+  // 板块列表排序优先级:①「其他」永远置末 ②含★关注(自选即关注)的板块最前(关注数降序)
   //   ③含推荐股的在前(推荐数降序)④其余按个股数降序
   const sectors = useMemo(() => {
-    if (!market) return [] as { name: string; n: number; rec: number; cust: number }[]
-    const byS = new Map<string, { name: string; n: number; rec: number; cust: number }>()
+    if (!market) return [] as { name: string; n: number; rec: number; star: number }[]
+    const byS = new Map<string, { name: string; n: number; rec: number; star: number }>()
     for (const s of market.stocks) {
-      const e = byS.get(s.sector) || { name: s.sector, n: 0, rec: 0, cust: 0 }
-      e.n++; if (recSet.has(s.code)) e.rec++; if (customSet.has(s.code)) e.cust++
+      const e = byS.get(s.sector) || { name: s.sector, n: 0, rec: 0, star: 0 }
+      e.n++; if (recSet.has(s.code)) e.rec++; if (watch.has(s.code)) e.star++
       byS.set(s.sector, e)
     }
     return [...byS.values()].sort((a, b) =>
       (a.name === '其他' ? 1 : 0) - (b.name === '其他' ? 1 : 0)
-      || b.cust - a.cust || b.rec - a.rec || b.n - a.n)
-  }, [market, recSet, customSet])
+      || b.star - a.star || b.rec - a.rec || b.n - a.n)
+  }, [market, recSet, watch])
 
   // 板块 tab 条:横滚模式(两端 ‹ › 按钮,兼容 Windows 无横滚鼠标)/ 一键展开全部(多行铺开)
   const ltRef = useRef<HTMLDivElement>(null)
@@ -143,11 +142,12 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
     let rows = market.stocks
     if (q) rows = rows.filter((s) => s.code.toLowerCase().includes(q) || (s.name || '').toLowerCase().includes(q))
     else if (subTab !== 'rec' && subTab !== 'custom') rows = rows.filter((s) => s.sector === subTab)
-    // 排序:推荐置顶 → 档位高→低 → 成交额高→低
+    // 排序:★关注(自选即关注)置顶 → 推荐次之 → 档位高→低 → 成交额高→低
     return [...rows].sort((a, b) =>
-      (recSet.has(b.code) ? 1 : 0) - (recSet.has(a.code) ? 1 : 0)
+      (watch.has(b.code) ? 1 : 0) - (watch.has(a.code) ? 1 : 0)
+      || (recSet.has(b.code) ? 1 : 0) - (recSet.has(a.code) ? 1 : 0)
       || b.grade - a.grade || (b.amount || 0) - (a.amount || 0))
-  }, [market, search, subTab, recSet])
+  }, [market, search, subTab, recSet, watch])
 
   // 当前 tab 的总行数(用于分页)
   const usingMarket = !!search.trim() || (subTab !== 'rec' && subTab !== 'custom')
@@ -159,8 +159,8 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
 
   // 板块/搜索 tab 的行渲染(MarketStock):推荐股富标记,点行进详情(任意股可下钻)
   const renderMarketRow = (s: MarketStock) => {
-    const on = watch.has(s.code)
-    const isRec = recSet.has(s.code); const isCustom = customSet.has(s.code)
+    const on = watch.has(s.code)   // ★关注(自选即关注)
+    const isRec = recSet.has(s.code)
     const b = s.h20
     return (
       <tr key={s.code} className="clickable" onClick={() => onSelect(s.code)}>
@@ -170,7 +170,6 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
         <td>
           <b>{s.code}</b>{s.name && <span className="cn">{s.name}</span>}
           {isRec && <span className="pill b-mom" style={{ marginLeft: 6 }}>推荐</span>}
-          {isCustom && <span className="pill b-custom" style={{ marginLeft: 4 }}>自选</span>}
           {s.st && <span className="pill g-neg1" style={{ marginLeft: 4 }}>ST</span>}
           <span className="go"> ›</span>
         </td>
@@ -385,8 +384,9 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                 <button className={'lt' + (!search && subTab === 'custom' ? ' on' : '')} onClick={() => { setSubTab('custom'); setSearch('') }}>自选 <em>{customRows.length}</em></button>
                 <span className="lt-div" />
                 {sectors.map((s) => (
-                  <button key={s.name} className={'lt' + (!search && subTab === s.name ? ' on' : '')} onClick={() => { setSubTab(s.name); setSearch('') }} title={s.rec > 0 ? `${s.rec} 只推荐` : undefined}>
-                    {s.name} <em>{s.n}</em>{s.rec > 0 && <i className="lt-rec">{s.rec}</i>}
+                  <button key={s.name} className={'lt' + (!search && subTab === s.name ? ' on' : '')} onClick={() => { setSubTab(s.name); setSearch('') }}
+                    title={[s.star > 0 ? `${s.star} 只关注` : '', s.rec > 0 ? `${s.rec} 只推荐` : ''].filter(Boolean).join(' · ') || undefined}>
+                    {s.name} <em>{s.n}</em>{s.star > 0 && <i className="lt-cust" title="关注">★{s.star}</i>}{s.rec > 0 && <i className="lt-rec" title="推荐">{s.rec}</i>}
                   </button>
                 ))}
               </div>

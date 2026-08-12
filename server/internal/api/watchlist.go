@@ -65,8 +65,9 @@ func (a *API) watchCustom(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": tk + " 不在数据池,无法追踪"})
 			return
 		}
-		a.gdb.Exec(`INSERT INTO watchlist(user_id,market,ticker,custom) VALUES(?,?,?,true)
-			ON CONFLICT(user_id,market,ticker) DO UPDATE SET custom=true`, uid, mkt, tk)
+		// 自选 ⟹ ★关注(统一:自选即关注,前端只按 ★ 一层置顶,不再有独立自选排序层)
+		a.gdb.Exec(`INSERT INTO watchlist(user_id,market,ticker,custom,starred) VALUES(?,?,?,true,true)
+			ON CONFLICT(user_id,market,ticker) DO UPDATE SET custom=true, starred=true`, uid, mkt, tk)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "ticker": tk})
 	case http.MethodDelete:
 		a.gdb.Exec(`UPDATE watchlist SET custom=false WHERE user_id=? AND market=? AND ticker=?`, uid, mkt, tk)
