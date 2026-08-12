@@ -19,7 +19,7 @@
 |---|---|---|
 | 非推荐股展示深度 | **B:每只都算完整档位+20日区间** | 用户要"看没进推荐的实际算出来啥样",做直观对比 |
 | Tab 形态 | 固定 `[推荐][自选]` + 板块**横向滚动条**(31 个一级行业) | 贴合"每板块一个 tab",31 个太长 → 横向滚动 |
-| 分级 | 仅申万**一级(L1)**,31 个 | `sw_industry.csv` 的 `sw_name` 即 L1;L2/L3 会让 tab 数爆炸,本期不做 |
+| 分级 | 仅申万**一级(L1)**,31 个 | tushare 申万成分的 L1(见 §6.5);L2/L3 会让 tab 数爆炸,本期不做 |
 
 ## 3. 性能结论(已实测,含生产 4GB 机)
 
@@ -54,7 +54,7 @@
 
 独立脚本,**不复用快照的 `M` 大矩阵**(那会 2GB → OOM)。逐个 CSV:读 `close/turn/amount/pctChg/isST` →
 构造单股迷你 `M={"close":df1}` 复用 `trend_grade_cn`/`vol_scaled_prob` → 取末行行情 → 存标量、丢弃序列。
-峰值仅 ~115MB。停牌/退市久(末交易日距市场最新 >10 日)剔除。`sector` 来自 `sw_industry.csv`(code→申万一级)。
+峰值仅 ~115MB。停牌/退市久(末交易日距市场最新 >10 日)剔除。`sector` 来自 `sw_members_cn.py`(tushare 申万一级,见 §6.5)。
 输出**紧凑** JSON(前端一次拉全,做 filter/排序/搜索/分页):
 
 ```jsonc
@@ -71,7 +71,7 @@
 }
 ```
 
-- 字段全部来自 `M`:`close`(price)、`pct`、`turn`、`amount`(成交额)、`fmc`(流通市值)、`st`;`sector` 来自 `sw_industry.csv`(`code→sw_name` L1);`grade/h20` 复用 `trend_grade_cn`/`vol_scaled_prob`。
+- 字段全部来自逐股 CSV(`close/pct/turn/amount/isST`);`sector` 来自 `sw_members_cn.py`(tushare 申万一级);`grade/h20` 复用 `trend_grade_cn`/`vol_scaled_prob`。
 - **不含** `signals/indicators/reason`(那些重字段只推荐股才需要,点股详情时走现有 `/api/focus` 按需取)。
 - 体积:~5300 行 × ~150B ≈ **0.8MB raw / gzip ~150KB**,可接受。
 - 新脚本 `engine/market_grade_cn.py`(独立可跑),或在 `run_daily.py` 快照后追加一步。倾向**独立脚本 + run_daily 调用**,便于单测。
@@ -119,9 +119,11 @@
 - LLM 板块解读(独立功能,后续单议)。
 - 服务端分页/搜索(数据量不需要)。
 
-## 6.5 部署注记
+## 6.5 板块分类数据源:统一 tushare(v2.5.x)
 
-- **`sw_industry.csv` 生产缺失**:`engine/data_cn_meta` 是软链 → `safna_jr_a/data/meta`,生产只镜像了部分文件(sector flow 用 `sw_levels.json`,从没用过 `sw_industry.csv`)。已手动 `scp engine/data_cn_meta/sw_industry.csv → 服务器 safna_jr_a/data/meta/`。**重建服务器数据镜像时勿漏此文件**,否则板块列全「其他」。
+- **原**:akshare 静态 `sw_industry.csv`(当期快照/需手动重抓;生产还漏镜像过)。
+- **现**:`engine/sw_members_cn.py` 走 **tushare `index_member_all`**(申万 SW2021,一次得全市场 code→L1/L2/L3 + 进出日 PIT),与 sw_levels/资金流**同一个 tushare 源、同 token**;7 天文件缓存 `data_cn_meta/sw_members.json`;tushare 挂了回退静态 `sw_industry.csv`,再挂记「其他」。
+- **好处**:不再依赖静态文件(**消除"生产缺 sw_industry.csv"部署坑**)、可定时刷、与全站口径一致。
 - runner `RunMarketGrade` 超时 5min(生产 204s + 余量);warmMarket 并入 `StartSectorWarmer`(启动 + 每 25min)。
 
 ## 7. 风险 / 待验

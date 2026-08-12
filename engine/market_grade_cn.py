@@ -20,20 +20,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import pandas as pd
 from cn_engine import E, vol_scaled_prob, trend_grade_cn, _names
+from sw_members_cn import code_to_l1   # 统一:tushare 申万成分(替代 akshare 静态 sw_industry.csv)
 
-SW_IND = os.path.join(HERE, "data_cn_meta", "sw_industry.csv")
 START = "2021-01-01"      # 与快照同窗口(足够 vol_scaled_prob 的 500 日经验分布)
 MIN_DAYS = 250            # 与 load_matrices 同门槛:窗口内不足 250 日的剔除
 USECOLS = ["date", "close", "turn", "amount", "pctChg", "isST"]
-
-
-def _sector_map():
-    """code → 申万一级行业名(sw_name)。取不到回退空 dict → 前端显示「其他」。"""
-    try:
-        d = pd.read_csv(SW_IND, dtype=str)
-        return dict(zip(d["code"], d["sw_name"]))
-    except Exception:
-        return {}
 
 
 def _last_num(df, col, nd=2):
@@ -50,7 +41,7 @@ def build():
     if not files:
         return {"error": "取不到日频数据目录(检查 data_cn 软链)"}
     names = _names()
-    sect = _sector_map()
+    sect = code_to_l1()   # 统一 tushare 申万一级(缓存7天,失败回退静态)
     start_ts = pd.Timestamp(START)
 
     rows = []
