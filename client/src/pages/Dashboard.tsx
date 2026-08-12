@@ -91,7 +91,9 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
     || b.grade - a.grade
     || medRet(b) - medRet(a)
   const mainRows = shown.filter((h) => h.sleeve !== 'custom').sort(byRank)
-  const customRows = shown.filter((h) => h.sleeve === 'custom').sort(byRank)
+  const customRows = shown.filter((h) => h.sleeve === 'custom').sort(byRank)  // 美股分组沿用
+  // 自选 tab(A股)=所有★关注的 holdings(含关注的推荐股;不受策略腿过滤,自选是个人列表)
+  const starRows = snap.holdings.filter((h) => watch.has(h.ticker)).sort(byRank)
 
   // ── 建议持仓列表:子 tab(推荐 / 自选 / 各板块)+ 全局搜索 + 分页 ──
   // 板块 tab 用「全市场档位表」(A股,全用户共享缓存);推荐/自选仍用 snapshot。
@@ -151,7 +153,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
 
   // 当前 tab 的总行数(用于分页)
   const usingMarket = !!search.trim() || (subTab !== 'rec' && subTab !== 'custom')
-  const holdingRows = subTab === 'custom' ? customRows : mainRows
+  const holdingRows = subTab === 'custom' ? starRows : mainRows   // 自选 tab=★关注
   const totalRows = usingMarket ? marketView.length : holdingRows.length
   const pageStart = (page - 1) * pageSize
   const pagedHoldings = holdingRows.slice(pageStart, pageStart + pageSize)
@@ -381,7 +383,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
               {!ltExpanded && ltEdge.l && <button className="lt-arrow left" onClick={() => ltScrollBy(-260)} aria-label="向左滚动">‹</button>}
               <div className={'lt-scroll' + (ltExpanded ? ' expanded' : '')} ref={ltRef}>
                 <button className={'lt' + (!search && subTab === 'rec' ? ' on' : '')} onClick={() => { setSubTab('rec'); setSearch('') }}>推荐 <em>{mainRows.length}</em></button>
-                <button className={'lt' + (!search && subTab === 'custom' ? ' on' : '')} onClick={() => { setSubTab('custom'); setSearch('') }}>自选 <em>{customRows.length}</em></button>
+                <button className={'lt' + (!search && subTab === 'custom' ? ' on' : '')} onClick={() => { setSubTab('custom'); setSearch('') }}>自选 <em>{starRows.length}</em></button>
                 <span className="lt-div" />
                 {sectors.map((s) => (
                   <button key={s.name} className={'lt' + (!search && subTab === s.name ? ' on' : '')} onClick={() => { setSubTab(s.name); setSearch('') }}
@@ -463,7 +465,7 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
                 {pagedHoldings.map(renderRow)}
                 {pagedHoldings.length === 0 && (subTab !== 'custom' || pending.size === 0) && (
                   <tr><td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 20 }}>
-                    {subTab === 'custom' ? '还没有自选股,右上角搜索添加。' : '当前策略今日无推荐(风险灯/数据所致),可切换策略或看板块。'}
+                    {subTab === 'custom' ? '还没有自选股。右上角搜索添加,或点任意股的 ★ 关注(关注即入自选)。' : '当前策略今日无推荐(风险灯/数据所致),可切换策略或看板块。'}
                   </td></tr>
                 )}
               </>) : (<>

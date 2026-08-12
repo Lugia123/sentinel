@@ -631,8 +631,9 @@ func (a *API) personalizeSnapshot(uid int64, market string, raw json.RawMessage)
 			}
 		}
 	}
+	// ★关注=自选(统一):合并该用户所有关注/自选股(custom 或 starred)。已在推荐 holdings 里的(如关注的推荐股)由下方 held 去重跳过,不重复。
 	var customTk []string
-	a.gdb.Raw(`SELECT ticker FROM watchlist WHERE user_id=? AND market=? AND custom=true`, uid, market).Scan(&customTk)
+	a.gdb.Raw(`SELECT ticker FROM watchlist WHERE user_id=? AND market=? AND (custom=true OR starred=true)`, uid, market).Scan(&customTk)
 	for _, tk := range customTk {
 		tk = normTicker(market, tk)
 		if tk == "" || held[strings.ToUpper(tk)] {

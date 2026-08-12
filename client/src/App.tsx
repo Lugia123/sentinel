@@ -105,6 +105,7 @@ export default function App() {
   const toggleWatch = async (tk: string, on: boolean) => {
     await setStar(tk, on)
     await loadWatch()
+    await load()   // ★关注=自选:关注的任意股(含板块tab里非持仓股)合并进快照→出现在自选列表
   }
   const recompute = async () => {
     setRunning(true); setErr('')
