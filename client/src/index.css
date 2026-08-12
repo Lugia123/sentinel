@@ -544,9 +544,10 @@ a:hover { color: var(--gold-hi); text-decoration: underline; text-underline-offs
 .lt:hover { border-color: var(--gold-dim); color: var(--gold-hi); }
 .lt.on { background: var(--gold-glow); border-color: var(--gold); color: var(--gold-hi); }
 .lt em { font-style: normal; font-weight: 500; font-size: 11px; opacity: .7; font-variant-numeric: tabular-nums; }
-.lt .lt-rec { font-style: normal; min-width: 15px; height: 15px; line-height: 15px; text-align: center;
-  padding: 0 4px; border-radius: 999px; background: rgba(111,174,134,.2); color: var(--up);
-  font-size: 10px; font-weight: 700; }
+.lt .lt-rec, .lt .lt-cust { font-style: normal; min-width: 15px; height: 15px; line-height: 15px;
+  text-align: center; padding: 0 4px; border-radius: 999px; font-size: 10px; font-weight: 700; }
+.lt .lt-rec { background: rgba(111,174,134,.2); color: var(--up); }        /* 推荐=绿 */
+.lt .lt-cust { background: rgba(123,167,176,.22); color: var(--c5); }      /* 自选=蓝 */
 .lt-div { flex: 0 0 auto; width: 1px; height: 18px; background: var(--border-2); margin: 0 2px; }
 .lt-search { flex: 0 0 auto; position: relative; display: flex; align-items: center; }
 .lt-search input { width: 210px; padding: 6px 26px 6px 11px; border: 1px solid var(--border);
