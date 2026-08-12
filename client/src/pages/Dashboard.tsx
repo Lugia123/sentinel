@@ -106,19 +106,35 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
   // 推荐集(当前策略腿的策略推荐 ticker):板块 tab 里置顶 + 打「推荐」徽标
   const recSet = useMemo(() => new Set(mainRows.map((h) => h.ticker)), [mainRows])
   const customSet = useMemo(() => new Set(customRows.map((h) => h.ticker)), [customRows])
-  // 板块列表:含推荐股的板块在前(按推荐数降序),其余按个股数降序;「其他」置末
+  // 板块列表排序优先级:①「其他」永远置末 ②含用户自选股的板块最前(按自选数降序,最贴个人关注)
+  //   ③含推荐股的在前(推荐数降序)④其余按个股数降序
   const sectors = useMemo(() => {
-    if (!market) return [] as { name: string; n: number; rec: number }[]
-    const byS = new Map<string, { name: string; n: number; rec: number }>()
+    if (!market) return [] as { name: string; n: number; rec: number; cust: number }[]
+    const byS = new Map<string, { name: string; n: number; rec: number; cust: number }>()
     for (const s of market.stocks) {
-      const e = byS.get(s.sector) || { name: s.sector, n: 0, rec: 0 }
-      e.n++; if (recSet.has(s.code)) e.rec++
+      const e = byS.get(s.sector) || { name: s.sector, n: 0, rec: 0, cust: 0 }
+      e.n++; if (recSet.has(s.code)) e.rec++; if (customSet.has(s.code)) e.cust++
       byS.set(s.sector, e)
     }
     return [...byS.values()].sort((a, b) =>
       (a.name === '其他' ? 1 : 0) - (b.name === '其他' ? 1 : 0)
-      || b.rec - a.rec || b.n - a.n)
-  }, [market, recSet])
+      || b.cust - a.cust || b.rec - a.rec || b.n - a.n)
+  }, [market, recSet, customSet])
+
+  // 板块 tab 条:横滚模式(两端 ‹ › 按钮,兼容 Windows 无横滚鼠标)/ 一键展开全部(多行铺开)
+  const ltRef = useRef<HTMLDivElement>(null)
+  const [ltExpanded, setLtExpanded] = useState(false)
+  const [ltEdge, setLtEdge] = useState<{ l: boolean; r: boolean }>({ l: false, r: false })
+  useEffect(() => {
+    const el = ltRef.current
+    if (!el || !isCN || ltExpanded) { setLtEdge({ l: false, r: false }); return }
+    const update = () => setLtEdge({ l: el.scrollLeft > 2, r: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 })
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => { el.removeEventListener('scroll', update); window.removeEventListener('resize', update) }
+  }, [isCN, ltExpanded, sectors.length, subTab])
+  const ltScrollBy = (dx: number) => ltRef.current?.scrollBy({ left: dx, behavior: 'smooth' })
 
   // 当前视图的 market 行(板块 tab 或搜索):搜索跨全市场,不限当前板块
   const marketView = useMemo(() => {
@@ -361,17 +377,24 @@ export default function Dashboard({ snap, meta, watch, onToggleWatch, onSelect, 
         )}
         {/* A股:推荐/自选/各板块 子tab + 全市场搜索 + 分页;美股:保持原分组表 */}
         {listTab === 'rec' && isCN && (
-          <div className="list-tabs">
-            <div className="lt-scroll">
-              <button className={'lt' + (!search && subTab === 'rec' ? ' on' : '')} onClick={() => { setSubTab('rec'); setSearch('') }}>推荐 <em>{mainRows.length}</em></button>
-              <button className={'lt' + (!search && subTab === 'custom' ? ' on' : '')} onClick={() => { setSubTab('custom'); setSearch('') }}>自选 <em>{customRows.length}</em></button>
-              <span className="lt-div" />
-              {sectors.map((s) => (
-                <button key={s.name} className={'lt' + (!search && subTab === s.name ? ' on' : '')} onClick={() => { setSubTab(s.name); setSearch('') }} title={s.rec > 0 ? `${s.rec} 只推荐` : undefined}>
-                  {s.name} <em>{s.n}</em>{s.rec > 0 && <i className="lt-rec">{s.rec}</i>}
-                </button>
-              ))}
+          <div className={'list-tabs' + (ltExpanded ? ' expanded' : '')}>
+            <div className="lt-wrap">
+              {!ltExpanded && ltEdge.l && <button className="lt-arrow left" onClick={() => ltScrollBy(-260)} aria-label="向左滚动">‹</button>}
+              <div className={'lt-scroll' + (ltExpanded ? ' expanded' : '')} ref={ltRef}>
+                <button className={'lt' + (!search && subTab === 'rec' ? ' on' : '')} onClick={() => { setSubTab('rec'); setSearch('') }}>推荐 <em>{mainRows.length}</em></button>
+                <button className={'lt' + (!search && subTab === 'custom' ? ' on' : '')} onClick={() => { setSubTab('custom'); setSearch('') }}>自选 <em>{customRows.length}</em></button>
+                <span className="lt-div" />
+                {sectors.map((s) => (
+                  <button key={s.name} className={'lt' + (!search && subTab === s.name ? ' on' : '')} onClick={() => { setSubTab(s.name); setSearch('') }} title={s.rec > 0 ? `${s.rec} 只推荐` : undefined}>
+                    {s.name} <em>{s.n}</em>{s.rec > 0 && <i className="lt-rec">{s.rec}</i>}
+                  </button>
+                ))}
+              </div>
+              {!ltExpanded && ltEdge.r && <button className="lt-arrow right" onClick={() => ltScrollBy(260)} aria-label="向右滚动">›</button>}
             </div>
+            <button className="lt-expand" onClick={() => setLtExpanded((v) => !v)} title={ltExpanded ? '收起为横向条' : '展开全部板块(多行铺开)'}>
+              {ltExpanded ? '⤡ 收起' : '⤢ 展开'}
+            </button>
             <div className="lt-search">
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 搜全市场:代码/名称" />
               {search && <button className="lt-clear" onClick={() => setSearch('')} aria-label="清除搜索">×</button>}
