@@ -107,3 +107,24 @@ export async function adminSaveSchedule(interval_hours: number) {
   const r = await fetch('/api/admin/settings/schedule', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ interval_hours }) })
   const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || '保存失败'); return j
 }
+
+// 数据源凭证(tushare:接口地址 host + api key)——管理员维护,存 DB,保存即热生效(无需重启后端)
+export interface TushareCfg { url: string; token_masked: string; has_token: boolean; url_source: string; token_source: string }
+export interface DatasourceResp { tushare: TushareCfg; enabled: boolean; default_url: string; note: string }
+export async function adminGetDatasource(): Promise<DatasourceResp> {
+  const r = await fetch('/api/admin/settings/datasource')
+  const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || '读取失败'); return j
+}
+export async function adminSaveDatasource(url: string, token: string): Promise<DatasourceResp> {
+  const r = await fetch('/api/admin/settings/datasource', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, token }) })
+  const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || '保存失败'); return j
+}
+export async function adminTestDatasource(url: string, token: string): Promise<{ ok: boolean; note?: string; error?: string }> {
+  const r = await fetch('/api/admin/settings/datasource/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, token }) })
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || '测试失败'); return j
+}
+// 数据源健康(与顶部故障红条同源):最近成功刷新时间 / 报错
+export async function adminAltStatus(): Promise<{ ok: boolean; source?: string; last_ok?: string; stale_hours?: number; last_error?: string }> {
+  const r = await fetch('/api/altstatus')
+  return r.ok ? r.json() : { ok: true }
+}

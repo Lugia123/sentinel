@@ -5,8 +5,8 @@ package main
 
 import (
 	"log"
-	"os"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"sentinel/internal/ai"
@@ -15,6 +15,7 @@ import (
 	"sentinel/internal/auth"
 	"sentinel/internal/blob"
 	"sentinel/internal/config"
+	"sentinel/internal/datasource"
 	"sentinel/internal/db"
 	"sentinel/internal/earnings"
 	"sentinel/internal/engine"
@@ -63,6 +64,9 @@ func main() {
 	} else {
 		log.Printf("未建初始管理员(设 SENTINEL_ADMIN_EMAIL + SENTINEL_ADMIN_PASSWORD 后重启即可)")
 	}
+	// 数据源凭证(tushare host+key):库里配过则以库为准、覆盖 .env,注入进程 env 供 Python 引擎子进程继承
+	tsCreds := datasource.Apply(st)
+
 	a := api.New(st, rn, pf, ex, inv, earn, al, au, bs, gdb, aic, cfg.DataDir, cfg.EngineDir, ver)
 	a.StartSectorWarmer() // 后台预热板块资金流缓存(用户永远命中热缓存)
 
@@ -78,7 +82,12 @@ func main() {
 	if bs != nil && bs.Enabled() {
 		minioState = "已连接(" + cfg.Minio.Bucket + ")"
 	}
+	tsState := "未配置(A股事件/红利/资金流腿停更;可在系统管理·数据源里配)"
+	if tsCreds.Enabled() {
+		tsState = "已配置(" + tsCreds.URL + ")"
+	}
 	log.Printf("  PostgreSQL 已连接 + 迁移完成 | DeepSeek AI: %s | MinIO: %s", aiState, minioState)
+	log.Printf("  数据源 tushare: %s", tsState)
 	log.Printf("  API: /api/snapshot · /api/run · /api/positions · /api/explain · /api/datastatus")
 	if err := http.ListenAndServe(":"+cfg.Port, a.Routes()); err != nil {
 		log.Fatal(err)

@@ -14,17 +14,17 @@ import (
 	"gorm.io/gorm"
 
 	"sentinel/internal/ai"
+	"sentinel/internal/allocate"
+	"sentinel/internal/auth"
 	"sentinel/internal/blob"
 	"sentinel/internal/earnings"
 	"sentinel/internal/engine"
 	"sentinel/internal/explain"
 	"sentinel/internal/investigate"
 	"sentinel/internal/pipeline"
-	"sentinel/internal/scheduler"
 	"sentinel/internal/portfolio"
+	"sentinel/internal/scheduler"
 	"sentinel/internal/store"
-	"sentinel/internal/allocate"
-	"sentinel/internal/auth"
 	"sentinel/internal/version"
 )
 
@@ -58,8 +58,10 @@ func (a *API) Routes() http.Handler {
 	mux.HandleFunc("/api/snapshot", a.snapshot)
 	mux.HandleFunc("/api/snapshot/dates", a.dates)
 	mux.HandleFunc("/api/risklight/history", a.riskHistory)
-	mux.HandleFunc("/api/run", auth.RequireAdmin(a.run)) // 重算仅管理员
-	mux.HandleFunc("/api/admin/settings/schedule", auth.RequireAdmin(a.schedule)) // 调度间隔(管理员维护)
+	mux.HandleFunc("/api/run", auth.RequireAdmin(a.run))                                 // 重算仅管理员
+	mux.HandleFunc("/api/admin/settings/schedule", auth.RequireAdmin(a.schedule))        // 调度间隔(管理员维护)
+	mux.HandleFunc("/api/admin/settings/datasource", auth.RequireAdmin(a.datasourceCfg)) // 数据源凭证(tushare host+key)
+	mux.HandleFunc("/api/admin/settings/datasource/test", auth.RequireAdmin(a.datasourceTest))
 	mux.HandleFunc("/api/positions", a.positions)
 	mux.HandleFunc("/api/explain", a.explainHandler)
 	mux.HandleFunc("/api/history", a.history)
@@ -587,8 +589,8 @@ func (a *API) snapshot(w http.ResponseWriter, r *http.Request) {
 }
 
 // personalizeSnapshot 把共享快照个性化为当前用户视图:
-//  1) 按该用户的资金池线性缩放 target_shares/target_value(资金池只是线性因子,不用重跑引擎)
-//  2) 并入该用户的自定义追踪股(watchlist source=user,sleeve=custom股数0,隔离)
+//  1. 按该用户的资金池线性缩放 target_shares/target_value(资金池只是线性因子,不用重跑引擎)
+//  2. 并入该用户的自定义追踪股(watchlist source=user,sleeve=custom股数0,隔离)
 func (a *API) personalizeSnapshot(uid int64, market string, raw json.RawMessage) json.RawMessage {
 	if uid == 0 {
 		return raw
