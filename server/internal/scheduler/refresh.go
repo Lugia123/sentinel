@@ -40,7 +40,8 @@ func (s *Scheduler) refreshData(market string) {
 // 调 engine/ts_refresh.py --since <日>:拉分红/业绩预告/研报评级 → 覆写引擎读的 parquet(schema 不变)。
 // 窗口自适应(见下方):既保留~45交易日回看余量,又能在 token 续期晚时补齐整段断档。
 // 记录成功时刻(AltLastOKKey)/失败标记(AltErrKey)供 /api/altstatus 驱动前端故障红条。
-// 头号腿行情不涉及(仍走 baostock)。凭证 SENTINEL_TS_URL/SENTINEL_TS_TOKEN 由 server/.env 注入进程 env,RunPython 继承。
+// 头号腿行情不涉及(仍走 baostock)。凭证 SENTINEL_TS_URL/SENTINEL_TS_TOKEN 由 internal/datasource 注入进程 env
+//(真源=DB settings,管理员在「系统管理·数据源」维护;库中未配则回退 server/.env),RunPython 继承。
 // 脚本不存在或凭证缺失则内部跳过;失败只记日志+故障标记、继续用现有 parquet(失败隔离,不阻断策略)。
 func (s *Scheduler) refreshAlt(market string) {
 	if market != "cn" {
