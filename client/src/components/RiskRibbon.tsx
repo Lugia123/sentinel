@@ -56,11 +56,13 @@ export default function RiskRibbon({ market, range = 'ytd', rawData, onOpenDetai
     const thr = isCN ? data.map((d) => (d.breadth_ma ?? 0) * 100) : []
     const series: any[] = [{
       name: isCN ? '市场宽度' : 'SPY年化波动', type: 'line', data: main, showSymbol: false, smooth: true,
-      lineStyle: { color: '#e6c878', width: 2 }, areaStyle: { color: 'rgba(200,162,83,.10)' },
+      color: '#e6c878',   // 线 + 图例标记统一金色(只设 lineStyle 会让图例用默认调色板色 → 对不上)
+      lineStyle: { width: 2 }, areaStyle: { color: 'rgba(200,162,83,.10)' },
     }]
     if (isCN) series.push({
       name: '翻灯阈值(宽度MA)', type: 'line', data: thr, showSymbol: false, smooth: true,
-      lineStyle: { color: '#7ba7b0', width: 1.5, type: 'dashed' },
+      color: '#7ba7b0',   // 线 + 图例标记统一蓝
+      lineStyle: { width: 1.5, type: 'dashed' },
     })
     chart.setOption({
       backgroundColor: 'transparent',
